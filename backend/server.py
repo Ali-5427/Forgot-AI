@@ -94,6 +94,7 @@ class SavedItem(BaseModel):
     extracted_text: str = ""
     searchable_text: str = ""
     status: str = "processing"  # processing | ready | failed
+    pinned: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -117,6 +118,10 @@ class ItemUpdate(BaseModel):
 
 class SearchIn(BaseModel):
     query: str
+
+
+class PinIn(BaseModel):
+    pinned: bool
 
 
 class AskIn(BaseModel):
@@ -318,6 +323,15 @@ async def update_item(item_id: str, payload: ItemUpdate):
 async def delete_item(item_id: str):
     await db.items.delete_one({"id": item_id})
     return {"ok": True}
+
+
+@api_router.post("/items/{item_id}/pin", response_model=SavedItem)
+async def pin_item(item_id: str, payload: PinIn):
+    await db.items.update_one({"id": item_id}, {"$set": {"pinned": payload.pinned}})
+    doc = await db.items.find_one({"id": item_id})
+    if not doc:
+        raise HTTPException(404, "Not found")
+    return clean(doc)
 
 
 @api_router.post("/items/{item_id}/retry", response_model=SavedItem)

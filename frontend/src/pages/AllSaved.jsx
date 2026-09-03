@@ -1,33 +1,97 @@
-import { Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ItemCard } from "@/components/ItemCard";
 import { useItems } from "@/lib/useItems";
 import { useStore } from "@/store";
 
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
 export default function AllSaved() {
-  const { refreshKey, openSave, openItem } = useStore();
+  const { refreshKey, openSave, openItem, togglePin } = useStore();
   const { items, loading } = useItems(refreshKey);
+  const [timeFilter, setTimeFilter] = useState("all"); // all | week
+  const [category, setCategory] = useState("all");
+
+  // Smart Collections: auto-group by AI category
+  const collections = useMemo(() => {
+    const counts = {};
+    items.forEach((i) => {
+      if (i.status === "ready" && i.category) counts[i.category] = (counts[i.category] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    const now = Date.now();
+    return items.filter((i) => {
+      if (timeFilter === "week" && now - new Date(i.created_at).getTime() > WEEK_MS) return false;
+      if (category !== "all" && i.category !== category) return false;
+      return true;
+    });
+  }, [items, timeFilter, category]);
+
+  const chip = (active) =>
+    `text-xs rounded-full px-3 py-1.5 border transition-colors ${
+      active ? "bg-neutral-900 text-white border-neutral-900" : "border-border text-muted-foreground hover:bg-neutral-100"
+    }`;
 
   return (
     <div className="max-w-5xl mx-auto px-8 py-12">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">All Saved</h1>
-          <p className="text-sm text-muted-foreground mt-1">{items.length} item{items.length !== 1 ? "s" : ""} in your memory</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {filtered.length} of {items.length} item{items.length !== 1 ? "s" : ""}
+          </p>
         </div>
         <Button onClick={openSave} data-testid="allsaved-save-btn">
           <Plus className="h-4 w-4 mr-1.5" /> Save
         </Button>
       </div>
 
+      {/* Time filter */}
+      <div className="flex items-center gap-2 mb-4">
+        <button className={chip(timeFilter === "all")} onClick={() => setTimeFilter("all")} data-testid="filter-all-time">
+          All time
+        </button>
+        <button className={chip(timeFilter === "week")} onClick={() => setTimeFilter("week")} data-testid="filter-this-week">
+          This week
+        </button>
+      </div>
+
+      {/* Smart Collections */}
+      {collections.length > 0 && (
+        <div className="mb-6">
+          <p className="mono-label text-[10px] text-muted-foreground mb-2 flex items-center gap-1.5">
+            <Layers className="h-3 w-3" /> Smart Collections
+          </p>
+          <div className="flex flex-wrap gap-2" data-testid="collections">
+            <button className={chip(category === "all")} onClick={() => setCategory("all")} data-testid="collection-all">
+              All
+            </button>
+            {collections.map(([cat, count]) => (
+              <button
+                key={cat}
+                className={chip(category === cat)}
+                onClick={() => setCategory(cat)}
+                data-testid={`collection-${cat}`}
+              >
+                {cat} <span className="opacity-60">· {count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing saved yet.</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No items match this filter.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((item) => (
-            <ItemCard key={item.id} item={item} onClick={openItem} />
+          {filtered.map((item) => (
+            <ItemCard key={item.id} item={item} onClick={openItem} onPin={togglePin} />
           ))}
         </div>
       )}

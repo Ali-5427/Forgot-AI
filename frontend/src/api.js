@@ -15,6 +15,7 @@ export const api = {
   updateItem: (id, payload) => axios.put(`${API}/items/${id}`, payload).then((r) => r.data),
   deleteItem: (id) => axios.delete(`${API}/items/${id}`).then((r) => r.data),
   retryItem: (id) => axios.post(`${API}/items/${id}/retry`).then((r) => r.data),
+  pinItem: (id, pinned) => axios.post(`${API}/items/${id}/pin`, { pinned }).then((r) => r.data),
   ask: (id, question) => axios.post(`${API}/items/${id}/ask`, { question }).then((r) => r.data),
   search: (query) => axios.post(`${API}/search`, { query }).then((r) => r.data),
 };

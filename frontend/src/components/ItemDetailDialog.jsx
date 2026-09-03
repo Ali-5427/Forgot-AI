@@ -12,7 +12,7 @@ import { api, fileUrl } from "@/api";
 import { typeMeta, timeAgo } from "@/lib/format";
 import { toast } from "sonner";
 import {
-  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check,
+  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin,
 } from "lucide-react";
 
 const QUICK = ["What is this?", "Why did I save this?", "Explain this simply.", "Key points?", "How can I use this?"];
@@ -104,6 +104,20 @@ export const ItemDetailDialog = ({ itemId, open, onOpenChange, onChanged }) => {
               <Icon className="h-3 w-3" /> {label} · {timeAgo(item.created_at)}
             </span>
             <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  const r = await api.pinItem(item.id, !item.pinned);
+                  setItem(r);
+                  toast.success(item.pinned ? "Unpinned" : "Pinned to top");
+                  onChanged && onChanged();
+                }}
+                data-testid="pin-item-btn"
+                title={item.pinned ? "Unpin" : "Pin to top"}
+              >
+                <Pin className={`h-3.5 w-3.5 ${item.pinned ? "fill-neutral-900" : ""}`} />
+              </Button>
               {!editing && (
                 <Button variant="ghost" size="sm" onClick={startEdit} data-testid="edit-item-btn">
                   <Pencil className="h-3.5 w-3.5" />

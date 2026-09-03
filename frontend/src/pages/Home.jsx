@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, Brain } from "lucide-react";
+import { Search, Plus, Brain, Pin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ItemCard } from "@/components/ItemCard";
 import { useItems } from "@/lib/useItems";
 import { useStore } from "@/store";
 
 export default function Home() {
-  const { refreshKey, openSave, openItem } = useStore();
+  const { refreshKey, openSave, openItem, togglePin } = useStore();
   const { items, loading } = useItems(refreshKey);
   const [q, setQ] = useState("");
   const navigate = useNavigate();
+
+  const pinned = items.filter((i) => i.pinned);
 
   const submit = (e) => {
     e.preventDefault();
@@ -38,6 +40,19 @@ export default function Home() {
         </Button>
       </form>
 
+      {pinned.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+            <Pin className="h-4 w-4 fill-neutral-900" /> Pinned
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="pinned-grid">
+            {pinned.map((item) => (
+              <ItemCard key={item.id} item={item} onClick={openItem} onPin={togglePin} />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mt-12 mb-4">
         <h2 className="text-lg font-semibold">Recent saves</h2>
         <Button variant="outline" size="sm" onClick={openSave} data-testid="home-save-btn">
@@ -63,7 +78,7 @@ export default function Home() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.slice(0, 9).map((item) => (
-            <ItemCard key={item.id} item={item} onClick={openItem} />
+            <ItemCard key={item.id} item={item} onClick={openItem} onPin={togglePin} />
           ))}
         </div>
       )}
