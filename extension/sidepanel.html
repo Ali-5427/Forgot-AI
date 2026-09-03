@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="sidepanel.css" />
+    <title>Forgot AI</title>
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <div class="logo">F</div>
+        <span>Forgot AI</span>
+      </div>
+    </header>
+
+    <div class="searchbox">
+      <input id="search" type="text" placeholder="Search your memory…" />
+    </div>
+
+    <div class="actions">
+      <button class="action" id="save-page">＋ Save this page</button>
+      <button class="action" id="save-selection">＋ Save selected text</button>
+      <button class="action" id="save-screenshot">＋ Save screenshot</button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <div class="section-title" id="list-title">Recent saves</div>
+    <div id="list" class="list"></div>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
