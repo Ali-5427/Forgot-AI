@@ -1,4 +1,4 @@
-import { API } from "./config.js";
+import { API, libHeaders } from "./config.js";
 
 // Open the side panel when the toolbar icon is clicked.
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
@@ -16,7 +16,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "forgot-save-selection" && info.selectionText) {
     await fetch(`${API}/items/text`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await libHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         text: info.selectionText,
         source_url: tab?.url,

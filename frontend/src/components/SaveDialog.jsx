@@ -1,25 +1,27 @@
 import { useState, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { api } from "@/api";
 import { toast } from "sonner";
-import { Loader2, Upload, FileText, Link2, Image as ImageIcon } from "lucide-react";
+import { Loader2, Upload, FileText, Link2, Image as ImageIcon, AlertCircle } from "lucide-react";
 
-export const SaveDialog = ({ open, onOpenChange, onSaved }) => {
+export const SaveDialog = ({ open, onOpenChange, onSaved, onOpenExisting }) => {
   const [tab, setTab] = useState("text");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [dup, setDup] = useState(null); // existing item detected
   const fileRef = useRef(null);
 
   const reset = () => {
     setText("");
     setUrl("");
     setFile(null);
+    setDup(null);
   };
 
   const done = (item) => {
@@ -29,21 +31,34 @@ export const SaveDialog = ({ open, onOpenChange, onSaved }) => {
     onSaved && onSaved(item);
   };
 
+  const persist = async () => {
+    if (tab === "text") return done(await api.saveText({ text }));
+    if (tab === "url") return done(await api.saveUrl({ url }));
+    const fd = new FormData();
+    fd.append("file", file);
+    return done(await api.saveImage(fd));
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
-      if (tab === "text") {
-        if (!text.trim()) return toast.error("Enter some text");
-        done(await api.saveText({ text }));
-      } else if (tab === "url") {
-        if (!url.trim()) return toast.error("Enter a URL");
-        done(await api.saveUrl({ url }));
-      } else {
-        if (!file) return toast.error("Choose an image");
-        const fd = new FormData();
-        fd.append("file", file);
-        done(await api.saveImage(fd));
+      setDup(null);
+      // validate
+      if (tab === "text" && !text.trim()) return toast.error("Enter some text");
+      if (tab === "url" && !url.trim()) return toast.error("Enter a URL");
+      if (tab === "image" && !file) return toast.error("Choose an image");
+
+      // duplicate awareness
+      let check = { duplicate: false };
+      if (tab === "text") check = await api.check({ content_type: "text", text });
+      else if (tab === "url") check = await api.check({ content_type: "url", url });
+      else if (tab === "image") check = await api.checkFile(file);
+
+      if (check.duplicate) {
+        setDup(check.item);
+        return;
       }
+      await persist();
     } catch (e) {
       toast.error("Could not save", { description: e?.response?.data?.detail || "Try again" });
     } finally {
@@ -51,14 +66,24 @@ export const SaveDialog = ({ open, onOpenChange, onSaved }) => {
     }
   };
 
+  const saveAnyway = async () => {
+    try {
+      setSaving(true);
+      await persist();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
       <DialogContent className="max-w-lg" data-testid="save-dialog">
         <DialogHeader>
           <DialogTitle>Save to Forgot AI</DialogTitle>
+          <DialogDescription className="sr-only">Save text, a URL, or an image to your memory</DialogDescription>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={setTab}>
+        <Tabs value={tab} onValueChange={(v) => { setTab(v); setDup(null); }}>
           <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="text" data-testid="save-tab-text">
               <FileText className="h-3.5 w-3.5 mr-1.5" /> Text
@@ -114,15 +139,37 @@ export const SaveDialog = ({ open, onOpenChange, onSaved }) => {
           </TabsContent>
         </Tabs>
 
-        <Button onClick={handleSave} disabled={saving} data-testid="save-submit-btn" className="w-full">
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving…
-            </>
-          ) : (
-            "Save"
-          )}
-        </Button>
+        {dup ? (
+          <div className="border border-amber-200 bg-amber-50 rounded-lg p-3" data-testid="duplicate-notice">
+            <p className="text-sm text-amber-900 flex items-center gap-2 font-medium">
+              <AlertCircle className="h-4 w-4" /> Looks like you already saved this
+            </p>
+            <p className="text-xs text-amber-800 mt-1 truncate">{dup.title}</p>
+            <div className="flex gap-2 mt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="open-existing-btn"
+                onClick={() => { const it = dup; reset(); onOpenChange(false); onOpenExisting && onOpenExisting(it.id); }}
+              >
+                Open existing
+              </Button>
+              <Button size="sm" onClick={saveAnyway} disabled={saving} data-testid="save-anyway-btn">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save anyway"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button onClick={handleSave} disabled={saving} data-testid="save-submit-btn" className="w-full">
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving…
+              </>
+            ) : (
+              "Save"
+            )}
+          </Button>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -9,16 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api, fileUrl } from "@/api";
+import { useStore } from "@/store";
 import { typeMeta, timeAgo } from "@/lib/format";
 import { toast } from "sonner";
 import {
-  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin,
+  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon,
 } from "lucide-react";
 
 const QUICK = ["What is this?", "Why did I save this?", "Explain this simply.", "Key points?", "How can I use this?"];
 
 export const ItemDetailDialog = ({ itemId, open, onOpenChange, onChanged }) => {
+  const { openItem } = useStore();
   const [item, setItem] = useState(null);
+  const [related, setRelated] = useState([]);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [question, setQuestion] = useState("");
@@ -30,7 +33,9 @@ export const ItemDetailDialog = ({ itemId, open, onOpenChange, onChanged }) => {
       setEditing(false);
       setAnswer("");
       setQuestion("");
+      setRelated([]);
       api.getItem(itemId).then(setItem);
+      api.related(itemId).then(setRelated).catch(() => setRelated([]));
     }
   }, [open, itemId]);
 
@@ -277,6 +282,32 @@ export const ItemDetailDialog = ({ itemId, open, onOpenChange, onChanged }) => {
                   {asking ? <span className="text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Thinking…</span> : answer}
                 </div>
               )}
+            </section>
+          )}
+
+          {/* Related memories */}
+          {!editing && related.length > 0 && (
+            <section className="border-t border-border pt-4" data-testid="related-section">
+              <p className="text-sm font-semibold flex items-center gap-1.5 mb-3">
+                <LinkIcon className="h-4 w-4 text-neutral-600" /> Related memories
+              </p>
+              <div className="space-y-2">
+                {related.map((r) => {
+                  const rt = typeMeta(r.content_type);
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => openItem(r.id)}
+                      data-testid={`related-${r.id}`}
+                      className="w-full text-left border border-border rounded-lg p-2.5 hover:border-neutral-400 transition-colors flex items-center gap-2"
+                    >
+                      <rt.Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-sm truncate flex-1">{r.title}</span>
+                      <span className="text-[10px] text-muted-foreground shrink-0">{r.category}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </section>
           )}
         </div>

@@ -27,7 +27,7 @@ function GlobalDialogs() {
 
   return (
     <>
-      <SaveDialog open={saveOpen} onOpenChange={setSaveOpen} onSaved={() => bumpRefresh()} />
+      <SaveDialog open={saveOpen} onOpenChange={setSaveOpen} onSaved={() => bumpRefresh()} onOpenExisting={(id) => openItem(id)} />
       <ItemDetailDialog
         itemId={detailId}
         open={detailOpen}

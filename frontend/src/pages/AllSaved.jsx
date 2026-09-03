@@ -6,14 +6,21 @@ import { useItems } from "@/lib/useItems";
 import { useStore } from "@/store";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const TYPES = [
+  { id: "all", label: "All" },
+  { id: "image", label: "Images" },
+  { id: "text", label: "Text" },
+  { id: "url", label: "Links" },
+];
 
 export default function AllSaved() {
   const { refreshKey, openSave, openItem, togglePin } = useStore();
   const { items, loading } = useItems(refreshKey);
-  const [timeFilter, setTimeFilter] = useState("all"); // all | week
+  const [type, setType] = useState("all");
+  const [recent, setRecent] = useState(false);
+  const [sort, setSort] = useState("newest");
   const [category, setCategory] = useState("all");
 
-  // Smart Collections: auto-group by AI category
   const collections = useMemo(() => {
     const counts = {};
     items.forEach((i) => {
@@ -24,12 +31,19 @@ export default function AllSaved() {
 
   const filtered = useMemo(() => {
     const now = Date.now();
-    return items.filter((i) => {
-      if (timeFilter === "week" && now - new Date(i.created_at).getTime() > WEEK_MS) return false;
+    let list = items.filter((i) => {
+      if (type !== "all" && i.content_type !== type) return false;
+      if (recent && now - new Date(i.created_at).getTime() > WEEK_MS) return false;
       if (category !== "all" && i.category !== category) return false;
       return true;
     });
-  }, [items, timeFilter, category]);
+    list = [...list].sort((a, b) => {
+      const da = new Date(a.created_at).getTime();
+      const db = new Date(b.created_at).getTime();
+      return sort === "newest" ? db - da : da - db;
+    });
+    return list;
+  }, [items, type, recent, category, sort]);
 
   const chip = (active) =>
     `text-xs rounded-full px-3 py-1.5 border transition-colors ${
@@ -50,14 +64,28 @@ export default function AllSaved() {
         </Button>
       </div>
 
-      {/* Time filter */}
-      <div className="flex items-center gap-2 mb-4">
-        <button className={chip(timeFilter === "all")} onClick={() => setTimeFilter("all")} data-testid="filter-all-time">
-          All time
+      {/* Type filter + recent + sort */}
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        {TYPES.map((t) => (
+          <button key={t.id} className={chip(type === t.id)} onClick={() => setType(t.id)} data-testid={`filter-type-${t.id}`}>
+            {t.label}
+          </button>
+        ))}
+        <span className="mx-1 h-4 w-px bg-border" />
+        <button className={chip(recent)} onClick={() => setRecent((v) => !v)} data-testid="filter-recent">
+          Recently saved
         </button>
-        <button className={chip(timeFilter === "week")} onClick={() => setTimeFilter("week")} data-testid="filter-this-week">
-          This week
-        </button>
+        <div className="ml-auto">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            data-testid="sort-select"
+            className="text-xs border border-border rounded-md px-2 py-1.5 bg-white outline-none"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+        </div>
       </div>
 
       {/* Smart Collections */}
@@ -71,12 +99,7 @@ export default function AllSaved() {
               All
             </button>
             {collections.map(([cat, count]) => (
-              <button
-                key={cat}
-                className={chip(category === cat)}
-                onClick={() => setCategory(cat)}
-                data-testid={`collection-${cat}`}
-              >
+              <button key={cat} className={chip(category === cat)} onClick={() => setCategory(cat)} data-testid={`collection-${cat}`}>
                 {cat} <span className="opacity-60">· {count}</span>
               </button>
             ))}

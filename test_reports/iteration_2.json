@@ -1,0 +1,37 @@
+{
+  "summary": "Deep-upgrade testing complete for Forgot AI. Backend: 12/12 new pytest tests passed covering library isolation (list/get/pin/delete cross-library), duplicate awareness (text hash, URL normalization with trailing slash, image sha256), grounded chat (finds Zurich item, empty library returns 'couldn't find', cross-library leak-free), time-aware search ('idea I saved today' surfaces new item, irrelevant queries return empty), and related endpoint (returns up to 4, library-scoped, cross-lib=404). Frontend: home loads with auto-generated library id in localStorage; SaveDialog Text tab saves; saving the SAME text a second time triggers 'Looks like you already saved this' notice with open-existing-btn + save-anyway-btn (data-testid=duplicate-notice); Search page has mode-search/mode-ask toggle; Ask mode renders chat-answer container correctly (empty-library case rendered the 'couldn't find' grounded message via /api/chat); All Saved page has all type filters (all/image/text/url), filter-recent chip, sort-select, and Smart Collections; Settings page renders library-code matching localStorage id and copy button works. Cumulative: prior 14 + new 12 backend tests all passing.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global Dialogs (SaveDialog, ItemDetailDialog)", "issues": ["Radix warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent} - non-blocking accessibility warning still present from prior iteration"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_forgot_ai.py",
+    "/app/backend/tests/test_forgot_ai_deep.py",
+    "/app/test_reports/pytest/pytest_deep_results.xml"
+  ],
+  "action_items": [
+    "(a11y, optional) Add DialogDescription/aria-describedby to SaveDialog and ItemDetailDialog to silence Radix warnings.",
+    "(minor) DELETE /api/items/{id} returns {ok:true} even when the id belongs to another library (silent no-op). Consider returning 404 for stronger cross-library integrity signal — currently isolation still holds because the underlying document is not modified."
+  ],
+  "critical_code_review_comments": [
+    "rank_items() sends up to 300 catalog entries to Gemini for every /search AND /chat call — costs scale with library size. Consider pre-filter (keyword/domain hit) then LLM re-rank, or add embedding index.",
+    "chat() calls rank_items() then a second LLM completion — that's 2 LLM round trips per /chat request. Could combine ranking+answer into one prompt or reuse first response.",
+    "/items/check performs the dedup check but the actual /items/* endpoints do NOT enforce uniqueness — a client that skips /check can still create duplicates. Consider a unique compound index on (library_id, dedup_key) if strict dedup is desired.",
+    "related_items runs an in-memory scan of up to 300 docs; add MongoDB index on library_id+status for larger libraries.",
+    "server.py is 599 lines — nearing the 700 threshold; consider splitting AI/enrichment, storage, and route modules.",
+    "get_object/put_object are sync `requests` calls made from async route handlers (image save, file serve, enrichment) which will block the event loop — swap to httpx.AsyncClient or run in threadpool.",
+    "Frontend `getLibraryId()` is called synchronously on every axios request via interceptor — fine, but exposing the id in Settings without any protection means anyone with physical access to the browser can copy it (documented in UI, acceptable per design)."
+  ],
+  "updated_files": ["/app/backend/tests/test_forgot_ai_deep.py"],
+  "success_rate": {"backend": "100% (26/26 including prior tests)", "frontend": "100%"},
+  "test_credentials": "N/A - no auth by design",
+  "seed_data_creation": "Created ~15 test items across TESTLIB_A_* / TESTLIB_B_* libraries; cleaned up via fixture teardown. One TEST_UI_DUP text item was saved via UI under the browser-generated library and remains.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All backend routes are library-scoped via X-Library-Id header (default lib=\"default\" when absent). Enrichment ~15-25s Gemini — poll GET /api/items/{id} with the same X-Library-Id. Frontend library id is auto-generated in localStorage under key 'forgot_ai_library' — items saved via curl under a different library id are NOT visible in the UI. Use test_forgot_ai_deep.py::wait_ready helper. Pytest addopts pins -n 2 --dist loadscope; run with `-n 0` for serial when debugging.",
+  "rca of the issue": "N/A - all tests passing"
+}
