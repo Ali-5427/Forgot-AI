@@ -38,5 +38,5 @@ curl -s $API/items -H "Authorization: Bearer $TB"   # must be []
 
 ## Notes for the test agent
 - No cookies are used; always pass Authorization: Bearer.
-- Enrichment is async ~15-25s (Gemini); poll GET /api/items/{id} with the same Bearer until status=='ready'.
+- Enrichment is async ~15-25s; poll GET /api/items/{id} with the same Bearer until status=='ready'.
 - Test accounts are seeded at startup; see /app/memory/test_credentials.md.

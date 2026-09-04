@@ -18,7 +18,6 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 import jwt as pyjwt
 from auth import hash_password, verify_password, create_token, decode_token
 
@@ -32,8 +31,10 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
-AI_MODEL = ("gemini", "gemini-3.1-pro-preview")
+OLLAMA_API_KEY = os.environ.get('OLLAMA_API_KEY') or "846824d59d444705958669e23646d738.btM_3qGruYLaHdy5F0nxESJp"
+OLLAMA_BASE_URL = (os.environ.get('OLLAMA_BASE_URL') or "https://ollama.com/api/generate").rstrip('/')
+AI_MODEL = ("ollama", "qwen3-vl:235b-instruct")
+EMERGENT_LLM_KEY = OLLAMA_API_KEY
 
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
 STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
@@ -231,12 +232,37 @@ async def get_current_user(request: Request) -> dict:
 
 # ---------------- AI helpers ----------------
 async def llm_text(system: str, prompt: str, image_b64: Optional[str] = None) -> str:
-    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system).with_model(*AI_MODEL)
+    payload = {
+        "model": AI_MODEL[1],
+        "system": system,
+        "prompt": prompt,
+        "stream": False,
+        "format": "json",
+    }
     if image_b64:
-        msg = UserMessage(text=prompt, file_contents=[ImageContent(image_base64=image_b64)])
-    else:
-        msg = UserMessage(text=prompt)
-    return await chat.send_message(msg)
+        payload["images"] = [image_b64]
+
+    headers = {"Content-Type": "application/json"}
+    if OLLAMA_API_KEY:
+        headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
+        headers["X-API-Key"] = OLLAMA_API_KEY
+
+    response = requests.post(OLLAMA_BASE_URL, headers=headers, json=payload, timeout=180)
+    response.raise_for_status()
+    data = response.json()
+
+    if isinstance(data, dict):
+        if isinstance(data.get("response"), str):
+            return data["response"]
+        if isinstance(data.get("content"), str):
+            return data["content"]
+        if isinstance(data.get("message"), str):
+            return data["message"]
+        if isinstance(data.get("message"), dict):
+            content = data["message"].get("content")
+            if isinstance(content, str):
+                return content
+    return json.dumps(data)
 
 
 def parse_json_block(text: str) -> dict:

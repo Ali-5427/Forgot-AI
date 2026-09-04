@@ -5,7 +5,7 @@ A personal memory system: "Save anything now. Find it later." Save screenshots, 
 
 ## Architecture
 - **Backend**: FastAPI (`/app/backend/server.py`), MongoDB, routes under `/api`. Async enrichment via BackgroundTasks.
-- **AI**: Gemini 3.1 Pro (`gemini-3.1-pro-preview`) via `emergentintegrations` + `EMERGENT_LLM_KEY` — image OCR+meaning, text/URL understanding, time-aware multi-signal search ranking, grounded memory chat, per-item Q&A.
+- **AI**: qwen3-vl:235b-instruct via Ollama at `https://ollama.com/api/generate` with the configured API key — image OCR+meaning, text/URL understanding, time-aware multi-signal search ranking, grounded memory chat, per-item Q&A.
 - **Storage**: Emergent object storage for original images; served via `/api/files/{path}`.
 - **Frontend**: React (CRA), react-router, shadcn/ui, sonner. Minimal utility design (IBM Plex Sans/Mono).
 - **Extension**: Chrome MV3 side panel in `/app/extension` (load unpacked); zip at `/app/forgot-ai-extension.zip`.
@@ -29,7 +29,7 @@ Save (text/url/image) with async AI enrichment + failed/Retry state; natural-lan
 Verified end-to-end: 26/26 backend tests + all frontend flows, 100%.
 
 ## Backlog (P1/P2, deliberately deferred — not over-engineering)
-- P1: pre-filter + LLM re-rank or embedding index (search/chat send up to 300 items to Gemini); combine chat's 2 LLM calls into 1.
+- P1: pre-filter + LLM re-rank or embedding index (search/chat send up to 300 items to the model); combine chat's 2 LLM calls into 1.
 - P2: async httpx for storage calls (currently sync requests in async handlers); Mongo index on (library_id,status); unique compound index (library_id,dedup_key) if strict dedup wanted; real accounts layered on top of library_id later.
 
 ## Out of scope (by user direction)
