@@ -55,12 +55,16 @@ create index if not exists login_attempts_locked_idx on public.login_attempts (l
 alter table public.profiles enable row level security;
 alter table public.items enable row level security;
 alter table public.login_attempts enable row level security;
+alter table public.user_sessions enable row level security;
 
 drop policy if exists profiles_self on public.profiles;
 create policy profiles_self on public.profiles for all using (id = auth.uid()) with check (id = auth.uid());
 
 drop policy if exists items_owner on public.items;
 create policy items_owner on public.items for all using (owner_user_id = auth.uid()) with check (owner_user_id = auth.uid());
+
+drop policy if exists user_sessions_self on public.user_sessions;
+create policy user_sessions_self on public.user_sessions for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 insert into storage.buckets (id, name, public)
 values ('forgot-ai-assets', 'forgot-ai-assets', false)
