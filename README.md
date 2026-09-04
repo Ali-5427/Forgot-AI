@@ -34,7 +34,7 @@ The product is designed as a personal knowledge layer: save anything now, find i
 
 ### Backend
 - FastAPI server in [backend/server.py](backend/server.py)
-- MongoDB-backed storage and auth system
+- Supabase PostgreSQL, Supabase Auth, and private Supabase Storage
 - REST API routes under /api
 - AI enrichment runs asynchronously for saved items
 
@@ -63,12 +63,12 @@ This model powers:
 
 ## Tech stack
 
-- Python: FastAPI, Pydantic, Motor/MongoDB
+- Python: FastAPI, Pydantic, Supabase PostgreSQL
 - Frontend: React, CRA, React Router, shadcn-inspired UI components
 - Extension: Chrome MV3 side panel
 - AI: Ollama qwen3-vl:235b-instruct
-- Auth: JWT + bcrypt-based authentication flow
-- Storage: object storage for uploaded images/files
+- Auth: Supabase Auth email/password flow with Bearer sessions
+- Storage: private Supabase Storage bucket for uploaded images/files
 
 ## Repository structure
 
@@ -109,7 +109,7 @@ Forgot-AI/
 
 - Python 3.10+
 - Node.js 18+
-- MongoDB instance
+- Supabase project with the schema in [backend/supabase_schema.sql](backend/supabase_schema.sql) applied
 - Chrome browser for the extension
 - An Ollama API key with access to qwen3-vl:235b-instruct
 
@@ -125,11 +125,12 @@ pip install -r requirements.txt
 Create a .env file in the backend directory with values similar to:
 
 ```env
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=forgot_ai
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 OLLAMA_API_KEY=your_ollama_key_here
 OLLAMA_BASE_URL=https://ollama.com/api/generate
-INTEGRATION_PROXY_URL=https://integrations.emergentagent.com
+CORS_ORIGINS=http://localhost:3000
+STORAGE_BUCKET=forgot-ai-assets
 ```
 
 Start the API:
@@ -148,7 +149,7 @@ npm start
 
 The frontend will connect to the backend API, typically on localhost:8000.
 
-For AI configuration, the backend reads the Ollama key and endpoint from environment variables or falls back to the configured values in [backend/server.py](backend/server.py).
+The backend reads Supabase, Ollama, and CORS configuration from environment variables. Apply the Supabase schema before starting the API; privileged keys remain server-side.
 
 ### 3) Chrome extension setup
 

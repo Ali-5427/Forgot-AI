@@ -1,5 +1,5 @@
-// Set this to your Forgot AI backend URL (same as the web app).
-export const BACKEND_URL = "https://instant-recall-8.preview.emergentagent.com";
+// Set this to the backend URL used by the local or deployed environment.
+export const BACKEND_URL = "http://localhost:8000";
 export const API = BACKEND_URL + "/api";
 
 // Resolve the signed-in account token:

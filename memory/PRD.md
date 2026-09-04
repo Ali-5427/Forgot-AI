@@ -4,12 +4,12 @@
 A personal memory system: "Save anything now. Find it later." Save screenshots, text and URLs; AI understands and organizes each item automatically; retrieve later with natural language. Main web app + Chrome extension sidebar sharing one per-browser library.
 
 ## Architecture
-- **Backend**: FastAPI (`/app/backend/server.py`), MongoDB, routes under `/api`. Async enrichment via BackgroundTasks.
+- **Backend**: FastAPI (`/app/backend/server.py`), Supabase PostgreSQL, routes under `/api`. Async enrichment via BackgroundTasks.
 - **AI**: qwen3-vl:235b-instruct via Ollama at `https://ollama.com/api/generate` with the configured API key — image OCR+meaning, text/URL understanding, time-aware multi-signal search ranking, grounded memory chat, per-item Q&A.
-- **Storage**: Emergent object storage for original images; served via `/api/files/{path}`.
+- **Storage**: private Supabase Storage for original images; served via `/api/files/{path}`.
 - **Frontend**: React (CRA), react-router, shadcn/ui, sonner. Minimal utility design (IBM Plex Sans/Mono).
 - **Extension**: Chrome MV3 side panel in `/app/extension` (load unpacked); zip at `/app/forgot-ai-extension.zip`.
-- **Identity**: NO login. Per-browser anonymous library via `X-Library-Id` header (localStorage key `forgot_ai_library`). Extension auto-links by reading it from an open Forgot AI tab, or manual paste of the library code from Settings. Not secure auth (documented), acceptable for no-login MVP.
+- **Identity**: Supabase Auth email/password accounts with Bearer access tokens. Anonymous pre-signup libraries remain available through `X-Library-Id` and can be imported into an account.
 
 ## Data model (SavedItem)
 id, library_id, content_type (image|text|url), original_text, source_url, source_title, source_domain, image_path, title, summary, keywords[], category, extracted_text, searchable_text, dedup_key, status (processing|ready|failed), pinned, created_at. Original content always preserved.
@@ -30,10 +30,10 @@ Verified end-to-end: 26/26 backend tests + all frontend flows, 100%.
 
 ## Backlog (P1/P2, deliberately deferred — not over-engineering)
 - P1: pre-filter + LLM re-rank or embedding index (search/chat send up to 300 items to the model); combine chat's 2 LLM calls into 1.
-- P2: async httpx for storage calls (currently sync requests in async handlers); Mongo index on (library_id,status); unique compound index (library_id,dedup_key) if strict dedup wanted; real accounts layered on top of library_id later.
+- P2: async httpx for URL and Ollama calls; stronger server-side deduplication and signed short-lived file URLs.
 
 ## Out of scope (by user direction)
-Login/signup, passwords, billing, teams, marketing pages, advanced settings.
+Billing, teams, marketing pages, advanced settings, and Mongo-to-Supabase data backfill.
 
 ### 2026-09-04 — Login & multi-user release
 - Email/password accounts with JWT **Bearer** tokens (no cookies; works for web + extension). `auth.py` (bcrypt hashing, token create/decode); `token_version` on each user so logout invalidates all outstanding tokens on every surface.

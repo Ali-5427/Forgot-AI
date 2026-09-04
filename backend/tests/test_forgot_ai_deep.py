@@ -8,7 +8,7 @@ import pytest
 import requests
 from PIL import Image, ImageDraw
 
-BASE_URL = (os.environ.get('REACT_APP_BACKEND_URL') or open('/app/frontend/.env').read().split('REACT_APP_BACKEND_URL=')[1].split('\n')[0].strip()).rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:8000').rstrip('/')
 API = f"{BASE_URL}/api"
 
 LIB_A = f"TESTLIB_A_{uuid.uuid4().hex[:8]}"

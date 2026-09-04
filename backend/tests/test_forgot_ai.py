@@ -7,7 +7,7 @@ import pytest
 import requests
 from PIL import Image, ImageDraw, ImageFont
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://instant-recall-8.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:8000').rstrip('/')
 API = f"{BASE_URL}/api"
 POLL_TIMEOUT = 60  # seconds for enrichment
 POLL_INTERVAL = 3

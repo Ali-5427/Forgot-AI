@@ -7,8 +7,7 @@ import pytest
 import requests
 from PIL import Image, ImageDraw
 
-BASE_URL = (os.environ.get('REACT_APP_BACKEND_URL')
-            or open('/app/frontend/.env').read().split('REACT_APP_BACKEND_URL=')[1].splitlines()[0]).rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:8000').rstrip('/')
 API = f"{BASE_URL}/api"
 
 USER_A = {"email": "usera@forgot.ai", "password": "TestPassA123"}

@@ -15,11 +15,8 @@ from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, B
 from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
-
-import jwt as pyjwt
-from auth import hash_password, verify_password, create_token, decode_token
+from supabase_db import SupabaseDatabase, create_supabase_client
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -27,19 +24,14 @@ load_dotenv(ROOT_DIR / '.env')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+supabase = create_supabase_client()
+db = SupabaseDatabase(supabase)
 
-OLLAMA_API_KEY = os.environ.get('OLLAMA_API_KEY') or "846824d59d444705958669e23646d738.btM_3qGruYLaHdy5F0nxESJp"
+OLLAMA_API_KEY = os.environ.get('OLLAMA_API_KEY', '').strip()
 OLLAMA_BASE_URL = (os.environ.get('OLLAMA_BASE_URL') or "https://ollama.com/api/generate").rstrip('/')
 AI_MODEL = ("ollama", "qwen3-vl:235b-instruct")
-EMERGENT_LLM_KEY = OLLAMA_API_KEY
-
-STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
-STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
 APP_NAME = "forgot-ai"
-storage_key = None
+STORAGE_BUCKET = os.environ.get("STORAGE_BUCKET", "forgot-ai-assets")
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -49,39 +41,18 @@ MAX_FAILED = 5
 LOCKOUT_MIN = 15
 
 
-# ---------------- Storage helpers ----------------
-def init_storage(force: bool = False):
-    global storage_key
-    if storage_key and not force:
-        return storage_key
-    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_LLM_KEY}, timeout=30)
-    resp.raise_for_status()
-    storage_key = resp.json()["storage_key"]
-    return storage_key
-
-
 def put_object(path: str, data: bytes, content_type: str) -> dict:
-    key = init_storage()
-    resp = requests.put(f"{STORAGE_URL}/objects/{path}",
-                        headers={"X-Storage-Key": key, "Content-Type": content_type},
-                        data=data, timeout=120)
-    if resp.status_code == 404:
-        key = init_storage(force=True)
-        resp = requests.put(f"{STORAGE_URL}/objects/{path}",
-                            headers={"X-Storage-Key": key, "Content-Type": content_type},
-                            data=data, timeout=120)
-    resp.raise_for_status()
-    return resp.json()
+    supabase.storage.from_(STORAGE_BUCKET).upload(
+        path, data, {"content-type": content_type, "upsert": "false"}
+    )
+    return {"path": path}
 
 
 def get_object(path: str):
-    key = init_storage()
-    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
-    if resp.status_code == 404:
-        key = init_storage(force=True)
-        resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
-    resp.raise_for_status()
-    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+    data = supabase.storage.from_(STORAGE_BUCKET).download(path)
+    extension = path.rsplit(".", 1)[-1].lower() if "." in path else "octet-stream"
+    content_types = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
+    return data, content_types.get(extension, "application/octet-stream")
 
 
 # ---------------- Dedup / helpers ----------------
@@ -198,15 +169,10 @@ def _bearer(request: Request) -> Optional[str]:
 
 async def _user_from_token(token: str) -> Optional[dict]:
     try:
-        p = decode_token(token)
+        auth_user = supabase.auth.get_user(token).user
     except Exception:
         return None
-    if p.get("type") != "access":
-        return None
-    u = await db.users.find_one({"id": p.get("sub")})
-    if not u or u.get("token_version", 0) != p.get("tv"):
-        return None
-    return u
+    return await db.users.find_one({"id": str(auth_user.id)})
 
 
 async def resolve_library(request: Request) -> str:
@@ -437,7 +403,10 @@ async def import_library(source_lib: str, user_id: str) -> int:
         return 0
     if await db.users.find_one({"id": source_lib}):
         return 0
-    res = await db.items.update_many({"library_id": source_lib}, {"$set": {"library_id": user_id}})
+    res = await db.items.update_many(
+        {"library_id": source_lib},
+        {"$set": {"library_id": user_id, "owner_user_id": user_id}},
+    )
     return res.modified_count
 
 
@@ -456,12 +425,21 @@ async def register(payload: AuthIn, request: Request):
     email = payload.email.lower().strip()
     if len(payload.password) < 6:
         raise HTTPException(400, "Password must be at least 6 characters")
-    if await db.users.find_one({"email": email}):
-        raise HTTPException(400, "An account with this email already exists")
+    try:
+        created = supabase.auth.admin.create_user({
+            "email": email,
+            "password": payload.password,
+            "email_confirm": True,
+            "user_metadata": {"name": email.split("@")[0]},
+        })
+        auth_user = created.user
+    except Exception as e:
+        if "already" in str(e).lower() or "duplicate" in str(e).lower():
+            raise HTTPException(400, "An account with this email already exists")
+        raise HTTPException(400, "Unable to create account") from e
     user = {
-        "id": str(uuid.uuid4()),
+        "id": str(auth_user.id),
         "email": email,
-        "password_hash": hash_password(payload.password),
         "name": email.split("@")[0],
         "token_version": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -470,8 +448,8 @@ async def register(payload: AuthIn, request: Request):
     # auto-import this browser's anonymous memories
     anon = (request.headers.get("X-Library-Id") or "").strip()
     imported = await import_library(anon, user["id"])
-    token = create_token(user["id"], 0)
-    return {"token": token, "user": public_user(user), "imported": imported}
+    session = supabase.auth.sign_in_with_password({"email": email, "password": payload.password})
+    return {"token": session.session.access_token, "user": public_user(user), "imported": imported}
 
 
 @api_router.post("/auth/login")
@@ -484,8 +462,10 @@ async def login(payload: AuthIn, request: Request):
         locked_until = datetime.fromisoformat(att["locked_until"]) if att.get("locked_until") else None
         if locked_until and locked_until > datetime.now(timezone.utc):
             raise HTTPException(429, "Too many attempts. Try again in a few minutes.")
-    user = await db.users.find_one({"email": email})
-    if not user or not verify_password(payload.password, user["password_hash"]):
+    try:
+        session = supabase.auth.sign_in_with_password({"email": email, "password": payload.password})
+        auth_user = session.user
+    except Exception:
         count = (att.get("count", 0) if att else 0) + 1
         await db.login_attempts.update_one(
             {"identifier": ident},
@@ -494,10 +474,19 @@ async def login(payload: AuthIn, request: Request):
         )
         raise HTTPException(401, "Invalid email or password")
     await db.login_attempts.delete_one({"identifier": ident})
-    token = create_token(user["id"], user.get("token_version", 0))
+    user = await db.users.find_one({"id": str(auth_user.id)})
+    if not user:
+        user = {
+            "id": str(auth_user.id),
+            "email": email,
+            "name": (auth_user.user_metadata or {}).get("name", email.split("@")[0]),
+            "token_version": 0,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.users.insert_one(user)
     anon = (request.headers.get("X-Library-Id") or "").strip()
     count = await importable_count(anon)
-    return {"token": token, "user": public_user(user), "importable_count": count}
+    return {"token": session.session.access_token, "user": public_user(user), "importable_count": count}
 
 
 @api_router.get("/auth/me")
@@ -507,7 +496,6 @@ async def me(user: dict = Depends(get_current_user)):
 
 @api_router.post("/auth/logout")
 async def logout(user: dict = Depends(get_current_user)):
-    await db.users.update_one({"id": user["id"]}, {"$inc": {"token_version": 1}})
     return {"ok": True}
 
 
@@ -548,7 +536,9 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str =
                      source_url=payload.source_url, source_title=payload.source_title,
                      source_domain=domain_of(payload.source_url) if payload.source_url else None,
                      dedup_key=text_hash(payload.text), title=payload.text.strip()[:60])
-    await db.items.insert_one(item.model_dump())
+    values = item.model_dump()
+    values["owner_user_id"] = lib if await db.users.find_one({"id": lib}) else None
+    await db.items.insert_one(values)
     background.add_task(enrich_item, item.id)
     return item
 
@@ -563,7 +553,9 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
     item = SavedItem(library_id=lib, content_type="url", source_url=url,
                      original_text=payload.context_text, source_title=payload.source_title,
                      source_domain=domain_of(url), dedup_key=normalize_url(url), title=url[:60])
-    await db.items.insert_one(item.model_dump())
+    values = item.model_dump()
+    values["owner_user_id"] = lib if await db.users.find_one({"id": lib}) else None
+    await db.items.insert_one(values)
     background.add_task(enrich_item, item.id)
     return item
 
@@ -591,7 +583,9 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
                      source_domain=domain_of(source_url) if source_url else None,
                      dedup_key="img:" + hashlib.sha256(data).hexdigest(),
                      title=(file.filename or "Screenshot")[:60])
-    await db.items.insert_one(item.model_dump())
+    values = item.model_dump()
+    values["owner_user_id"] = lib if await db.users.find_one({"id": lib}) else None
+    await db.items.insert_one(values)
     background.add_task(enrich_item, item.id)
     return item
 
@@ -755,38 +749,8 @@ app.add_middleware(
 )
 
 
-async def seed_test_users():
-    seeds = [
-        {"email": "usera@forgot.ai", "password": "TestPassA123", "name": "User A"},
-        {"email": "userb@forgot.ai", "password": "TestPassB123", "name": "User B"},
-    ]
-    for s in seeds:
-        existing = await db.users.find_one({"email": s["email"]})
-        if not existing:
-            await db.users.insert_one({
-                "id": str(uuid.uuid4()), "email": s["email"], "password_hash": hash_password(s["password"]),
-                "name": s["name"], "token_version": 0, "created_at": datetime.now(timezone.utc).isoformat(),
-            })
-
-
 @app.on_event("startup")
 async def startup():
-    try:
-        init_storage()
-        logger.info("Storage initialized")
-    except Exception as e:
-        logger.error(f"Storage init failed: {e}")
-    try:
-        await db.users.create_index("email", unique=True)
-        await db.users.create_index("id", unique=True)
-        await db.items.create_index([("library_id", 1), ("status", 1)])
-        await db.login_attempts.create_index("identifier")
-        await seed_test_users()
-        logger.info("Auth setup complete")
-    except Exception as e:
-        logger.error(f"Auth setup failed: {e}")
+    logger.info("Supabase database and storage configured")
 
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()

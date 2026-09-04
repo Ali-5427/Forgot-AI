@@ -15,7 +15,7 @@ The extension uses your Forgot AI account:
 - Click the account line in the header to sign out. Logging out on the website also ends the extension's session.
 
 ## Configure
-The backend URL lives in `config.js` (already set to the current Forgot AI backend). Update `BACKEND_URL` if you deploy elsewhere.
+The backend URL lives in `config.js` and defaults to `http://localhost:8000` for local development. Update `BACKEND_URL` before loading the extension against a deployed API.
 
 ## Features
 - **Search your memory** — type a query and press Enter (semantic search)
