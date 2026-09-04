@@ -870,8 +870,10 @@ async def root():
 # ---------------- App wiring ----------------
 app.include_router(api_router)
 
-raw_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000').split(',')
-origins = [o.strip() for o in raw_origins if o.strip()]
+# Fallback includes both local dev and the live Vercel URL
+default_origins = 'http://localhost:3000,https://forgot-ai.vercel.app'
+raw_origins = os.environ.get('CORS_ORIGINS', default_origins).split(',')
+origins = [o.strip().strip("'").strip('"') for o in raw_origins if o.strip()]
 allow_all = "*" in origins
 
 app.add_middleware(
