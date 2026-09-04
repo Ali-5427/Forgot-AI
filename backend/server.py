@@ -862,6 +862,11 @@ async def download_file(path: str, request: Request, token: Optional[str] = Quer
     return Response(content=data, media_type=content_type)
 
 
+# ---------------- Health check ----------------
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "Forgot AI API", "message": "Backend is running!"}
+
 # ---------------- App wiring ----------------
 app.include_router(api_router)
 
