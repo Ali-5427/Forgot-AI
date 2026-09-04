@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Fallback to local host if env var is missing during build, or empty string (relative)
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://forgot-ai.onrender.com";
 export const API = `${BACKEND_URL}/api`;
 
 const LIB_KEY = "forgot_ai_library";
