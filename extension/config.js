@@ -1,5 +1,5 @@
 // Set this to the backend URL used by the deployed environment.
-export const BACKEND_URL = (typeof process !== "undefined" && process.env?.REACT_APP_BACKEND_URL) || "https://instant-recall-8.preview.emergentagent.com";
+export const BACKEND_URL = (typeof process !== "undefined" && process.env?.REACT_APP_BACKEND_URL) || "https://forgot-ai.onrender.com";
 export const API = BACKEND_URL.replace(/\/+$/, "") + "/api";
 
 // Resolve the signed-in account token:
@@ -9,7 +9,8 @@ export async function getToken() {
   const { token } = await chrome.storage.local.get("token");
   if (token) return token;
   try {
-    const tabs = await chrome.tabs.query({ url: BACKEND_URL + "/*" });
+    const FRONTEND_URL = "https://forgot-ai.vercel.app";
+    const tabs = await chrome.tabs.query({ url: FRONTEND_URL + "/*" });
     for (const t of tabs) {
       const [{ result }] = await chrome.scripting.executeScript({
         target: { tabId: t.id },
