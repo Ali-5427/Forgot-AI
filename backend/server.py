@@ -5,10 +5,13 @@ import logging
 import base64
 import re
 import hashlib
+import socket
+import ipaddress
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 from typing import List, Optional, Annotated
+from collections import defaultdict
 
 import requests
 from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Query, Request, Depends
@@ -41,6 +44,22 @@ MAX_FAILED = 5
 LOCKOUT_MIN = 15
 
 
+class SimpleRateLimiter:
+    def __init__(self):
+        self.requests = defaultdict(list)
+
+    def check(self, key: str, max_requests: int, window_seconds: int = 60):
+        now = datetime.now(timezone.utc).timestamp()
+        timestamps = [t for t in self.requests[key] if now - t < window_seconds]
+        if len(timestamps) >= max_requests:
+            raise HTTPException(429, "Too many requests. Please slow down.")
+        timestamps.append(now)
+        self.requests[key] = timestamps
+
+
+limiter = SimpleRateLimiter()
+
+
 def put_object(path: str, data: bytes, content_type: str) -> dict:
     supabase.storage.from_(STORAGE_BUCKET).upload(
         path, data, {"content-type": content_type, "upsert": "false"}
@@ -53,6 +72,42 @@ def get_object(path: str):
     extension = path.rsplit(".", 1)[-1].lower() if "." in path else "octet-stream"
     content_types = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
     return data, content_types.get(extension, "application/octet-stream")
+
+
+def is_safe_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme.lower() not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        if hostname.lower() in ("localhost", "loopback", "metadata.google.internal"):
+            return False
+        addr_info = socket.getaddrinfo(hostname, None)
+        for family, socktype, proto, canonname, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            ip = ipaddress.ip_address(ip_str)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+                return False
+            if str(ip) in ("169.254.169.254", "169.254.169.253"):
+                return False
+        return True
+    except Exception as e:
+        logger.warning(f"URL safety check failed for {url}: {e}")
+        return False
+
+
+def validate_image_bytes(data: bytes) -> str:
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return "gif"
+    if data.startswith(b"RIFF") and len(data) >= 12 and data[8:12] == b"WEBP":
+        return "webp"
+    raise HTTPException(400, "Invalid image format")
 
 
 # ---------------- Dedup / helpers ----------------
@@ -153,6 +208,10 @@ class AuthIn(BaseModel):
     password: str
 
 
+class RefreshIn(BaseModel):
+    refresh_token: str
+
+
 class ImportIn(BaseModel):
     library_id: str
 
@@ -167,29 +226,46 @@ def _bearer(request: Request) -> Optional[str]:
     return h[7:] if h.startswith("Bearer ") else None
 
 
+async def _record_session(user_id: str, access_token: str, token_version: int):
+    token_hash = hashlib.sha256(access_token.encode()).hexdigest()
+    await db.sessions.insert_one({
+        "user_id": user_id,
+        "token_hash": token_hash,
+        "token_version": token_version,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+
 async def _user_from_token(token: str) -> Optional[dict]:
     try:
         auth_user = supabase.auth.get_user(token).user
     except Exception:
         return None
-    return await db.users.find_one({"id": str(auth_user.id)})
+    user = await db.users.find_one({"id": str(auth_user.id)})
+    if not user:
+        return None
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    sess = await db.sessions.find_one({"token_hash": token_hash, "user_id": user["id"]})
+    if not sess or sess.get("token_version") != user.get("token_version", 0):
+        return None
+    return user
 
 
 async def resolve_library(request: Request) -> str:
-    """Authenticated -> user's private library (=user id). Else anonymous X-Library-Id."""
+    """Authenticated -> user's private library (=user id). Unauthenticated -> 401."""
     token = _bearer(request)
     if token:
         u = await _user_from_token(token)
         if u:
             return u["id"]
         raise HTTPException(401, "Invalid or expired session")
-    return (request.headers.get("X-Library-Id") or "").strip() or DEFAULT_LIB
+    raise HTTPException(401, "Please sign in to Forgot AI.")
 
 
 async def get_current_user(request: Request) -> dict:
     token = _bearer(request)
     if not token:
-        raise HTTPException(401, "Not authenticated")
+        raise HTTPException(401, "Please sign in to Forgot AI.")
     u = await _user_from_token(token)
     if not u:
         raise HTTPException(401, "Invalid or expired session")
@@ -263,6 +339,9 @@ def enrich_prompt(kind: str, body: str) -> str:
 
 
 async def fetch_url_content(url: str):
+    if not is_safe_url(url):
+        logger.warning(f"SSRF blocked URL fetch for {url}")
+        return None, ""
     title, text = None, ""
     try:
         r = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0 (compatible; ForgotAI/1.0)"})
@@ -396,35 +475,24 @@ async def rank_items(query: str, lib: str, limit: int = 30):
 
 
 async def import_library(source_lib: str, user_id: str) -> int:
-    """Move anonymous library items into a user account. Never imports the shared
-    'default' pile and never steals another user's library."""
     source_lib = (source_lib or "").strip()
     if not source_lib or source_lib == DEFAULT_LIB or source_lib == user_id:
         return 0
     if await db.users.find_one({"id": source_lib}):
         return 0
     res = await db.items.update_many(
-        {"library_id": source_lib},
+        {"library_id": source_lib, "owner_user_id": None},
         {"$set": {"library_id": user_id, "owner_user_id": user_id}},
     )
     return res.modified_count
-
-
-async def importable_count(source_lib: str) -> int:
-    source_lib = (source_lib or "").strip()
-    if not source_lib or source_lib == DEFAULT_LIB:
-        return 0
-    if await db.users.find_one({"id": source_lib}):
-        return 0
-    return await db.items.count_documents({"library_id": source_lib})
 
 
 # ---------------- Auth routes ----------------
 @api_router.post("/auth/register")
 async def register(payload: AuthIn, request: Request):
     email = payload.email.lower().strip()
-    if len(payload.password) < 6:
-        raise HTTPException(400, "Password must be at least 6 characters")
+    if len(payload.password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
     try:
         created = supabase.auth.admin.create_user({
             "email": email,
@@ -445,11 +513,17 @@ async def register(payload: AuthIn, request: Request):
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.users.insert_one(user)
-    # auto-import this browser's anonymous memories
-    anon = (request.headers.get("X-Library-Id") or "").strip()
-    imported = await import_library(anon, user["id"])
     session = supabase.auth.sign_in_with_password({"email": email, "password": payload.password})
-    return {"token": session.session.access_token, "user": public_user(user), "imported": imported}
+    await _record_session(user["id"], session.session.access_token, user["token_version"])
+
+    anon = (request.headers.get("X-Library-Id") or "").strip()
+    imported = await import_library(anon, user["id"]) if anon else 0
+    return {
+        "token": session.session.access_token,
+        "refresh_token": session.session.refresh_token,
+        "user": public_user(user),
+        "imported": imported,
+    }
 
 
 @api_router.post("/auth/login")
@@ -484,9 +558,34 @@ async def login(payload: AuthIn, request: Request):
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await db.users.insert_one(user)
+    await _record_session(user["id"], session.session.access_token, user.get("token_version", 0))
+
     anon = (request.headers.get("X-Library-Id") or "").strip()
-    count = await importable_count(anon)
-    return {"token": session.session.access_token, "user": public_user(user), "importable_count": count}
+    count = await import_library(anon, user["id"]) if anon else 0
+    return {
+        "token": session.session.access_token,
+        "refresh_token": session.session.refresh_token,
+        "user": public_user(user),
+        "importable_count": count,
+    }
+
+
+@api_router.post("/auth/refresh")
+async def refresh_session(payload: RefreshIn):
+    try:
+        session = supabase.auth.refresh_session(payload.refresh_token)
+        auth_user = session.user
+    except Exception:
+        raise HTTPException(401, "Invalid or expired refresh token")
+    user = await db.users.find_one({"id": str(auth_user.id)})
+    if not user:
+        raise HTTPException(401, "User profile not found")
+    await _record_session(user["id"], session.session.access_token, user.get("token_version", 0))
+    return {
+        "token": session.session.access_token,
+        "refresh_token": session.session.refresh_token,
+        "user": public_user(user),
+    }
 
 
 @api_router.get("/auth/me")
@@ -495,13 +594,24 @@ async def me(user: dict = Depends(get_current_user)):
 
 
 @api_router.post("/auth/logout")
-async def logout(user: dict = Depends(get_current_user)):
+async def logout(request: Request, user: dict = Depends(get_current_user)):
+    token = _bearer(request)
+    await db.users.update_one({"id": user["id"]}, {"$inc": {"token_version": 1}})
+    await db.sessions.delete_one({"user_id": user["id"]})
+    if token:
+        try:
+            supabase.auth.admin.sign_out(token)
+        except Exception:
+            pass
     return {"ok": True}
 
 
 @api_router.post("/auth/import")
-async def do_import(payload: ImportIn, user: dict = Depends(get_current_user)):
-    imported = await import_library(payload.library_id, user["id"])
+async def do_import(payload: ImportIn, request: Request, user: dict = Depends(get_current_user)):
+    anon_hdr = (request.headers.get("X-Library-Id") or "").strip()
+    if not anon_hdr or anon_hdr != payload.library_id:
+        return {"imported": 0}
+    imported = await import_library(anon_hdr, user["id"])
     return {"imported": imported}
 
 
@@ -530,6 +640,7 @@ async def check_duplicate(payload: CheckIn, lib: str = Depends(resolve_library))
 
 @api_router.post("/items/text", response_model=SavedItem)
 async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str = Depends(resolve_library)):
+    limiter.check(lib, 60, 60)
     if not payload.text.strip():
         raise HTTPException(400, "Text is empty")
     item = SavedItem(library_id=lib, content_type="text", original_text=payload.text,
@@ -537,7 +648,7 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str =
                      source_domain=domain_of(payload.source_url) if payload.source_url else None,
                      dedup_key=text_hash(payload.text), title=payload.text.strip()[:60])
     values = item.model_dump()
-    values["owner_user_id"] = lib if await db.users.find_one({"id": lib}) else None
+    values["owner_user_id"] = lib
     await db.items.insert_one(values)
     background.add_task(enrich_item, item.id)
     return item
@@ -545,6 +656,7 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str =
 
 @api_router.post("/items/url", response_model=SavedItem)
 async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = Depends(resolve_library)):
+    limiter.check(lib, 60, 60)
     url = payload.url.strip()
     if not url:
         raise HTTPException(400, "URL is empty")
@@ -554,7 +666,7 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
                      original_text=payload.context_text, source_title=payload.source_title,
                      source_domain=domain_of(url), dedup_key=normalize_url(url), title=url[:60])
     values = item.model_dump()
-    values["owner_user_id"] = lib if await db.users.find_one({"id": lib}) else None
+    values["owner_user_id"] = lib
     await db.items.insert_one(values)
     background.add_task(enrich_item, item.id)
     return item
@@ -564,14 +676,16 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
 async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
                      source_url: Optional[str] = Form(None), source_title: Optional[str] = Form(None),
                      lib: str = Depends(resolve_library)):
+    limiter.check(lib, 60, 60)
     data = await file.read()
     if not data:
         raise HTTPException(400, "Empty image")
-    ext = (file.filename or "png").split(".")[-1].lower()
-    if ext not in ("png", "jpg", "jpeg", "webp", "gif"):
-        ext = "png"
-    path = f"{APP_NAME}/uploads/{lib}/{uuid.uuid4()}.{ext}"
-    ct = file.content_type or "image/png"
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(400, "Image too large. Max 10MB.")
+    ext = validate_image_bytes(data)
+
+    path = f"{lib}/{uuid.uuid4()}.{ext}"
+    ct = file.content_type or f"image/{ext}"
     try:
         result = put_object(path, data, ct)
         stored_path = result["path"]
@@ -584,7 +698,7 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
                      dedup_key="img:" + hashlib.sha256(data).hexdigest(),
                      title=(file.filename or "Screenshot")[:60])
     values = item.model_dump()
-    values["owner_user_id"] = lib if await db.users.find_one({"id": lib}) else None
+    values["owner_user_id"] = lib
     await db.items.insert_one(values)
     background.add_task(enrich_item, item.id)
     return item
@@ -642,9 +756,17 @@ async def update_item(item_id: str, payload: ItemUpdate, lib: str = Depends(reso
 
 @api_router.delete("/items/{item_id}")
 async def delete_item(item_id: str, lib: str = Depends(resolve_library)):
+    doc = await db.items.find_one({"id": item_id, "library_id": lib})
+    if not doc:
+        raise HTTPException(404, "Not found")
     res = await db.items.delete_one({"id": item_id, "library_id": lib})
     if res.deleted_count == 0:
         raise HTTPException(404, "Not found")
+    if doc.get("image_path"):
+        try:
+            supabase.storage.from_(STORAGE_BUCKET).remove([doc["image_path"]])
+        except Exception as e:
+            logger.warning(f"Failed to delete storage object {doc['image_path']}: {e}")
     return {"ok": True}
 
 
@@ -659,6 +781,7 @@ async def pin_item(item_id: str, payload: PinIn, lib: str = Depends(resolve_libr
 
 @api_router.post("/items/{item_id}/retry", response_model=SavedItem)
 async def retry_item(item_id: str, background: BackgroundTasks, lib: str = Depends(resolve_library)):
+    limiter.check(lib, 30, 60)
     doc = await db.items.find_one({"id": item_id, "library_id": lib})
     if not doc:
         raise HTTPException(404, "Not found")
@@ -670,6 +793,7 @@ async def retry_item(item_id: str, background: BackgroundTasks, lib: str = Depen
 
 @api_router.post("/items/{item_id}/ask")
 async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_library)):
+    limiter.check(lib, 30, 60)
     doc = await db.items.find_one({"id": item_id, "library_id": lib})
     if not doc:
         raise HTTPException(404, "Not found")
@@ -688,6 +812,7 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
 
 @api_router.post("/search")
 async def search(payload: SearchIn, lib: str = Depends(resolve_library)):
+    limiter.check(lib, 30, 60)
     q = payload.query.strip()
     if not q:
         return {"results": []}
@@ -697,6 +822,7 @@ async def search(payload: SearchIn, lib: str = Depends(resolve_library)):
 
 @api_router.post("/chat")
 async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
+    limiter.check(lib, 30, 60)
     q = payload.query.strip()
     if not q:
         return {"answer": "Ask me anything about what you've saved.", "results": []}
@@ -722,15 +848,14 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
 
 
 @api_router.get("/files/{path:path}")
-async def download_file(path: str, token: Optional[str] = Query(None), lib: Optional[str] = Query(None)):
-    resolved = None
-    if token:
-        u = await _user_from_token(token)
-        if u:
-            resolved = u["id"]
-    if not resolved:
-        resolved = (lib or "").strip() or DEFAULT_LIB
-    doc = await db.items.find_one({"image_path": path, "library_id": resolved})
+async def download_file(path: str, request: Request, token: Optional[str] = Query(None)):
+    tok = token or _bearer(request)
+    if not tok:
+        raise HTTPException(401, "Not authenticated")
+    u = await _user_from_token(tok)
+    if not u:
+        raise HTTPException(401, "Invalid or expired session")
+    doc = await db.items.find_one({"image_path": path, "library_id": u["id"]})
     if not doc:
         raise HTTPException(404, "File not found")
     data, content_type = get_object(path)
@@ -740,10 +865,14 @@ async def download_file(path: str, token: Optional[str] = Query(None), lib: Opti
 # ---------------- App wiring ----------------
 app.include_router(api_router)
 
+raw_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000').split(',')
+origins = [o.strip() for o in raw_origins if o.strip()]
+allow_all = "*" in origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_credentials=not allow_all,
+    allow_origins=origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

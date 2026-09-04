@@ -136,11 +136,17 @@ accountEl.onclick = async () => {
   showSignedOut();
 };
 
+function isRestrictedTab(url) {
+  if (!url) return false;
+  return url.startsWith("chrome://") || url.includes("chrome.google.com/webstore") || url.includes("chromewebstore.google.com");
+}
+
 // --- Actions ---
 $("save-page").onclick = async (e) => {
   const btn = e.target; btn.disabled = true;
   try {
     const tab = await activeTab();
+    if (isRestrictedTab(tab?.url)) { toast("Can't save this page."); btn.disabled = false; return; }
     await fetch(`${API}/items/url`, {
       method: "POST",
       headers: await authHeaders({ "Content-Type": "application/json" }),
@@ -156,6 +162,7 @@ $("save-selection").onclick = async (e) => {
   const btn = e.target; btn.disabled = true;
   try {
     const tab = await activeTab();
+    if (isRestrictedTab(tab?.url)) { toast("Can't save this page."); btn.disabled = false; return; }
     const [{ result: sel }] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: () => window.getSelection().toString(),
@@ -175,11 +182,12 @@ $("save-selection").onclick = async (e) => {
 $("save-screenshot").onclick = async (e) => {
   const btn = e.target; btn.disabled = true;
   try {
+    const tab = await activeTab();
+    if (isRestrictedTab(tab?.url)) { toast("Can't save this page."); btn.disabled = false; return; }
     const dataUrl = await chrome.tabs.captureVisibleTab({ format: "png" });
     const blob = await (await fetch(dataUrl)).blob();
     const fd = new FormData();
     fd.append("file", blob, "screenshot.png");
-    const tab = await activeTab();
     fd.append("source_url", tab.url || "");
     fd.append("source_title", tab.title || "");
     await fetch(`${API}/items/image`, { method: "POST", headers: await authHeaders(), body: fd });

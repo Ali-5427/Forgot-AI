@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { api, getToken, setToken, getLibraryId } from "@/api";
+import { api, getToken, setToken, setRefreshToken, getLibraryId } from "@/api";
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -29,6 +29,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const data = await api.login(email, password);
     setToken(data.token);
+    if (data.refresh_token) setRefreshToken(data.refresh_token);
     setUser(data.user);
     if (data.importable_count > 0) setImportPrompt({ count: data.importable_count });
     return data;
@@ -37,6 +38,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (email, password) => {
     const data = await api.register(email, password);
     setToken(data.token);
+    if (data.refresh_token) setRefreshToken(data.refresh_token);
     setUser(data.user);
     return data;
   };
@@ -48,6 +50,7 @@ export const AuthProvider = ({ children }) => {
       /* ignore */
     }
     setToken(null);
+    setRefreshToken(null);
     setUser(false);
   };
 

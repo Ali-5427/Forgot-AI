@@ -112,6 +112,7 @@ class SupabaseDatabase:
         self.users = SupabaseCollection(client, "profiles")
         self.items = SupabaseCollection(client, "items")
         self.login_attempts = SupabaseCollection(client, "login_attempts")
+        self.sessions = SupabaseCollection(client, "user_sessions")
 
 
 def _update_values(existing: dict, update: dict) -> dict:

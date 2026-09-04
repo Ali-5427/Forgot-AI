@@ -1,6 +1,6 @@
-// Set this to the backend URL used by the local or deployed environment.
-export const BACKEND_URL = "http://localhost:8000";
-export const API = BACKEND_URL + "/api";
+// Set this to the backend URL used by the deployed environment.
+export const BACKEND_URL = (typeof process !== "undefined" && process.env?.REACT_APP_BACKEND_URL) || "https://instant-recall-8.preview.emergentagent.com";
+export const API = BACKEND_URL.replace(/\/+$/, "") + "/api";
 
 // Resolve the signed-in account token:
 // 1) a token stored in the extension (from sidebar sign-in), else
@@ -20,7 +20,7 @@ export async function getToken() {
         return result;
       }
     }
-  } catch (e) {
+  } catch {
     /* no accessible Forgot AI tab */
   }
   return null;
@@ -39,10 +39,18 @@ export async function signIn(email, password) {
   });
   if (!r.ok) throw new Error("Invalid email or password");
   const d = await r.json();
-  await chrome.storage.local.set({ token: d.token, email: d.user.email });
+  await chrome.storage.local.set({ token: d.token, refresh_token: d.refresh_token, email: d.user.email });
   return d;
 }
 
 export async function signOut() {
-  await chrome.storage.local.remove(["token", "email"]);
+  const t = await getToken();
+  if (t) {
+    try {
+      await fetch(`${API}/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${t}` } });
+    } catch {
+      /* ignore network errors on logout */
+    }
+  }
+  await chrome.storage.local.remove(["token", "refresh_token", "email"]);
 }

@@ -51,16 +51,6 @@ export default function Settings() {
             <li>Open the Forgot AI side panel from the toolbar</li>
           </ol>
         </div>
-
-        <div className="border border-border rounded-lg bg-white p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <Database className="h-4 w-4 text-neutral-700" />
-            <h2 className="font-semibold text-sm">API</h2>
-          </div>
-          <p className="text-sm text-muted-foreground break-all">
-            Endpoint: <code>{API}</code>
-          </p>
-        </div>
       </div>
     </div>
   );

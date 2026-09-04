@@ -5,6 +5,7 @@ export const API = `${BACKEND_URL}/api`;
 
 const LIB_KEY = "forgot_ai_library";
 const TOKEN_KEY = "forgot_ai_token";
+const REFRESH_KEY = "forgot_ai_refresh_token";
 
 export function getLibraryId() {
   let id = localStorage.getItem(LIB_KEY);
@@ -17,6 +18,8 @@ export function getLibraryId() {
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
+export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY);
+export const setRefreshToken = (rt) => (rt ? localStorage.setItem(REFRESH_KEY, rt) : localStorage.removeItem(REFRESH_KEY));
 
 // Attach auth token (if signed in) + the browser's anonymous library id to every request.
 axios.interceptors.request.use((config) => {
@@ -27,14 +30,36 @@ axios.interceptors.request.use((config) => {
   return config;
 });
 
-// If a signed-in request is rejected (expired/logged-out token), drop the session.
+let isRefreshing = false;
+
+// If a signed-in request is rejected (expired/logged-out token), attempt refresh once or drop session.
 axios.interceptors.response.use(
   (r) => r,
-  (error) => {
-    const url = error?.config?.url || "";
-    const isAuthCall = url.includes("/auth/login") || url.includes("/auth/register");
-    if (error?.response?.status === 401 && getToken() && !isAuthCall) {
+  async (error) => {
+    const originalRequest = error?.config;
+    const url = originalRequest?.url || "";
+    const isAuthCall = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh");
+
+    if (error?.response?.status === 401 && getToken() && !isAuthCall && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const rt = getRefreshToken();
+      if (rt && !isRefreshing) {
+        isRefreshing = true;
+        try {
+          const res = await axios.post(`${API}/auth/refresh`, { refresh_token: rt });
+          if (res.data?.token) {
+            setToken(res.data.token);
+            if (res.data.refresh_token) setRefreshToken(res.data.refresh_token);
+            originalRequest.headers["Authorization"] = `Bearer ${res.data.token}`;
+            isRefreshing = false;
+            return axios(originalRequest);
+          }
+        } catch {
+          isRefreshing = false;
+        }
+      }
       setToken(null);
+      setRefreshToken(null);
       window.location.reload();
     }
     return Promise.reject(error);

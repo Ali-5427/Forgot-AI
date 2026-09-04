@@ -37,6 +37,14 @@ create table if not exists public.login_attempts (
     updated_at timestamptz not null default now()
 );
 
+create table if not exists public.user_sessions (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users(id) on delete cascade,
+    token_hash text not null unique,
+    token_version integer not null default 0,
+    created_at timestamptz not null default now()
+);
+
 create index if not exists items_library_created_idx on public.items (library_id, created_at desc);
 create index if not exists items_library_status_idx on public.items (library_id, status);
 create index if not exists items_library_dedup_idx on public.items (library_id, dedup_key);
