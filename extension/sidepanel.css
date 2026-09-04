@@ -13,7 +13,19 @@ body {
   position: sticky;
   top: 0;
   z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+.account { font-size: 11px; color: #737373; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.signin { padding: 20px 14px; display: flex; flex-direction: column; gap: 8px; }
+.signin-title { font-weight: 600; font-size: 14px; }
+.signin-sub { font-size: 12px; color: #737373; margin-bottom: 4px; }
+.signin input { height: 34px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 0 10px; font-size: 13px; outline: none; }
+.signin input:focus { border-color: #171717; }
+.si-error { font-size: 12px; color: #dc2626; min-height: 14px; }
+.si-btn { height: 34px; border: none; background: #171717; color: #fff; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.si-link { background: none; border: none; color: #737373; font-size: 12px; cursor: pointer; text-decoration: underline; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
 .logo {
   width: 22px; height: 22px; border-radius: 6px; background: #171717; color: #fff;

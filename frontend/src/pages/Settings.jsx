@@ -1,17 +1,10 @@
-import { useState } from "react";
-import { Puzzle, Database, Sparkles, Copy, Check, KeyRound } from "lucide-react";
-import { API, getLibraryId } from "@/api";
+import { Puzzle, Database, Sparkles, LogOut, User } from "lucide-react";
+import { API } from "@/api";
+import { useAuth } from "@/auth";
 import { Button } from "@/components/ui/button";
 
 export default function Settings() {
-  const [copied, setCopied] = useState(false);
-  const libId = getLibraryId();
-
-  const copy = () => {
-    navigator.clipboard.writeText(libId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+  const { user, logout } = useAuth();
 
   return (
     <div className="max-w-2xl mx-auto px-8 py-12">
@@ -20,19 +13,13 @@ export default function Settings() {
       <div className="space-y-4">
         <div className="border border-border rounded-lg bg-white p-5">
           <div className="flex items-center gap-2 mb-2">
-            <KeyRound className="h-4 w-4 text-neutral-700" />
-            <h2 className="font-semibold text-sm">Your library</h2>
+            <User className="h-4 w-4 text-neutral-700" />
+            <h2 className="font-semibold text-sm">Account</h2>
           </div>
-          <p className="text-sm text-muted-foreground mb-3">
-            This browser has its own private, anonymous memory library — no signup needed. Paste this code into the
-            browser extension if it doesn't link automatically. Anyone with this code can load this library, so keep it private.
-          </p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 text-xs bg-neutral-50 border border-border rounded-md px-3 py-2 break-all" data-testid="library-code">
-              {libId}
-            </code>
-            <Button variant="outline" size="sm" onClick={copy} data-testid="copy-library-btn">
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground" data-testid="account-email">{user?.email}</p>
+            <Button variant="outline" size="sm" onClick={logout} data-testid="logout-btn">
+              <LogOut className="h-3.5 w-3.5 mr-1.5" /> Log out
             </Button>
           </div>
         </div>
@@ -54,8 +41,8 @@ export default function Settings() {
             <h2 className="font-semibold text-sm">Browser extension</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-3">
-            Save pages, selected text and screenshots from any website using the right-side sidebar. It links to this
-            library automatically when the Forgot AI site is open; otherwise paste the code above. To install:
+            Save pages, selected text and screenshots from any website using the right-side sidebar. It uses your account
+            automatically when you're signed in to Forgot AI in this browser; otherwise sign in from the sidebar. To install:
           </p>
           <ol className="text-sm text-muted-foreground list-decimal pl-5 space-y-1">
             <li>Open <code>chrome://extensions</code></li>

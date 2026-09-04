@@ -6,19 +6,21 @@ import base64
 import re
 import hashlib
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 from typing import List, Optional, Annotated
 
 import requests
-from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Header
+from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Query, Request, Depends
 from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, Field, BeforeValidator, ConfigDict
+from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+import jwt as pyjwt
+from auth import hash_password, verify_password, create_token, decode_token
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -42,10 +44,8 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 DEFAULT_LIB = "default"
-
-
-def lib_of(x_library_id: Optional[str]) -> str:
-    return (x_library_id or "").strip() or DEFAULT_LIB
+MAX_FAILED = 5
+LOCKOUT_MIN = 15
 
 
 # ---------------- Storage helpers ----------------
@@ -116,7 +116,7 @@ class SavedItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     library_id: str = DEFAULT_LIB
-    content_type: str  # image | text | url
+    content_type: str
     original_text: Optional[str] = None
     source_url: Optional[str] = None
     source_title: Optional[str] = None
@@ -129,7 +129,7 @@ class SavedItem(BaseModel):
     extracted_text: str = ""
     searchable_text: str = ""
     dedup_key: Optional[str] = None
-    status: str = "processing"  # processing | ready | failed
+    status: str = "processing"
     pinned: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -174,6 +174,59 @@ class CheckIn(BaseModel):
     text: Optional[str] = None
     url: Optional[str] = None
     hash: Optional[str] = None
+
+
+class AuthIn(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class ImportIn(BaseModel):
+    library_id: str
+
+
+# ---------------- Auth dependencies ----------------
+def public_user(u: dict) -> dict:
+    return {"id": u["id"], "email": u["email"], "name": u.get("name", ""), "created_at": u.get("created_at")}
+
+
+def _bearer(request: Request) -> Optional[str]:
+    h = request.headers.get("Authorization", "")
+    return h[7:] if h.startswith("Bearer ") else None
+
+
+async def _user_from_token(token: str) -> Optional[dict]:
+    try:
+        p = decode_token(token)
+    except Exception:
+        return None
+    if p.get("type") != "access":
+        return None
+    u = await db.users.find_one({"id": p.get("sub")})
+    if not u or u.get("token_version", 0) != p.get("tv"):
+        return None
+    return u
+
+
+async def resolve_library(request: Request) -> str:
+    """Authenticated -> user's private library (=user id). Else anonymous X-Library-Id."""
+    token = _bearer(request)
+    if token:
+        u = await _user_from_token(token)
+        if u:
+            return u["id"]
+        raise HTTPException(401, "Invalid or expired session")
+    return (request.headers.get("X-Library-Id") or "").strip() or DEFAULT_LIB
+
+
+async def get_current_user(request: Request) -> dict:
+    token = _bearer(request)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    u = await _user_from_token(token)
+    if not u:
+        raise HTTPException(401, "Invalid or expired session")
+    return u
 
 
 # ---------------- AI helpers ----------------
@@ -350,15 +403,102 @@ async def rank_items(query: str, lib: str, limit: int = 30):
     return results, by_id
 
 
-# ---------------- Routes ----------------
+async def import_library(source_lib: str, user_id: str) -> int:
+    """Move anonymous library items into a user account. Never imports the shared
+    'default' pile and never steals another user's library."""
+    source_lib = (source_lib or "").strip()
+    if not source_lib or source_lib == DEFAULT_LIB or source_lib == user_id:
+        return 0
+    if await db.users.find_one({"id": source_lib}):
+        return 0
+    res = await db.items.update_many({"library_id": source_lib}, {"$set": {"library_id": user_id}})
+    return res.modified_count
+
+
+async def importable_count(source_lib: str) -> int:
+    source_lib = (source_lib or "").strip()
+    if not source_lib or source_lib == DEFAULT_LIB:
+        return 0
+    if await db.users.find_one({"id": source_lib}):
+        return 0
+    return await db.items.count_documents({"library_id": source_lib})
+
+
+# ---------------- Auth routes ----------------
+@api_router.post("/auth/register")
+async def register(payload: AuthIn, request: Request):
+    email = payload.email.lower().strip()
+    if len(payload.password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(400, "An account with this email already exists")
+    user = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "password_hash": hash_password(payload.password),
+        "name": email.split("@")[0],
+        "token_version": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.insert_one(user)
+    # auto-import this browser's anonymous memories
+    anon = (request.headers.get("X-Library-Id") or "").strip()
+    imported = await import_library(anon, user["id"])
+    token = create_token(user["id"], 0)
+    return {"token": token, "user": public_user(user), "imported": imported}
+
+
+@api_router.post("/auth/login")
+async def login(payload: AuthIn, request: Request):
+    email = payload.email.lower().strip()
+    ip = request.client.host if request.client else "unknown"
+    ident = f"{ip}:{email}"
+    att = await db.login_attempts.find_one({"identifier": ident})
+    if att and att.get("count", 0) >= MAX_FAILED:
+        locked_until = datetime.fromisoformat(att["locked_until"]) if att.get("locked_until") else None
+        if locked_until and locked_until > datetime.now(timezone.utc):
+            raise HTTPException(429, "Too many attempts. Try again in a few minutes.")
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(payload.password, user["password_hash"]):
+        count = (att.get("count", 0) if att else 0) + 1
+        await db.login_attempts.update_one(
+            {"identifier": ident},
+            {"$set": {"count": count, "locked_until": (datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MIN)).isoformat()}},
+            upsert=True,
+        )
+        raise HTTPException(401, "Invalid email or password")
+    await db.login_attempts.delete_one({"identifier": ident})
+    token = create_token(user["id"], user.get("token_version", 0))
+    anon = (request.headers.get("X-Library-Id") or "").strip()
+    count = await importable_count(anon)
+    return {"token": token, "user": public_user(user), "importable_count": count}
+
+
+@api_router.get("/auth/me")
+async def me(user: dict = Depends(get_current_user)):
+    return public_user(user)
+
+
+@api_router.post("/auth/logout")
+async def logout(user: dict = Depends(get_current_user)):
+    await db.users.update_one({"id": user["id"]}, {"$inc": {"token_version": 1}})
+    return {"ok": True}
+
+
+@api_router.post("/auth/import")
+async def do_import(payload: ImportIn, user: dict = Depends(get_current_user)):
+    imported = await import_library(payload.library_id, user["id"])
+    return {"imported": imported}
+
+
+# ---------------- Item routes ----------------
 @api_router.get("/")
 async def root():
     return {"message": "Forgot AI API"}
 
 
 @api_router.post("/items/check")
-async def check_duplicate(payload: CheckIn, x_library_id: Optional[str] = Header(None)):
-    lib = lib_of(x_library_id)
+async def check_duplicate(payload: CheckIn, lib: str = Depends(resolve_library)):
     key = None
     if payload.content_type == "url" and payload.url:
         key = normalize_url(payload.url)
@@ -375,10 +515,10 @@ async def check_duplicate(payload: CheckIn, x_library_id: Optional[str] = Header
 
 
 @api_router.post("/items/text", response_model=SavedItem)
-async def save_text(payload: TextSaveIn, background: BackgroundTasks, x_library_id: Optional[str] = Header(None)):
+async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str = Depends(resolve_library)):
     if not payload.text.strip():
         raise HTTPException(400, "Text is empty")
-    item = SavedItem(library_id=lib_of(x_library_id), content_type="text", original_text=payload.text,
+    item = SavedItem(library_id=lib, content_type="text", original_text=payload.text,
                      source_url=payload.source_url, source_title=payload.source_title,
                      source_domain=domain_of(payload.source_url) if payload.source_url else None,
                      dedup_key=text_hash(payload.text), title=payload.text.strip()[:60])
@@ -388,13 +528,13 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, x_library_
 
 
 @api_router.post("/items/url", response_model=SavedItem)
-async def save_url(payload: UrlSaveIn, background: BackgroundTasks, x_library_id: Optional[str] = Header(None)):
+async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = Depends(resolve_library)):
     url = payload.url.strip()
     if not url:
         raise HTTPException(400, "URL is empty")
     if not url.startswith("http"):
         url = "https://" + url
-    item = SavedItem(library_id=lib_of(x_library_id), content_type="url", source_url=url,
+    item = SavedItem(library_id=lib, content_type="url", source_url=url,
                      original_text=payload.context_text, source_title=payload.source_title,
                      source_domain=domain_of(url), dedup_key=normalize_url(url), title=url[:60])
     await db.items.insert_one(item.model_dump())
@@ -405,14 +545,14 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, x_library_id
 @api_router.post("/items/image", response_model=SavedItem)
 async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
                      source_url: Optional[str] = Form(None), source_title: Optional[str] = Form(None),
-                     x_library_id: Optional[str] = Header(None)):
+                     lib: str = Depends(resolve_library)):
     data = await file.read()
     if not data:
         raise HTTPException(400, "Empty image")
     ext = (file.filename or "png").split(".")[-1].lower()
     if ext not in ("png", "jpg", "jpeg", "webp", "gif"):
         ext = "png"
-    path = f"{APP_NAME}/uploads/shared/{uuid.uuid4()}.{ext}"
+    path = f"{APP_NAME}/uploads/{lib}/{uuid.uuid4()}.{ext}"
     ct = file.content_type or "image/png"
     try:
         result = put_object(path, data, ct)
@@ -420,7 +560,7 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
     except Exception as e:
         logger.error(f"Image upload failed: {e}")
         raise HTTPException(500, "Image storage failed")
-    item = SavedItem(library_id=lib_of(x_library_id), content_type="image", image_path=stored_path,
+    item = SavedItem(library_id=lib, content_type="image", image_path=stored_path,
                      source_url=source_url, source_title=source_title,
                      source_domain=domain_of(source_url) if source_url else None,
                      dedup_key="img:" + hashlib.sha256(data).hexdigest(),
@@ -431,14 +571,13 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
 
 
 @api_router.get("/items", response_model=List[SavedItem])
-async def list_items(limit: int = 200, x_library_id: Optional[str] = Header(None)):
-    docs = await db.items.find({"library_id": lib_of(x_library_id)}).sort("created_at", -1).to_list(limit)
+async def list_items(limit: int = 200, lib: str = Depends(resolve_library)):
+    docs = await db.items.find({"library_id": lib}).sort("created_at", -1).to_list(limit)
     return [clean(d) for d in docs]
 
 
 @api_router.get("/items/{item_id}/related", response_model=List[SavedItem])
-async def related_items(item_id: str, x_library_id: Optional[str] = Header(None)):
-    lib = lib_of(x_library_id)
+async def related_items(item_id: str, lib: str = Depends(resolve_library)):
     target = await db.items.find_one({"id": item_id, "library_id": lib})
     if not target:
         raise HTTPException(404, "Not found")
@@ -463,16 +602,15 @@ async def related_items(item_id: str, x_library_id: Optional[str] = Header(None)
 
 
 @api_router.get("/items/{item_id}", response_model=SavedItem)
-async def get_item(item_id: str, x_library_id: Optional[str] = Header(None)):
-    doc = await db.items.find_one({"id": item_id, "library_id": lib_of(x_library_id)})
+async def get_item(item_id: str, lib: str = Depends(resolve_library)):
+    doc = await db.items.find_one({"id": item_id, "library_id": lib})
     if not doc:
         raise HTTPException(404, "Not found")
     return clean(doc)
 
 
 @api_router.put("/items/{item_id}", response_model=SavedItem)
-async def update_item(item_id: str, payload: ItemUpdate, x_library_id: Optional[str] = Header(None)):
-    lib = lib_of(x_library_id)
+async def update_item(item_id: str, payload: ItemUpdate, lib: str = Depends(resolve_library)):
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     if update:
         await db.items.update_one({"id": item_id, "library_id": lib}, {"$set": update})
@@ -483,14 +621,15 @@ async def update_item(item_id: str, payload: ItemUpdate, x_library_id: Optional[
 
 
 @api_router.delete("/items/{item_id}")
-async def delete_item(item_id: str, x_library_id: Optional[str] = Header(None)):
-    await db.items.delete_one({"id": item_id, "library_id": lib_of(x_library_id)})
+async def delete_item(item_id: str, lib: str = Depends(resolve_library)):
+    res = await db.items.delete_one({"id": item_id, "library_id": lib})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Not found")
     return {"ok": True}
 
 
 @api_router.post("/items/{item_id}/pin", response_model=SavedItem)
-async def pin_item(item_id: str, payload: PinIn, x_library_id: Optional[str] = Header(None)):
-    lib = lib_of(x_library_id)
+async def pin_item(item_id: str, payload: PinIn, lib: str = Depends(resolve_library)):
     await db.items.update_one({"id": item_id, "library_id": lib}, {"$set": {"pinned": payload.pinned}})
     doc = await db.items.find_one({"id": item_id, "library_id": lib})
     if not doc:
@@ -499,8 +638,7 @@ async def pin_item(item_id: str, payload: PinIn, x_library_id: Optional[str] = H
 
 
 @api_router.post("/items/{item_id}/retry", response_model=SavedItem)
-async def retry_item(item_id: str, background: BackgroundTasks, x_library_id: Optional[str] = Header(None)):
-    lib = lib_of(x_library_id)
+async def retry_item(item_id: str, background: BackgroundTasks, lib: str = Depends(resolve_library)):
     doc = await db.items.find_one({"id": item_id, "library_id": lib})
     if not doc:
         raise HTTPException(404, "Not found")
@@ -511,8 +649,8 @@ async def retry_item(item_id: str, background: BackgroundTasks, x_library_id: Op
 
 
 @api_router.post("/items/{item_id}/ask")
-async def ask_item(item_id: str, payload: AskIn, x_library_id: Optional[str] = Header(None)):
-    doc = await db.items.find_one({"id": item_id, "library_id": lib_of(x_library_id)})
+async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_library)):
+    doc = await db.items.find_one({"id": item_id, "library_id": lib})
     if not doc:
         raise HTTPException(404, "Not found")
     context = (
@@ -529,20 +667,20 @@ async def ask_item(item_id: str, payload: AskIn, x_library_id: Optional[str] = H
 
 
 @api_router.post("/search")
-async def search(payload: SearchIn, x_library_id: Optional[str] = Header(None)):
+async def search(payload: SearchIn, lib: str = Depends(resolve_library)):
     q = payload.query.strip()
     if not q:
         return {"results": []}
-    results, _ = await rank_items(q, lib_of(x_library_id))
+    results, _ = await rank_items(q, lib)
     return {"results": results, "query": q}
 
 
 @api_router.post("/chat")
-async def chat(payload: ChatIn, x_library_id: Optional[str] = Header(None)):
+async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     q = payload.query.strip()
     if not q:
         return {"answer": "Ask me anything about what you've saved.", "results": []}
-    results, by_id = await rank_items(q, lib_of(x_library_id), limit=8)
+    results, by_id = await rank_items(q, lib, limit=8)
     if not results:
         return {"answer": "I couldn't find anything relevant in your saved memories. Try describing it differently.", "results": []}
     ctx_parts = []
@@ -564,8 +702,15 @@ async def chat(payload: ChatIn, x_library_id: Optional[str] = Header(None)):
 
 
 @api_router.get("/files/{path:path}")
-async def download_file(path: str):
-    doc = await db.items.find_one({"image_path": path})
+async def download_file(path: str, token: Optional[str] = Query(None), lib: Optional[str] = Query(None)):
+    resolved = None
+    if token:
+        u = await _user_from_token(token)
+        if u:
+            resolved = u["id"]
+    if not resolved:
+        resolved = (lib or "").strip() or DEFAULT_LIB
+    doc = await db.items.find_one({"image_path": path, "library_id": resolved})
     if not doc:
         raise HTTPException(404, "File not found")
     data, content_type = get_object(path)
@@ -584,6 +729,20 @@ app.add_middleware(
 )
 
 
+async def seed_test_users():
+    seeds = [
+        {"email": "usera@forgot.ai", "password": "TestPassA123", "name": "User A"},
+        {"email": "userb@forgot.ai", "password": "TestPassB123", "name": "User B"},
+    ]
+    for s in seeds:
+        existing = await db.users.find_one({"email": s["email"]})
+        if not existing:
+            await db.users.insert_one({
+                "id": str(uuid.uuid4()), "email": s["email"], "password_hash": hash_password(s["password"]),
+                "name": s["name"], "token_version": 0, "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+
+
 @app.on_event("startup")
 async def startup():
     try:
@@ -591,6 +750,15 @@ async def startup():
         logger.info("Storage initialized")
     except Exception as e:
         logger.error(f"Storage init failed: {e}")
+    try:
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("id", unique=True)
+        await db.items.create_index([("library_id", 1), ("status", 1)])
+        await db.login_attempts.create_index("identifier")
+        await seed_test_users()
+        logger.info("Auth setup complete")
+    except Exception as e:
+        logger.error(f"Auth setup failed: {e}")
 
 
 @app.on_event("shutdown")

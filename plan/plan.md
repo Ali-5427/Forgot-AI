@@ -1,48 +1,46 @@
-# Forgot AI — Deep Product Upgrade
+# Forgot AI — Login & Multi-User Release
 
-Builds on the existing working MVP. Nothing that works today is removed; capture, AI enrichment, search, item detail, edit/delete, Ask AI, pin, collections and the extension all stay. This plan adds the remaining depth from the full product definition and closes the end-to-end loop: see → capture → understand → store → forget → describe → find → open → ask.
+Turn the current no-login Forgot AI into a real multi-user product. Each person gets their own private account and their own memory library. The product itself — save (image/text/URL), AI understanding, search, time-aware search, Ask your memory, item detail, Ask AI, edit, delete, pin, Smart Collections, related memories, duplicate detection, and the browser extension — stays exactly as it is today. The only new work is accounts and per-user privacy.
 
-Still deliberately out of scope: login/signup, passwords, subscriptions/billing, teams, account management, marketing pages.
+## What changes for the user
 
-## 1. Private library per person (no login)
-Today every visitor to the app shares one library. That changes: each browser gets its own private, anonymous library automatically — no signup, no password.
+### Accounts (email + password)
+- Sign up with email and password, log in, log out.
+- The session stays signed in across page reloads and browser restarts until the user logs out.
+- The website now opens to a simple sign-up / log-in screen. Once signed in, the app looks and works exactly as it does now, showing only that user's library.
+- Clear, plain error messages for: wrong password, unknown/invalid login, duplicate email on sign-up, expired or logged-out session, and unauthorized access.
+- Auth screens reuse the existing minimal Forgot AI look — no marketing pages, no onboarding, no redesign.
 
-- A random anonymous library ID is created and stored in the browser the first time the app is opened, and silently attached to every request. Different testers on the same URL never see each other's memories.
-- The extension links to the same library so saves made while browsing show up in the web app and vice-versa:
-  - **Automatic**: when the Forgot AI website is open in the browser, the extension picks up that browser's library ID on its own (no code typing).
-  - **Manual fallback**: Settings shows a short "library code"; it can be pasted into the extension if automatic linking isn't available.
-- Structure is kept ready to attach real accounts later without reworking the data.
+### Private, per-user libraries
+- Every memory belongs to exactly one user. All operations — save, list, get, search, Ask your memory, memory chat, edit, delete, pin, collections, related memories, duplicate detection, and everything the extension does — only ever touch the signed-in user's memories.
+- Isolation is enforced on the server, not just hidden in the UI: a direct API call from one account cannot list, read, search, ask about, relate, duplicate-match, edit, delete, or open the images of another account's memories. Search ranking and the AI's context are built only from the current user's memories.
 
-Assumption worth noting: this gives real per-browser isolation, but because there is no login it is not secure authentication — anyone with a browser's library code could load that library. Acceptable for the current no-login MVP.
+### Keeping memories already saved before login
+- When someone signs up, the memories currently saved in that browser (its anonymous library) are automatically moved into the new account.
+- When someone logs in on a browser that still has unclaimed anonymous memories, they're offered a one-time choice: **Import these memories into my account** or **leave them out**. Nothing is moved silently and nothing is deleted.
+- The old shared/global demo library (the pre-existing "default" pile that was visible to everyone) is intentionally never imported into any account, and one user's memories are never moved into another user's account.
 
-## 2. Global memory chat (retrieval, not a chatbot)
-A conversational way to interrogate the whole library: "Find my marketing ideas", "What did I save about AI coding?", "I remember saving something about student productivity — find it." It first finds the relevant saved memories, then answers grounded only in those, and shows the matching memory cards beside the answer; clicking one opens it. It will not answer from general knowledge or pretend to know things that aren't in the library.
+### Browser extension
+- The extension works with the signed-in account. When the user is logged in on the Forgot AI website, the extension uses that same account automatically; a simple sign-in inside the sidebar is also available as a fallback.
+- When not signed in, the sidebar shows a plain "Sign in to Forgot AI" state with a button to sign in. When signed in, it shows the account is connected.
+- All extension actions (search, save page, save selected text, save screenshot, recent saves, open memory) use the signed-in user's library. It remembers the session so the user doesn't sign in every time.
+- The old browser "library code" linking stops being the primary identity for signed-in users; the account is the source of truth.
 
-Placement: added as an "Ask your memory" mode on the existing Search screen (a toggle between plain Search and Ask), so navigation stays Home / All Saved / Search / Settings.
+### Log out
+- Logging out ends the website session and also stops the extension's stored session from reaching the account — on both surfaces. Memories are never deleted on logout.
 
-## 3. Smarter search
-Search stays natural-language and meaning-based, and additionally becomes:
-- **Time-aware**: understands "today", "yesterday", "this week", "last month" and uses capture time to filter/rank. It won't invent exact dates it doesn't have.
-- **Multi-signal ranking**: combines meaning, extracted text (incl. text read from images), title, keywords, category, source/domain and content type — and avoids surfacing items just because one generic word matched.
-- Empty results say something useful ("Nothing relevant found — try describing it differently").
+### Settings
+- Settings shows the current account (email) and a Log out action. No other account-management features are added.
 
-## 4. All Saved: lightweight filtering & sorting
-Adds quick filters — All / Images / Text / Links / Recently saved — plus sort by newest or oldest. Keeps the existing Smart Collections (AI categories) and pin. No manual folder management.
+## Decisions and assumptions (worth a look before approving)
 
-## 5. Memory detail: related memories
-Each opened memory gains a compact "Related memories" section that surfaces other saved items with similar meaning (e.g. opening a Claude coding screenshot suggests another coding article or dev-tool link). Clicking one opens it.
+1. **The website now requires an account to use.** The previous "just start using it with no login" mode is replaced by a sign-in gate, which is what a shareable multi-user product needs. Anyone's earlier anonymous memories are still recoverable through the import flow above.
 
-## 6. Duplicate awareness on save
-When something substantially identical to an existing memory is saved (same URL, same text, or the same image), the app shows a gentle "Looks like you already saved this" with two choices: **Open existing** or **Save anyway**. It never auto-deletes or merges the user's content.
+2. **"Forgot password" via email is deferred this release.** Secure email/password and JWT sessions are in scope, but a self-service password-reset email requires adding an email-sending service, which this app does not currently have and which the brief says not to add. So there is no working "email me a reset link" for end users yet. If you'd rather ship real password reset now, that means adding an email provider — say so and it will be included.
 
-## 7. Capture, understanding & resilience (tightened across web + extension)
-All five capture types — image/screenshot, text, URL, selected text, current page — create a normal memory in the shared library and carry source info (URL, page title, domain) and capture timestamp. Each is enriched into title, summary, key concepts, keywords, category and a searchable representation; images use both OCR text and visual meaning so they're findable without matching visible words. Original content is always preserved and never depends on AI succeeding. Save is instant with clear states: Saving… → Understanding… → Ready, or Processing failed → Retry. Failed URL extraction still saves the URL; failed image understanding keeps the image; retry recovers the item.
+3. **Existing memories that aren't tied to any browser session won't automatically appear** for a new account. Only the memories from the browser a person signs up/logs in on are offered for import; the shared "default" demo pile stays out on purpose.
 
-## 8. Extension depth
-Right-side sidebar stays narrow and focused on Capture / Search / Open — not a general chatbot. Confirmed working actions: Save this page (URL + title + domain + page context), Save selected text (exact text + page context, also via right-click), Save screenshot (through the same image pipeline), Search your memory (compact results), Recent saves, and quiet "Saved to Forgot AI ✓" confirmation. Results and recent items open the corresponding memory in the web app. Uses the linked library from section 1.
+4. **Two test accounts (User A and User B)** will be created to prove isolation end-to-end at the API level (each cannot see, search, ask about, relate to, duplicate-match, modify, delete, or open the other's memories or images), including via the extension.
 
-## 9. Preserve the minimal look
-Same restrained utility style — compact cards, clean type, subtle borders, simple status text, no giant heroes/gradients/decoration. Desktop-first with sensible responsive behavior.
-
-## Acceptance
-The full 32-step end-to-end scenario in the brief (website capture/enrich/search/ask/edit/delete, extension capture appearing and searchable in the web app, vague and time-based retrieval, AI-failure recovery, and separate anonymous libraries not exposing each other) is the bar this is verified against.
+## Out of scope (unchanged from the brief)
+No billing, subscriptions, teams, collaboration, social features, reminders, new AI features, or new search features. No product redesign. Nothing existing is removed.

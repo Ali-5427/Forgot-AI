@@ -1,11 +1,12 @@
-import { API, BACKEND_URL, getLibraryId, libHeaders } from "./config.js";
+import { API, BACKEND_URL, getToken, authHeaders, signIn, signOut } from "./config.js";
 
 const $ = (id) => document.getElementById(id);
 const listEl = $("list");
 const titleEl = $("list-title");
 const toastEl = $("toast");
-const linkRow = $("link-row");
-const linkInput = $("link-input");
+const signinEl = $("signin");
+const appEl = $("app");
+const accountEl = $("account");
 
 let searchMode = false;
 
@@ -18,7 +19,6 @@ function toast(msg) {
 function typeLabel(t) {
   return t === "image" ? "Image" : t === "url" ? "Link" : "Text";
 }
-
 function escapeHtml(s) {
   return (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
@@ -32,7 +32,9 @@ function render(items, showWhy) {
   items.forEach((it) => {
     const card = document.createElement("div");
     card.className = "card";
-    const img = it.content_type === "image" && it.image_path ? `<img src="${API}/files/${it.image_path}" />` : "";
+    const token = tokenCache;
+    const img = it.content_type === "image" && it.image_path
+      ? `<img src="${API}/files/${it.image_path}?token=${encodeURIComponent(token || "")}" />` : "";
     const preview = it.summary || it.original_text || it.source_url || (it.status === "processing" ? "Understanding…" : "");
     const why = showWhy && it.match_reason ? `<div class="why">why · ${escapeHtml(it.match_reason)}</div>` : "";
     card.innerHTML = `${img}<div class="type">${typeLabel(it.content_type)}</div>
@@ -43,23 +45,47 @@ function render(items, showWhy) {
   });
 }
 
-async function ensureLinked() {
-  const id = await getLibraryId();
-  if (id) {
-    linkRow.style.display = "none";
-    return true;
+let tokenCache = null;
+
+async function showSignedOut() {
+  signinEl.style.display = "flex";
+  appEl.style.display = "none";
+  accountEl.textContent = "";
+}
+
+async function showSignedIn() {
+  signinEl.style.display = "none";
+  appEl.style.display = "block";
+  const { email } = await chrome.storage.local.get("email");
+  accountEl.textContent = email ? `● ${email}` : "● connected";
+  accountEl.title = "Signed in — click to sign out";
+  accountEl.style.cursor = "pointer";
+  loadRecent();
+}
+
+async function refreshAuth() {
+  tokenCache = await getToken();
+  if (tokenCache) {
+    // validate token
+    const r = await fetch(`${API}/auth/me`, { headers: await authHeaders() });
+    if (r.ok) {
+      const u = await r.json();
+      await chrome.storage.local.set({ email: u.email });
+      return showSignedIn();
+    }
+    await signOut();
+    tokenCache = null;
   }
-  linkRow.style.display = "flex";
-  return false;
+  showSignedOut();
 }
 
 async function loadRecent() {
   searchMode = false;
   titleEl.textContent = "Recent saves";
   listEl.innerHTML = `<div class="spinner">Loading…</div>`;
-  await ensureLinked();
   try {
-    const r = await fetch(`${API}/items`, { headers: await libHeaders() });
+    const r = await fetch(`${API}/items`, { headers: await authHeaders() });
+    if (r.status === 401) { await signOut(); tokenCache = null; return showSignedOut(); }
     const items = await r.json();
     render(items.slice(0, 12), false);
   } catch {
@@ -74,7 +100,7 @@ async function doSearch(q) {
   try {
     const r = await fetch(`${API}/search`, {
       method: "POST",
-      headers: await libHeaders({ "Content-Type": "application/json" }),
+      headers: await authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ query: q }),
     });
     const data = await r.json();
@@ -89,6 +115,27 @@ async function activeTab() {
   return tab;
 }
 
+// --- Sign in ---
+$("si-submit").onclick = async () => {
+  const email = $("si-email").value.trim();
+  const password = $("si-password").value;
+  $("si-error").textContent = "";
+  try {
+    await signIn(email, password);
+    tokenCache = await getToken();
+    showSignedIn();
+  } catch (e) {
+    $("si-error").textContent = "Invalid email or password";
+  }
+};
+$("si-open").onclick = () => chrome.tabs.create({ url: BACKEND_URL });
+accountEl.onclick = async () => {
+  if (!tokenCache) return;
+  await signOut();
+  tokenCache = null;
+  showSignedOut();
+};
+
 // --- Actions ---
 $("save-page").onclick = async (e) => {
   const btn = e.target; btn.disabled = true;
@@ -96,7 +143,7 @@ $("save-page").onclick = async (e) => {
     const tab = await activeTab();
     await fetch(`${API}/items/url`, {
       method: "POST",
-      headers: await libHeaders({ "Content-Type": "application/json" }),
+      headers: await authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ url: tab.url, context_text: tab.title, source_title: tab.title }),
     });
     toast("Saved to Forgot AI ✓");
@@ -116,7 +163,7 @@ $("save-selection").onclick = async (e) => {
     if (!sel || !sel.trim()) { toast("No text selected on the page"); btn.disabled = false; return; }
     await fetch(`${API}/items/text`, {
       method: "POST",
-      headers: await libHeaders({ "Content-Type": "application/json" }),
+      headers: await authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ text: sel, source_url: tab.url, source_title: tab.title }),
     });
     toast("Saved to Forgot AI ✓");
@@ -135,7 +182,7 @@ $("save-screenshot").onclick = async (e) => {
     const tab = await activeTab();
     fd.append("source_url", tab.url || "");
     fd.append("source_title", tab.title || "");
-    await fetch(`${API}/items/image`, { method: "POST", headers: await libHeaders(), body: fd });
+    await fetch(`${API}/items/image`, { method: "POST", headers: await authHeaders(), body: fd });
     toast("Saved to Forgot AI ✓");
     loadRecent();
   } catch { toast("Could not capture screenshot"); }
@@ -149,12 +196,4 @@ $("search").addEventListener("keydown", (ev) => {
   }
 });
 
-$("link-save").onclick = async () => {
-  const code = linkInput.value.trim();
-  if (!code) return;
-  await chrome.storage.local.set({ libId: code });
-  toast("Library linked ✓");
-  loadRecent();
-};
-
-loadRecent();
+refreshAuth();

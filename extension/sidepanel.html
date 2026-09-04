@@ -13,27 +13,37 @@
         <div class="logo">F</div>
         <span>Forgot AI</span>
       </div>
+      <span id="account" class="account"></span>
     </header>
 
-    <div class="searchbox">
-      <input id="search" type="text" placeholder="Search your memory…" />
+    <!-- Signed-out state -->
+    <div id="signin" class="signin" style="display:none">
+      <p class="signin-title">Sign in to Forgot AI</p>
+      <p class="signin-sub">Access your private memory library.</p>
+      <input id="si-email" type="email" placeholder="Email" />
+      <input id="si-password" type="password" placeholder="Password" />
+      <div id="si-error" class="si-error"></div>
+      <button id="si-submit" class="si-btn">Sign in</button>
+      <button id="si-open" class="si-link">Open Forgot AI website</button>
     </div>
 
-    <div id="link-row" class="link-row" style="display:none">
-      <input id="link-input" type="text" placeholder="Paste library code (Settings)" />
-      <button id="link-save">Link</button>
+    <!-- Signed-in app -->
+    <div id="app" style="display:none">
+      <div class="searchbox">
+        <input id="search" type="text" placeholder="Search your memory…" />
+      </div>
+
+      <div class="actions">
+        <button class="action" id="save-page">＋ Save this page</button>
+        <button class="action" id="save-selection">＋ Save selected text</button>
+        <button class="action" id="save-screenshot">＋ Save screenshot</button>
+      </div>
+
+      <div id="toast" class="toast"></div>
+
+      <div class="section-title" id="list-title">Recent saves</div>
+      <div id="list" class="list"></div>
     </div>
-
-    <div class="actions">
-      <button class="action" id="save-page">＋ Save this page</button>
-      <button class="action" id="save-selection">＋ Save selected text</button>
-      <button class="action" id="save-screenshot">＋ Save screenshot</button>
-    </div>
-
-    <div id="toast" class="toast"></div>
-
-    <div class="section-title" id="list-title">Recent saves</div>
-    <div id="list" class="list"></div>
 
     <script type="module" src="sidepanel.js"></script>
   </body>

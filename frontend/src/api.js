@@ -4,24 +4,48 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
 
 const LIB_KEY = "forgot_ai_library";
+const TOKEN_KEY = "forgot_ai_token";
 
 export function getLibraryId() {
   let id = localStorage.getItem(LIB_KEY);
   if (!id) {
-    id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+    id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
     localStorage.setItem(LIB_KEY, id);
   }
   return id;
 }
 
-// Attach the browser's private library id to every request.
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
+
+// Attach auth token (if signed in) + the browser's anonymous library id to every request.
 axios.interceptors.request.use((config) => {
   config.headers = config.headers || {};
+  const t = getToken();
+  if (t) config.headers["Authorization"] = `Bearer ${t}`;
   config.headers["X-Library-Id"] = getLibraryId();
   return config;
 });
 
-export const fileUrl = (imagePath) => `${API}/files/${imagePath}`;
+// If a signed-in request is rejected (expired/logged-out token), drop the session.
+axios.interceptors.response.use(
+  (r) => r,
+  (error) => {
+    const url = error?.config?.url || "";
+    const isAuthCall = url.includes("/auth/login") || url.includes("/auth/register");
+    if (error?.response?.status === 401 && getToken() && !isAuthCall) {
+      setToken(null);
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const fileUrl = (imagePath) => {
+  const t = getToken();
+  const q = t ? `token=${encodeURIComponent(t)}` : `lib=${encodeURIComponent(getLibraryId())}`;
+  return `${API}/files/${imagePath}?${q}`;
+};
 
 async function sha256Hex(file) {
   const buf = await file.arrayBuffer();
@@ -30,6 +54,13 @@ async function sha256Hex(file) {
 }
 
 export const api = {
+  // auth
+  register: (email, password) => axios.post(`${API}/auth/register`, { email, password }).then((r) => r.data),
+  login: (email, password) => axios.post(`${API}/auth/login`, { email, password }).then((r) => r.data),
+  me: () => axios.get(`${API}/auth/me`).then((r) => r.data),
+  logout: () => axios.post(`${API}/auth/logout`).then((r) => r.data),
+  importLibrary: (library_id) => axios.post(`${API}/auth/import`, { library_id }).then((r) => r.data),
+  // items
   listItems: () => axios.get(`${API}/items`).then((r) => r.data),
   getItem: (id) => axios.get(`${API}/items/${id}`).then((r) => r.data),
   related: (id) => axios.get(`${API}/items/${id}/related`).then((r) => r.data),
@@ -47,3 +78,12 @@ export const api = {
   check: (payload) => axios.post(`${API}/items/check`, payload).then((r) => r.data),
   checkFile: async (file) => api.check({ content_type: "image", hash: await sha256Hex(file) }),
 };
+
+export function formatApiErrorDetail(detail) {
+  if (detail == null) return "Something went wrong. Please try again.";
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail))
+    return detail.map((e) => (e && typeof e.msg === "string" ? e.msg : JSON.stringify(e))).filter(Boolean).join(" ");
+  if (detail && typeof detail.msg === "string") return detail.msg;
+  return String(detail);
+}

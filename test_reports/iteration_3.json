@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 3 (auth upgrade) fully green. Backend: 24/24 new pytest cases pass in /app/backend/tests/test_forgot_ai_auth.py covering (a) auth: register success/duplicate-400/short-password-400, login success/wrong-password-401/unknown-email-401, GET /auth/me with & without Bearer, POST /auth/logout invalidates the SAME token (subsequent /auth/me and /items -> 401 via token_version bump); (b) strict per-user isolation of User A vs User B — B's GET /items excludes A's item, and every A-scoped endpoint (GET/PUT/DELETE/pin/retry/ask/related) returns 404 for B; B's /search and /chat never return A's ids; image files served via /api/files/{path}?token= are only fetchable with the owner's Bearer, and unauthenticated hits 404; (c) import flow: register with X-Library-Id auto-imports (imported=2) and items become visible in the new user's authenticated list; login with X-Library-Id returns importable_count=3 and POST /auth/import moves them; guards work: library_id='default' and another user's id both return imported:0. Frontend: AuthGate renders (auth-email/auth-password/auth-submit/auth-switch), wrong login shows 'Invalid email or password' via auth-error, register + login flip to the app and store token in localStorage 'forgot_ai_token' (survives reload), Settings shows account-email with real email and logout-btn returns to the gate & clears the token. Import prompt (data-testid=import-prompt) appears when anonymous items exist and the user LOGS IN, with both import-skip and import-confirm; skip dismisses the dialog and reveals Home. Full items list, save button, and left nav render post-login.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AuthGate", "issues": ["Sign-in card is vertically centered but positioned relatively high; on wide viewports it feels top-heavy. Cosmetic only."]},
+      {"screen": "Dialogs (SaveDialog, ItemDetailDialog, ImportPrompt)", "issues": ["Prior-iteration Radix a11y warning about missing DialogDescription/aria-describedby likely still applies. Non-blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_forgot_ai_auth.py",
+    "/app/backend/tests/test_forgot_ai.py",
+    "/app/backend/tests/test_forgot_ai_deep.py",
+    "/app/test_reports/pytest/auth_results.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional: consider returning 401 (not 200) if a Bearer is present but expired/invalidated on non-/api/auth routes — currently resolve_library() already raises 401 which matches the spec, so verified.",
+    "Optional a11y: add DialogDescription to the ImportPrompt AlertDialog to silence Radix warning."
+  ],
+  "critical_code_review_comments": [
+    "auth.py uses raw JWT with only exp+tv (no iat/nbf). Fine for MVP but consider adding iat and a shorter TTL with a refresh flow — 30-day access tokens are long-lived.",
+    "login() rate-limit key is (ip:email). Behind a proxy request.client.host is likely the k8s ingress IP, which effectively rate-limits GLOBALLY per email — cannot distinguish real IPs. Should read X-Forwarded-For for a real per-user throttle.",
+    "login_attempts entries never expire when the user succeeds after being locked; delete_one on success is fine, but stale rows for never-succeeding attempts persist forever. Add a TTL index on locked_until.",
+    "resolve_library() returns DEFAULT_LIB ('default') for unauthenticated requests without X-Library-Id. Anonymous items on the shared 'default' bucket are visible to any other anonymous caller who doesn't set the header. Import guard blocks moving 'default' into a user, but the pre-signup exposure remains. Consider requiring a header or auto-issuing an anonymous cookie/lib on first call.",
+    "/api/files does token-based auth via query param — logs may capture the URL (and therefore the JWT). Consider signed short-lived URLs or moving auth into an Authorization header.",
+    "server.py grew to ~767 lines; time to split into modules (auth, items, ai, storage).",
+    "put_object/get_object still use blocking `requests` in async handlers (event-loop blocker) — carried over from iteration 2.",
+    "rank_items() still sends up to 300 items every /search & /chat (cost/latency); per-user libraries will grow.",
+    "No index on users.token_version or items.dedup_key; add unique compound index on (library_id, dedup_key) to enforce dedup server-side."
+  ],
+  "updated_files": ["/app/backend/tests/test_forgot_ai_auth.py"],
+  "success_rate": {"backend": "100% (24/24 new + prior suites intact)", "frontend": "100% of tested flows"},
+  "test_credentials": "usera@forgot.ai / TestPassA123, userb@forgot.ai / TestPassB123 (seeded at startup). Frontend token key: localStorage 'forgot_ai_token'. Anonymous lib key: 'forgot_ai_library'.",
+  "seed_data_creation": "Test creates ephemeral TEST_ / UI_IMPORT text items via API under uuid-prefixed anonymous libraries and cleans them up after. One 'UI_IMPORT one/two' anonymous library remains from the frontend import-skip flow (user chose to leave them out); this is intentional as skip should not import. usera has an earlier 'User's Secret Plan About Rockets' item from previous testing — harmless.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Auth is JWT Bearer only (no cookies). resolve_library() dependency maps Bearer->user_id, else falls back to X-Library-Id header, else 'default'. token_version bump on logout invalidates all outstanding tokens for that user. /api/files takes ?token=<jwt> or ?lib=<id>. Isolation is enforced by including library_id in every mongo query, so cross-tenant reads/writes naturally 404. Import guards: library_id 'default' and any id equal to an existing user id are refused (imported:0). Seed users are recreated at startup only if missing (idempotent, but password is NOT updated if the seed row already exists).",
+  "rca of the issue": "N/A - all tests passing"
+}

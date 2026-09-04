@@ -34,3 +34,17 @@ Verified end-to-end: 26/26 backend tests + all frontend flows, 100%.
 
 ## Out of scope (by user direction)
 Login/signup, passwords, billing, teams, marketing pages, advanced settings.
+
+### 2026-09-04 — Login & multi-user release
+- Email/password accounts with JWT **Bearer** tokens (no cookies; works for web + extension). `auth.py` (bcrypt hashing, token create/decode); `token_version` on each user so logout invalidates all outstanding tokens on every surface.
+- Routes `/api/auth/register|login|me|logout|import`; brute-force lockout on login; seeded test users usera@/userb@forgot.ai.
+- **Strict per-user isolation** via `resolve_library` dependency: Bearer → user's private library (=user id), else anonymous `X-Library-Id`. Every items/search/chat/related/files query includes library_id, so cross-account access naturally 404s. Verified end-to-end (24/24).
+- Import flow: register auto-imports the browser's anonymous library; login offers a one-time choice (`import-prompt`). Guards: never imports the shared "default" pile, never steals another user's library.
+- Frontend: `AuthProvider` + `AuthGate` (sign-in/create-account gate), token in localStorage `forgot_ai_token`, session persists across reload, 401 auto-logout, Settings shows account email + Log out. Images fetched via `/api/files/{path}?token=`.
+- Extension: signs in with the account (auto-pickup from an open Forgot AI tab, or sidebar sign-in fallback), signed-out state, remembers session; logout on web invalidates the extension token.
+- Deferred (stated): self-service password reset (needs an email provider, intentionally not added).
+
+## Auth-release backlog (P2, deferred hardening — not over-engineering)
+- Read X-Forwarded-For for real per-IP login throttle; TTL index on login_attempts.
+- Signed short-lived file URLs instead of ?token= query (avoid token in logs).
+- Split server.py into modules; async httpx for storage; pre-filter+rerank or embeddings for search; unique index on (library_id, dedup_key).
