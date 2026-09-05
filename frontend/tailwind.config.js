@@ -54,7 +54,20 @@ module.exports = {
           '3': 'hsl(var(--chart-3))',
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))'
-        }
+        },
+        paper: 'var(--color-paper)',
+        cream: 'var(--color-cream)',
+        ink: 'var(--color-ink)',
+        'muted-lp': 'var(--color-muted-lp)',
+        line: 'var(--color-line)',
+        'line-strong': 'var(--color-line-strong)',
+      },
+      fontFamily: {
+        display: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
+        'sans-lp': ['Figtree', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        soft: 'var(--shadow-soft)',
       },
       keyframes: {
         'accordion-down': {
