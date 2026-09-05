@@ -1,7 +1,7 @@
 
 import {
   ArrowUpRight,
-  Bookmark,
+  Bookmark, Brain,
   Image,
   LayoutPanelTop,
   Link2,
@@ -125,12 +125,12 @@ function SearchDemo() {
 
 export function LandingPage() {
   return (
-    <div className="paper-grain relative min-h-dvh bg-paper text-ink">
+    <div className="paper-grain relative min-h-dvh bg-paper text-ink font-sans-lp">
       <header className="sticky top-0 z-20 border-b border-line bg-paper/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-5 sm:h-16 sm:px-8">
           <a href="/" className="flex items-center gap-2 text-ink" aria-label="Forgot AI home">
             <span className="flex size-8 items-center justify-center rounded-sm bg-ink text-cream">
-              <Bookmark className="size-4" strokeWidth={2} aria-hidden="true" />
+              <Brain className="size-4" strokeWidth={2} aria-hidden="true" />
             </span>
             <span className="font-display text-lg font-medium tracking-tight">Forgot AI</span>
           </a>
