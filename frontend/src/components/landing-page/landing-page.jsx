@@ -15,6 +15,7 @@ import {
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "./reveal";
+import { Link } from "react-router-dom";
 
 const APP_URL = "https://forgot-ai.vercel.app";
 
