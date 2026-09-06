@@ -12,7 +12,8 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 from typing import List, Optional, Annotated
 from collections import defaultdict
-
+import asyncio
+import aiohttp
 import requests
 from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Query, Request, Depends
 from fastapi.responses import Response
@@ -47,28 +48,49 @@ LOCKOUT_MIN = 15
 class SimpleRateLimiter:
     def __init__(self):
         self.requests = defaultdict(list)
+        self.cleanup_counter = 0
 
     def check(self, key: str, max_requests: int, window_seconds: int = 60):
+        self.cleanup_counter += 1
         now = datetime.now(timezone.utc).timestamp()
+        if self.cleanup_counter > 1000:
+            self._prune(now, window_seconds)
+            self.cleanup_counter = 0
+
         timestamps = [t for t in self.requests[key] if now - t < window_seconds]
         if len(timestamps) >= max_requests:
             raise HTTPException(429, "Too many requests. Please slow down.")
         timestamps.append(now)
         self.requests[key] = timestamps
 
+    def _prune(self, now: float, window_seconds: int):
+        empty_keys = []
+        for k, v in self.requests.items():
+            valid = [t for t in v if now - t < window_seconds]
+            if not valid:
+                empty_keys.append(k)
+            else:
+                self.requests[k] = valid
+        for k in empty_keys:
+            del self.requests[k]
+
 
 limiter = SimpleRateLimiter()
 
 
-def put_object(path: str, data: bytes, content_type: str) -> dict:
-    supabase.storage.from_(STORAGE_BUCKET).upload(
-        path, data, {"content-type": content_type, "upsert": "false"}
-    )
+async def put_object(path: str, data: bytes, content_type: str) -> dict:
+    def _upload():
+        supabase.storage.from_(STORAGE_BUCKET).upload(
+            path, data, {"content-type": content_type, "upsert": "false"}
+        )
+    await asyncio.to_thread(_upload)
     return {"path": path}
 
 
-def get_object(path: str):
-    data = supabase.storage.from_(STORAGE_BUCKET).download(path)
+async def get_object(path: str):
+    def _download():
+        return supabase.storage.from_(STORAGE_BUCKET).download(path)
+    data = await asyncio.to_thread(_download)
     extension = path.rsplit(".", 1)[-1].lower() if "." in path else "octet-stream"
     content_types = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
     return data, content_types.get(extension, "application/octet-stream")
@@ -289,32 +311,43 @@ async def llm_text(system: str, prompt: str, image_b64: Optional[str] = None) ->
         headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
         headers["X-API-Key"] = OLLAMA_API_KEY
 
-    response = requests.post(OLLAMA_BASE_URL, headers=headers, json=payload, timeout=180)
-    response.raise_for_status()
-    data = response.json()
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(OLLAMA_BASE_URL, headers=headers, json=payload, timeout=180) as response:
+                response.raise_for_status()
+                data = await response.json()
 
-    if isinstance(data, dict):
-        if isinstance(data.get("response"), str):
-            return data["response"]
-        if isinstance(data.get("content"), str):
-            return data["content"]
-        if isinstance(data.get("message"), str):
-            return data["message"]
-        if isinstance(data.get("message"), dict):
-            content = data["message"].get("content")
-            if isinstance(content, str):
-                return content
-    return json.dumps(data)
+        if isinstance(data, dict):
+            if isinstance(data.get("response"), str):
+                return data["response"]
+            if isinstance(data.get("content"), str):
+                return data["content"]
+            if isinstance(data.get("message"), str):
+                return data["message"]
+            if isinstance(data.get("message"), dict):
+                content = data["message"].get("content")
+                if isinstance(content, str):
+                    return content
+        return json.dumps(data)
+    except Exception as e:
+        logger.error(f"LLM request failed: {e}")
+        return "{}"
 
 
 def parse_json_block(text: str) -> dict:
     if not text:
         return {}
-    m = re.search(r"\{.*\}", text, re.DOTALL)
+    m = re.search(r"[\{\[].*[\}\]]", text, re.DOTALL)
     if not m:
         return {}
     try:
-        return json.loads(m.group(0))
+        parsed = json.loads(m.group(0))
+        if isinstance(parsed, list):
+            for item in parsed:
+                if isinstance(item, dict):
+                    return item
+            return {}
+        return parsed
     except Exception:
         return {}
 
@@ -344,8 +377,9 @@ async def fetch_url_content(url: str):
         return None, ""
     title, text = None, ""
     try:
-        r = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0 (compatible; ForgotAI/1.0)"})
-        html = r.text
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0 (compatible; ForgotAI/1.0)"}) as r:
+                html = await r.text()
         tm = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
         if tm:
             title = re.sub(r"\s+", " ", tm.group(1)).strip()[:200]
@@ -365,7 +399,7 @@ async def enrich_item(item_id: str):
     try:
         ct = doc["content_type"]
         if ct == "image":
-            data, _ = get_object(doc["image_path"])
+            data, _ = await get_object(doc["image_path"])
             b64 = base64.b64encode(data).decode()
             raw = await llm_text(ENRICH_SYSTEM,
                                  enrich_prompt("screenshot/image",
@@ -431,7 +465,7 @@ def rel_age(iso: str) -> str:
 
 
 async def rank_items(query: str, lib: str, limit: int = 30):
-    docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(300)
+    docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(50)
     if not docs:
         return [], {}
     catalog = []
@@ -687,7 +721,7 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
     path = f"{lib}/{uuid.uuid4()}.{ext}"
     ct = file.content_type or f"image/{ext}"
     try:
-        result = put_object(path, data, ct)
+        result = await put_object(path, data, ct)
         stored_path = result["path"]
     except Exception as e:
         logger.error(f"Image upload failed: {e}")
@@ -858,7 +892,7 @@ async def download_file(path: str, request: Request, token: Optional[str] = Quer
     doc = await db.items.find_one({"image_path": path, "library_id": u["id"]})
     if not doc:
         raise HTTPException(404, "File not found")
-    data, content_type = get_object(path)
+    data, content_type = await get_object(path)
     return Response(content=data, media_type=content_type)
 
 
