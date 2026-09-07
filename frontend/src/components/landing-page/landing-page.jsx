@@ -1,7 +1,7 @@
 
 import {
   ArrowUpRight,
-  Bookmark, Brain,
+  Bookmark,
   Image,
   LayoutPanelTop,
   Link2,
@@ -14,8 +14,7 @@ import {
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Reveal } from "./reveal";
-import { Link } from "react-router-dom";
+import { Reveal } from "@/components/reveal";
 
 const APP_URL = "https://forgot-ai.vercel.app";
 
@@ -87,10 +86,10 @@ function AppLink({
 }) {
   return (
     <Button asChild size={size} className={className}>
-      <Link to="/app">
+      <a href={APP_URL}>
         {children}
         <ArrowUpRight className="size-4" strokeWidth={2} aria-hidden="true" />
-      </Link>
+      </a>
     </Button>
   );
 }
@@ -100,23 +99,23 @@ function SearchDemo() {
     <figure className="mx-auto max-w-xl">
       <div className="rounded-xl bg-cream p-4 shadow-soft">
         <div className="flex items-center gap-3 rounded-sm bg-paper px-4 py-3 text-ink">
-          <Search className="size-4 shrink-0 text-muted-lp" strokeWidth={1.75} aria-hidden="true" />
+          <Search className="size-4 shrink-0 text-muted" strokeWidth={1.75} aria-hidden="true" />
           <p className="min-w-0 flex-1 text-sm sm:text-base">
             that article about fast software
             <span className="search-caret" aria-hidden="true" />
           </p>
         </div>
         <div className="mt-3 rounded-sm bg-paper p-5">
-          <p className="text-xs font-medium tracking-wide text-muted-lp">Saved page</p>
+          <p className="text-xs font-medium tracking-wide text-muted">Saved page</p>
           <h3 className="mt-2 font-display text-xl font-medium tracking-tight text-ink">
             Why some software feels fast
           </h3>
-          <p className="mt-2 leading-relaxed text-muted-lp">
+          <p className="mt-2 leading-relaxed text-muted">
             A short piece on latency, waiting, and why some tools feel instant even when they aren’t.
           </p>
         </div>
       </div>
-      <figcaption className="mt-4 text-center text-sm text-muted-lp">
+      <figcaption className="mt-4 text-center text-sm text-muted">
         You type the idea. You get the thing back.
       </figcaption>
     </figure>
@@ -125,12 +124,12 @@ function SearchDemo() {
 
 export function LandingPage() {
   return (
-    <div className="paper-grain relative min-h-dvh bg-paper text-ink font-sans-lp">
+    <div className="paper-grain relative min-h-dvh bg-paper text-ink">
       <header className="sticky top-0 z-20 border-b border-line bg-paper/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-5 sm:h-16 sm:px-8">
           <a href="/" className="flex items-center gap-2 text-ink" aria-label="Forgot AI home">
             <span className="flex size-8 items-center justify-center rounded-sm bg-ink text-cream">
-              <Brain className="size-4" strokeWidth={2} aria-hidden="true" />
+              <Bookmark className="size-4" strokeWidth={2} aria-hidden="true" />
             </span>
             <span className="font-display text-lg font-medium tracking-tight">Forgot AI</span>
           </a>
@@ -141,13 +140,13 @@ export function LandingPage() {
       <main>
         <section className="mx-auto grid max-w-5xl items-center gap-10 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-2 lg:gap-16 lg:py-24">
           <div>
-            <p className="hero-enter text-sm font-medium tracking-wide text-muted-lp">
+            <p className="hero-enter text-sm font-medium tracking-wide text-muted">
               For people who keep losing things they already saw
             </p>
             <h1 className="hero-enter hero-enter-delay-1 mt-4 font-display text-4xl font-medium leading-tight tracking-tight text-ink sm:text-5xl lg:text-6xl">
               Save anything now. Find it later.
             </h1>
-            <p className="hero-enter hero-enter-delay-2 mt-5 max-w-xl text-lg leading-relaxed text-muted-lp">
+            <p className="hero-enter hero-enter-delay-2 mt-5 max-w-xl text-lg leading-relaxed text-muted">
               Drop a link, a screenshot, or a note — then find it later in the words you remember.
             </p>
             <div className="hero-enter hero-enter-delay-3 mt-8">
@@ -170,11 +169,11 @@ export function LandingPage() {
             <h2 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">
               You saved it. You just can’t find it.
             </h2>
-            <p className="mt-6 text-lg leading-relaxed text-muted-lp">
+            <p className="mt-6 text-lg leading-relaxed text-muted">
               You saw something useful. You saved it. You know you saved it. And now it is buried in bookmarks, the
               camera roll, or a doc you will never open again.
             </p>
-            <p className="mt-4 text-lg leading-relaxed text-muted-lp">
+            <p className="mt-4 text-lg leading-relaxed text-muted">
               Forgot AI is a quieter place to put those things. Later, you type the idea in normal words. You get it
               back.
             </p>
@@ -196,10 +195,10 @@ export function LandingPage() {
                       <span className="flex size-10 items-center justify-center rounded-md bg-paper text-ink">
                         <step.icon className="size-5" strokeWidth={1.75} aria-hidden="true" />
                       </span>
-                      <span className="font-display text-sm tracking-wide text-muted-lp">{step.n}</span>
+                      <span className="font-display text-sm tracking-wide text-muted">{step.n}</span>
                     </div>
                     <h3 className="mt-6 font-display text-xl font-medium tracking-tight text-ink">{step.title}</h3>
-                    <p className="mt-2 leading-relaxed text-muted-lp">{step.body}</p>
+                    <p className="mt-2 leading-relaxed text-muted">{step.body}</p>
                   </li>
                 </Reveal>
               ))}
@@ -213,7 +212,7 @@ export function LandingPage() {
               <h2 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">
                 Search like you remember it
               </h2>
-              <p className="mt-4 text-lg leading-relaxed text-muted-lp">
+              <p className="mt-4 text-lg leading-relaxed text-muted">
                 You will not remember the title. You will remember the idea. That is enough.
               </p>
             </Reveal>
@@ -238,7 +237,7 @@ export function LandingPage() {
                       <item.icon className="size-5" strokeWidth={1.75} aria-hidden="true" />
                     </span>
                     <h3 className="mt-5 font-display text-lg font-medium tracking-tight text-ink">{item.label}</h3>
-                    <p className="mt-1 leading-relaxed text-muted-lp">{item.hint}</p>
+                    <p className="mt-1 leading-relaxed text-muted">{item.hint}</p>
                   </li>
                 </Reveal>
               ))}
@@ -255,7 +254,7 @@ export function LandingPage() {
               <h2 className="mt-5 font-display text-2xl font-medium tracking-tight text-ink sm:text-3xl">
                 Save from any page, without leaving it
               </h2>
-              <p className="mt-3 leading-relaxed text-muted-lp">
+              <p className="mt-3 leading-relaxed text-muted">
                 There is a Chrome extension for one-click save while you browse. Use it when you do not want to break
                 your stride. The website is still where you come back to search.
               </p>
@@ -288,7 +287,7 @@ export function LandingPage() {
             <h2 className="font-display text-4xl font-medium tracking-tight text-ink sm:text-5xl">
               Save anything now. Find it later.
             </h2>
-            <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted-lp">
+            <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted">
               Start with whatever is already sitting in a tab, a screenshot, or the back of your mind.
             </p>
             <div className="mt-8 flex justify-center">
@@ -301,7 +300,7 @@ export function LandingPage() {
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-5xl flex-col gap-1 px-5 py-8 sm:flex-row sm:items-baseline sm:justify-between sm:px-8">
           <p className="font-display text-sm font-medium text-ink">Forgot AI</p>
-          <p className="text-sm text-muted-lp">Private to your account.</p>
+          <p className="text-sm text-muted">Private to your account.</p>
         </div>
       </footer>
     </div>

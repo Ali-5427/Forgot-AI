@@ -40,7 +40,7 @@ function render(items, showWhy) {
     card.innerHTML = `${img}<div class="type">${typeLabel(it.content_type)}</div>
       <div class="title">${escapeHtml(it.title)}</div>
       <div class="preview">${escapeHtml(preview)}</div>${why}`;
-    card.onclick = () => chrome.tabs.create({ url: `${BACKEND_URL}/?open=${it.id}` });
+    card.onclick = () => chrome.tabs.create({ url: `${FRONTEND_URL}/?open=${it.id}` });
     listEl.appendChild(card);
   });
 }

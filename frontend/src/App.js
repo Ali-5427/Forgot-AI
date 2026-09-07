@@ -77,43 +77,30 @@ function Shell() {
   if (!user) return <AuthGate />;
 
   return (
-    <>
+    <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
-          <Route path="all" element={<AllSaved />} />
-          <Route path="search" element={<SearchPage />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="/all" element={<AllSaved />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>
       <GlobalDialogs />
       <ImportPrompt />
-    </>
-  );
-}
-
-import { LandingPage } from "@/components/landing-page/landing-page";
-
-function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/app/*" element={<Shell />} />
-    </Routes>
+    </BrowserRouter>
   );
 }
 
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <AuthProvider>
-          <StoreProvider>
-            <AppRoutes />
-            <Toaster position="bottom-right" />
-          </StoreProvider>
-        </AuthProvider>
-      </BrowserRouter>
+      <AuthProvider>
+        <StoreProvider>
+          <Shell />
+          <Toaster position="bottom-right" />
+        </StoreProvider>
+      </AuthProvider>
     </div>
   );
 }

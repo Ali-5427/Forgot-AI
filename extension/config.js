@@ -2,6 +2,8 @@
 export const BACKEND_URL = (typeof process !== "undefined" && process.env?.REACT_APP_BACKEND_URL) || "https://forgot-ai.onrender.com";
 export const API = BACKEND_URL.replace(/\/+$/, "") + "/api";
 
+export const FRONTEND_URL = "https://forgot-ai.vercel.app";
+
 // Resolve the signed-in account token:
 // 1) a token stored in the extension (from sidebar sign-in), else
 // 2) auto-pickup from the Forgot AI website if it's open and signed in.
@@ -9,7 +11,6 @@ export async function getToken() {
   const { token } = await chrome.storage.local.get("token");
   if (token) return token;
   try {
-    const FRONTEND_URL = "https://forgot-ai.vercel.app";
     const tabs = await chrome.tabs.query({ url: FRONTEND_URL + "/*" });
     for (const t of tabs) {
       const [{ result }] = await chrome.scripting.executeScript({
