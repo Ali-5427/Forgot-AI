@@ -1,5 +1,5 @@
 import "@/App.css";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useSearchParams } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import {
@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from "@/auth";
 import { Layout } from "@/components/Layout";
 import { SaveDialog } from "@/components/SaveDialog";
 import { ItemDetailDialog } from "@/components/ItemDetailDialog";
+import { LandingPage } from "@/components/landing-page/landing-page";
 import AuthGate from "@/pages/AuthGate";
 import Home from "@/pages/Home";
 import AllSaved from "@/pages/AllSaved";
@@ -68,13 +69,35 @@ function ImportPrompt() {
   );
 }
 
+function LoggedOut() {
+  const [showAuth, setShowAuth] = useState(false);
+
+  if (showAuth) {
+    return (
+      <div className="relative min-h-screen">
+        <button
+          type="button"
+          onClick={() => setShowAuth(false)}
+          className="absolute left-4 top-4 z-10 text-sm text-muted-foreground hover:text-foreground"
+          data-testid="auth-back"
+        >
+          Back
+        </button>
+        <AuthGate />
+      </div>
+    );
+  }
+
+  return <LandingPage onOpenApp={() => setShowAuth(true)} />;
+}
+
 function Shell() {
   const { user } = useAuth();
 
   if (user === null) {
     return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Loading…</div>;
   }
-  if (!user) return <AuthGate />;
+  if (!user) return <LoggedOut />;
 
   return (
     <BrowserRouter>
