@@ -56,7 +56,6 @@ class SimpleRateLimiter:
         if self.cleanup_counter > 1000:
             self._prune(now, window_seconds)
             self.cleanup_counter = 0
-
         timestamps = [t for t in self.requests[key] if now - t < window_seconds]
         if len(timestamps) >= max_requests:
             raise HTTPException(429, "Too many requests. Please slow down.")
@@ -295,6 +294,7 @@ async def get_current_user(request: Request) -> dict:
 
 
 # ---------------- AI helpers ----------------
+async def llm_text(system: str, prompt: str, image_b64: Optional[str] = None) -> str:
     user_msg = {"role": "user", "content": prompt}
     if image_b64:
         user_msg["images"] = [image_b64]
@@ -654,7 +654,7 @@ async def do_import(payload: ImportIn, request: Request, user: dict = Depends(ge
 
 # ---------------- Item routes ----------------
 @api_router.get("/")
-async def root():
+async def api_root():
     return {"message": "Forgot AI API"}
 
 
@@ -720,7 +720,6 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(400, "Image too large. Max 10MB.")
     ext = validate_image_bytes(data)
-
     path = f"{lib}/{uuid.uuid4()}.{ext}"
     ct = file.content_type or f"image/{ext}"
     try:
@@ -904,15 +903,14 @@ async def download_file(path: str, request: Request, token: Optional[str] = Quer
 async def root():
     return {"status": "ok", "service": "Forgot AI API", "message": "Backend is running!"}
 
+
 # ---------------- App wiring ----------------
 app.include_router(api_router)
 
-# Fallback includes both local dev and the live Vercel URL
 default_origins = 'http://localhost:3000,https://forgot-ai.vercel.app'
 raw_origins = os.environ.get('CORS_ORIGINS', default_origins).split(',')
 origins = [o.strip().strip("'").strip('"') for o in raw_origins if o.strip()]
 allow_all = "*" in origins
-
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=not allow_all,
@@ -925,5 +923,3 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     logger.info("Supabase database and storage configured")
-
-
