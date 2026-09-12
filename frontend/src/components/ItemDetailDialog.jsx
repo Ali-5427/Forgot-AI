@@ -15,6 +15,9 @@ import { toast } from "sonner";
 import {
   Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 
 const QUICK = ["What is this?", "Why did I save this?", "Explain this simply.", "Key points?", "How can I use this?"];
 
@@ -278,8 +281,33 @@ export const ItemDetailDialog = ({ itemId, open, onOpenChange, onChanged }) => {
                 </Button>
               </div>
               {(asking || answer) && (
-                <div className="mt-3 text-sm bg-neutral-50 border border-border rounded-lg p-3 whitespace-pre-wrap" data-testid="ask-answer">
-                  {asking ? <span className="text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Thinking…</span> : answer}
+                <div className="mt-3 text-sm bg-neutral-50 border border-border rounded-lg p-4 overflow-auto" data-testid="ask-answer">
+                  {asking ? (
+                    <span className="text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Thinking…</span>
+                  ) : (
+                    <div className="text-foreground">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({node, ...props}) => <p className="mb-3 last:mb-0 leading-relaxed" {...props} />,
+                          a: ({node, ...props}) => <a className="text-blue-600 hover:underline font-medium" target="_blank" rel="noreferrer" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-3 space-y-1" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-3 space-y-1" {...props} />,
+                          li: ({node, ...props}) => <li className="" {...props} />,
+                          h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-3 mt-4 first:mt-0" {...props} />,
+                          h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-3 mt-4 first:mt-0" {...props} />,
+                          h3: ({node, ...props}) => <h3 className="text-base font-bold mb-2 mt-3" {...props} />,
+                          table: ({node, ...props}) => <div className="overflow-x-auto mb-4 border border-border rounded-md"><table className="w-full text-left border-collapse text-sm" {...props} /></div>,
+                          th: ({node, ...props}) => <th className="border-b border-border p-3 font-semibold bg-neutral-100/50" {...props} />,
+                          td: ({node, ...props}) => <td className="border-b border-border p-3" {...props} />,
+                          blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-neutral-300 pl-4 italic text-neutral-600 mb-3 py-1" {...props} />,
+                          strong: ({node, ...props}) => <strong className="font-semibold text-neutral-900" {...props} />
+                        }}
+                      >
+                        {answer}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               )}
             </section>
