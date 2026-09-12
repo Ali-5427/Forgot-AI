@@ -34,7 +34,7 @@ db = SupabaseDatabase(supabase)
 
 OLLAMA_API_KEY = os.environ.get('OLLAMA_API_KEY', '').strip()
 OLLAMA_BASE_URL = (os.environ.get('OLLAMA_BASE_URL') or "https://ollama.com/api/chat").rstrip('/')
-AI_MODEL = ("ollama", "deepseek-v4.1-flash")
+AI_MODEL = ("ollama", "gpt-oss:20b")
 APP_NAME = "forgot-ai"
 STORAGE_BUCKET = os.environ.get("STORAGE_BUCKET", "forgot-ai-assets")
 
