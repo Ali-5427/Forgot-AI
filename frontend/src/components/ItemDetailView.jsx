@@ -262,22 +262,36 @@ export const ItemDetailView = ({ itemId, onClose, onChanged }) => {
           )}
           
           {item.content_type === "url" && (
-            <div className="bg-white border border-neutral-200/60 rounded-2xl p-6 shadow-sm space-y-4">
-              <a
-                href={item.source_url}
-                target="_blank"
-                rel="noreferrer"
-                data-testid="open-source-url"
-                className="text-[15px] font-medium text-blue-600 hover:text-blue-800 hover:underline flex items-start gap-2 break-all bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 transition-colors"
-              >
-                <ExternalLink className="h-4 w-4 shrink-0 mt-0.5" />
-                {item.source_title || item.source_url} 
-              </a>
-              {item.original_text && (
-                <div className="text-[15px] leading-relaxed text-neutral-600 line-clamp-[25] font-serif">
-                  {item.original_text}
+            <div className="bg-white border border-neutral-200/60 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+              {item.og_image && (
+                <div className="w-full h-48 bg-neutral-100 border-b border-neutral-200/60 overflow-hidden shrink-0">
+                  <img src={item.og_image} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />
                 </div>
               )}
+              <div className="p-6 space-y-4">
+                <a
+                  href={item.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="open-source-url"
+                  className="text-[15px] font-medium text-blue-600 hover:text-blue-800 hover:underline flex items-start gap-2 break-all bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 transition-colors"
+                >
+                  <ExternalLink className="h-4 w-4 shrink-0 mt-0.5" />
+                  {item.source_title || item.source_url} 
+                </a>
+                
+                {item.og_description && (
+                  <div className="text-[14px] text-neutral-500 leading-relaxed italic border-l-2 border-neutral-200 pl-3">
+                    {item.og_description}
+                  </div>
+                )}
+
+                {item.original_text && (
+                  <div className="text-[15px] leading-relaxed text-neutral-600 line-clamp-[25] font-serif pt-2">
+                    {item.original_text}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

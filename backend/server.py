@@ -34,7 +34,7 @@ db = SupabaseDatabase(supabase)
 
 OLLAMA_API_KEY = os.environ.get('OLLAMA_API_KEY', '').strip()
 OLLAMA_BASE_URL = (os.environ.get('OLLAMA_BASE_URL') or "https://ollama.com/api/chat").rstrip('/')
-AI_MODEL = ("ollama", "gpt-oss:20b")
+AI_MODEL = ("ollama", "deepseek-v4.1-flash")
 APP_NAME = "forgot-ai"
 STORAGE_BUCKET = os.environ.get("STORAGE_BUCKET", "forgot-ai-assets")
 
@@ -171,6 +171,8 @@ class SavedItem(BaseModel):
     source_title: Optional[str] = None
     source_domain: Optional[str] = None
     image_path: Optional[str] = None
+    og_image: Optional[str] = None
+    og_description: Optional[str] = None
     title: str = "Untitled"
     summary: str = ""
     keywords: List[str] = Field(default_factory=list)
@@ -416,8 +418,8 @@ def enrich_prompt(kind: str, body: str) -> str:
 async def fetch_url_content(url: str):
     if not is_safe_url(url):
         logger.warning(f"SSRF blocked URL fetch for {url}")
-        return None, ""
-    title, text = None, ""
+        return None, "", None, None
+    title, text, og_image, og_desc = None, "", None, None
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0 (compatible; ForgotAI/1.0)"}) as r:
@@ -425,13 +427,22 @@ async def fetch_url_content(url: str):
         tm = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
         if tm:
             title = re.sub(r"\s+", " ", tm.group(1)).strip()[:200]
+            
+        og_img_m = re.search(r"<meta\s+(?:property|name)=[\"']og:image[\"']\s+content=[\"'](.*?)[\"']", html, re.IGNORECASE)
+        if og_img_m:
+            og_image = og_img_m.group(1).strip()
+            
+        og_desc_m = re.search(r"<meta\s+(?:property|name)=[\"']og:description[\"']\s+content=[\"'](.*?)[\"']", html, re.IGNORECASE)
+        if og_desc_m:
+            og_desc = og_desc_m.group(1).strip()
+            
         body = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html, flags=re.IGNORECASE | re.DOTALL)
         body = re.sub(r"<[^>]+>", " ", body)
         body = re.sub(r"\s+", " ", body).strip()
         text = body[:6000]
     except Exception as e:
         logger.warning(f"URL fetch failed for {url}: {e}")
-    return title, text
+    return title, text, og_image, og_desc
 
 
 async def enrich_item(item_id: str):
@@ -448,14 +459,19 @@ async def enrich_item(item_id: str):
                                                "Describe what this image shows, extract any readable text, and infer its topic."),
                                  image_b64=b64)
         elif ct == "url":
-            title, text = await fetch_url_content(doc["source_url"])
+            title, text, og_image, og_desc = await fetch_url_content(doc["source_url"])
             update = {}
             if title and not doc.get("source_title"):
                 update["source_title"] = title
+            if og_image and not doc.get("og_image"):
+                update["og_image"] = og_image
+            if og_desc and not doc.get("og_description"):
+                update["og_description"] = og_desc
             if update:
                 await db.items.update_one({"id": item_id}, {"$set": update})
             body = (f"URL: {doc['source_url']}\nDomain: {doc.get('source_domain')}\n"
                     f"Page title: {title or doc.get('source_title') or 'unknown'}\n"
+                    f"Page description: {og_desc or doc.get('og_description') or 'none'}\n"
                     f"Extracted page content: {text or doc.get('original_text') or 'not accessible'}")
             raw = await llm_text(ENRICH_SYSTEM, enrich_prompt("web page / URL", body))
         else:
