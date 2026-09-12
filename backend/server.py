@@ -295,16 +295,19 @@ async def get_current_user(request: Request) -> dict:
 
 
 # ---------------- AI helpers ----------------
-async def llm_text(system: str, prompt: str, image_b64: Optional[str] = None) -> str:
+    user_msg = {"role": "user", "content": prompt}
+    if image_b64:
+        user_msg["images"] = [image_b64]
+
     payload = {
         "model": AI_MODEL[1],
-        "system": system,
-        "prompt": prompt,
+        "messages": [
+            {"role": "system", "content": system},
+            user_msg,
+        ],
         "stream": False,
         "format": "json",
     }
-    if image_b64:
-        payload["images"] = [image_b64]
 
     headers = {"Content-Type": "application/json"}
     if OLLAMA_API_KEY:
