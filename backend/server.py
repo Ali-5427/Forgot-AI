@@ -896,7 +896,15 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
     )
     system = ("You are Forgot AI. Answer the user's question about ONE saved item using only its content below. "
               "Be concise and practical. If the item lacks the info, say so briefly.\n\nSAVED ITEM:\n" + context)
-    return StreamingResponse(llm_stream(system, payload.question), media_type="text/plain")
+    return StreamingResponse(
+        llm_stream(system, payload.question), 
+        media_type="application/octet-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
 
 
 @api_router.post("/search")
