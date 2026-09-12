@@ -16,7 +16,7 @@ import asyncio
 import aiohttp
 import requests
 from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Query, Request, Depends
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
@@ -336,6 +336,44 @@ async def llm_text(system: str, prompt: str, image_b64: Optional[str] = None) ->
     except Exception as e:
         logger.error(f"LLM request failed: {e}")
         return "{}"
+
+
+async def llm_stream(system: str, prompt: str, image_b64: Optional[str] = None):
+    user_msg = {"role": "user", "content": prompt}
+    if image_b64:
+        user_msg["images"] = [image_b64]
+
+    payload = {
+        "model": AI_MODEL[1],
+        "messages": [
+            {"role": "system", "content": system},
+            user_msg,
+        ],
+        "stream": True,
+    }
+
+    headers = {"Content-Type": "application/json"}
+    if OLLAMA_API_KEY:
+        headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
+        headers["X-API-Key"] = OLLAMA_API_KEY
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(OLLAMA_BASE_URL, headers=headers, json=payload, timeout=180) as response:
+                response.raise_for_status()
+                async for line in response.content:
+                    if line:
+                        try:
+                            data = json.loads(line.decode('utf-8'))
+                            if "message" in data and "content" in data["message"]:
+                                yield data["message"]["content"]
+                            elif "response" in data:
+                                yield data["response"]
+                        except json.JSONDecodeError:
+                            pass
+    except Exception as e:
+        logger.error(f"LLM stream request failed: {e}")
+        yield "Error: Could not complete the response."
 
 
 def parse_json_block(text: str) -> dict:
@@ -858,8 +896,7 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
     )
     system = ("You are Forgot AI. Answer the user's question about ONE saved item using only its content below. "
               "Be concise and practical. If the item lacks the info, say so briefly.\n\nSAVED ITEM:\n" + context)
-    answer = await llm_text(system, payload.question)
-    return {"answer": answer}
+    return StreamingResponse(llm_stream(system, payload.question), media_type="text/plain")
 
 
 @api_router.post("/search")

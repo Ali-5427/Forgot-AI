@@ -89,7 +89,10 @@ export const ItemDetailDialog = ({ itemId, open, onOpenChange, onChanged }) => {
     setAnswer("");
     setQuestion(query);
     try {
-      const r = await api.ask(item.id, query);
+      const r = await api.ask(item.id, query, (chunk) => {
+        setAnswer(chunk);
+        setAsking(false); // Hide the "Thinking..." loader once we start getting chunks
+      });
       setAnswer(r.answer);
     } catch {
       setAnswer("Could not get an answer. Try again.");

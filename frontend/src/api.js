@@ -98,7 +98,37 @@ export const api = {
   deleteItem: (id) => axios.delete(`${API}/items/${id}`).then((r) => r.data),
   retryItem: (id) => axios.post(`${API}/items/${id}/retry`).then((r) => r.data),
   pinItem: (id, pinned) => axios.post(`${API}/items/${id}/pin`, { pinned }).then((r) => r.data),
-  ask: (id, question) => axios.post(`${API}/items/${id}/ask`, { question }).then((r) => r.data),
+  ask: async (id, question, onChunk) => {
+    const t = getToken();
+    const headers = {
+      "Content-Type": "application/json",
+      "X-Library-Id": getLibraryId(),
+    };
+    if (t) headers["Authorization"] = `Bearer ${t}`;
+
+    const res = await fetch(`${API}/items/${id}/ask`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ question }),
+    });
+
+    if (!res.ok) throw new Error("Network response was not ok");
+    if (!onChunk) {
+      const text = await res.text();
+      return { answer: text };
+    }
+    
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let answer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      answer += decoder.decode(value, { stream: true });
+      onChunk(answer);
+    }
+    return { answer };
+  },
   search: (query) => axios.post(`${API}/search`, { query }).then((r) => r.data),
   chat: (query) => axios.post(`${API}/chat`, { query }).then((r) => r.data),
   check: (payload) => axios.post(`${API}/items/check`, payload).then((r) => r.data),
