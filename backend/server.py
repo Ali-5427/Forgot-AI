@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
 from supabase_db import SupabaseDatabase, create_supabase_client
+from supabase import create_client as make_supabase_client
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -531,17 +532,30 @@ async def register(payload: AuthIn, request: Request):
     if len(payload.password) < 8:
         raise HTTPException(400, "Password must be at least 8 characters")
     try:
-        created = supabase.auth.admin.create_user({
+        # --- THE FIX: Create a dedicated Admin Client ---
+        supabase_url = os.environ.get("SUPABASE_URL")
+        service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        
+        if not service_key:
+            raise HTTPException(500, "Server is missing SUPABASE_SERVICE_ROLE_KEY!")
+            
+        supabase_admin = make_supabase_client(supabase_url, service_key)
+        
+        # Use supabase_admin instead of supabase here!
+        created = supabase_admin.auth.admin.create_user({
             "email": email,
             "password": payload.password,
             "email_confirm": True,
             "user_metadata": {"name": email.split("@")[0]},
         })
         auth_user = created.user
+        # ------------------------------------------------
+
     except Exception as e:
         if "already" in str(e).lower() or "duplicate" in str(e).lower():
             raise HTTPException(400, "An account with this email already exists")
-        raise HTTPException(400, "Unable to create account") from e
+        raise HTTPException(400, f"Unable to create account: {str(e)}") from e
+        
     user = {
         "id": str(auth_user.id),
         "email": email,
@@ -550,6 +564,8 @@ async def register(payload: AuthIn, request: Request):
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.users.insert_one(user)
+    
+    # Use the regular anon client to sign them in after creation
     session = supabase.auth.sign_in_with_password({"email": email, "password": payload.password})
     await _record_session(user["id"], session.session.access_token, user["token_version"])
 
