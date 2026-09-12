@@ -18,8 +18,8 @@ import remarkGfm from "remark-gfm";
 
 const QUICK = ["What is this?", "Why did I save this?", "Explain this simply.", "Key points?", "How can I use this?"];
 
-export const ItemDetailView = ({ itemId, onClose, onChanged }) => {
-  const { openItem } = useStore();
+export const ItemDetailView = ({ itemId, onClose }) => {
+  const { updateItemLocal, deleteItemLocal, togglePin } = useStore();
   const [item, setItem] = useState(null);
   const [related, setRelated] = useState([]);
   const [editing, setEditing] = useState(false);
@@ -67,30 +67,55 @@ export const ItemDetailView = ({ itemId, onClose, onChanged }) => {
   };
 
   const saveEdit = async () => {
-    const updated = await api.updateItem(item.id, {
+    const updates = {
       title: form.title,
       summary: form.summary,
       category: form.category,
       keywords: form.keywords.split(",").map((k) => k.trim()).filter(Boolean),
-    });
-    setItem(updated);
+    };
+    // Optimistic local update
+    setItem((prev) => ({ ...prev, ...updates }));
+    updateItemLocal(item.id, updates);
     setEditing(false);
     toast.success("Saved changes ✓");
-    onChanged && onChanged();
+    
+    // Background sync
+    try {
+      await api.updateItem(item.id, updates);
+    } catch (err) {
+      toast.error("Failed to save changes");
+    }
   };
 
   const del = async () => {
-    await api.deleteItem(item.id);
+    // Optimistic local update
+    deleteItemLocal(item.id);
     toast.success("Deleted");
     onClose();
-    onChanged && onChanged();
+    
+    // Background sync
+    try {
+      await api.deleteItem(item.id);
+    } catch (err) {
+      toast.error("Failed to delete item");
+    }
   };
 
   const retry = async () => {
-    const r = await api.retryItem(item.id);
-    setItem(r);
+    // Optimistic local update for status
+    setItem((prev) => ({ ...prev, status: "processing" }));
+    updateItemLocal(item.id, { status: "processing" });
     toast.message("Re-processing…");
-    onChanged && onChanged();
+    
+    try {
+      const r = await api.retryItem(item.id);
+      setItem(r);
+      updateItemLocal(item.id, r);
+    } catch (err) {
+      setItem((prev) => ({ ...prev, status: "failed" }));
+      updateItemLocal(item.id, { status: "failed" });
+      toast.error("Failed to retry");
+    }
   };
 
   const ask = async (q) => {
@@ -145,11 +170,9 @@ export const ItemDetailView = ({ itemId, onClose, onChanged }) => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={async () => {
-                const r = await api.pinItem(item.id, !item.pinned);
-                setItem(r);
-                toast.success(item.pinned ? "Unpinned" : "Pinned to top");
-                onChanged && onChanged();
+              onClick={() => {
+                setItem((prev) => ({ ...prev, pinned: !item.pinned }));
+                togglePin(item);
               }}
               data-testid="pin-item-btn"
               title={item.pinned ? "Unpin" : "Pin to top"}

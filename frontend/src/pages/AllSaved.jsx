@@ -14,8 +14,8 @@ const TYPES = [
 ];
 
 export default function AllSaved() {
-  const { refreshKey, openSave, openItem, togglePin } = useStore();
-  const { items, loading } = useItems(refreshKey);
+  const { openSave, openItem, togglePin } = useStore();
+  const { items, loading } = useItems();
   const [type, setType] = useState("all");
   const [recent, setRecent] = useState(false);
   const [sort, setSort] = useState("newest");

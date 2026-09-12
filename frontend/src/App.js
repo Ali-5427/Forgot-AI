@@ -18,7 +18,7 @@ import SearchPage from "@/pages/SearchPage";
 import Settings from "@/pages/Settings";
 
 function GlobalDialogs() {
-  const { saveOpen, setSaveOpen, detailId, detailOpen, setDetailOpen, bumpRefresh, openItem } = useStore();
+  const { saveOpen, setSaveOpen, openItem, reloadItems } = useStore();
   const [params, setParams] = useSearchParams();
 
   useEffect(() => {
@@ -33,19 +33,19 @@ function GlobalDialogs() {
 
   return (
     <>
-      <SaveDialog open={saveOpen} onOpenChange={setSaveOpen} onSaved={() => bumpRefresh()} onOpenExisting={(id) => openItem(id)} />
+      <SaveDialog open={saveOpen} onOpenChange={setSaveOpen} onSaved={() => reloadItems()} onOpenExisting={(id) => openItem(id)} />
     </>
   );
 }
 
 function ImportPrompt() {
   const { importPrompt, confirmImport } = useAuth();
-  const { bumpRefresh } = useStore();
+  const { reloadItems } = useStore();
   const open = !!importPrompt;
 
   const handle = async (doImport) => {
     await confirmImport(doImport);
-    if (doImport) bumpRefresh();
+    if (doImport) reloadItems();
   };
 
   return (

@@ -7,8 +7,8 @@ import { useItems } from "@/lib/useItems";
 import { useStore } from "@/store";
 
 export default function Home() {
-  const { refreshKey, openSave, openItem, togglePin } = useStore();
-  const { items, loading } = useItems(refreshKey);
+  const { openSave, openItem, togglePin } = useStore();
+  const { items, loading } = useItems();
   const [q, setQ] = useState("");
   const navigate = useNavigate();
 

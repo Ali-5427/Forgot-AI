@@ -12,7 +12,7 @@ const nav = [
 ];
 
 export const Layout = () => {
-  const { openSave, detailOpen, detailId, setDetailOpen, bumpRefresh } = useStore();
+  const { openSave, detailOpen, detailId, setDetailOpen } = useStore();
   return (
     <div className="min-h-screen flex bg-neutral-50 text-foreground overflow-hidden">
       <aside className="w-60 shrink-0 border-r border-border bg-white flex flex-col fixed h-screen z-20">
@@ -58,7 +58,7 @@ export const Layout = () => {
 
       <main className="flex-1 ml-60 min-h-screen relative flex flex-col bg-white">
         {detailOpen && detailId ? (
-          <ItemDetailView itemId={detailId} onClose={() => setDetailOpen(false)} onChanged={bumpRefresh} />
+          <ItemDetailView itemId={detailId} onClose={() => setDetailOpen(false)} />
         ) : (
           <Outlet />
         )}
