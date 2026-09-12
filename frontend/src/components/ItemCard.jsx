@@ -34,9 +34,15 @@ export const ItemCard = ({ item, onClick, onPin }) => {
         </button>
       )}
 
-      {item.content_type === "image" && item.image_path && (
-        <div className="h-36 w-full bg-neutral-100 border-b border-border overflow-hidden">
-          <img src={fileUrl(item.image_path)} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
+      {item.image_path && (
+        <div className="h-36 w-full bg-neutral-100 border-b border-border overflow-hidden shrink-0 relative">
+          <img 
+            src={item.content_type === "image" ? fileUrl(item.image_path) : item.image_path} 
+            alt={item.title} 
+            className="absolute inset-0 h-full w-full object-cover" 
+            loading="lazy" 
+            onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.style.display = 'none'; }}
+          />
         </div>
       )}
       <div className="p-4 flex flex-col gap-2 flex-1">
