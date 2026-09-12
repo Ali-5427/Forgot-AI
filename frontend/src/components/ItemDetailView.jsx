@@ -263,9 +263,9 @@ export const ItemDetailView = ({ itemId, onClose, onChanged }) => {
           
           {item.content_type === "url" && (
             <div className="bg-white border border-neutral-200/60 rounded-2xl overflow-hidden shadow-sm flex flex-col">
-              {item.og_image && (
+              {item.image_path && (
                 <div className="w-full h-48 bg-neutral-100 border-b border-neutral-200/60 overflow-hidden shrink-0">
-                  <img src={item.og_image} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />
+                  <img src={item.image_path} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />
                 </div>
               )}
               <div className="p-6 space-y-4">
@@ -279,12 +279,6 @@ export const ItemDetailView = ({ itemId, onClose, onChanged }) => {
                   <ExternalLink className="h-4 w-4 shrink-0 mt-0.5" />
                   {item.source_title || item.source_url} 
                 </a>
-                
-                {item.og_description && (
-                  <div className="text-[14px] text-neutral-500 leading-relaxed italic border-l-2 border-neutral-200 pl-3">
-                    {item.og_description}
-                  </div>
-                )}
 
                 {item.original_text && (
                   <div className="text-[15px] leading-relaxed text-neutral-600 line-clamp-[25] font-serif pt-2">

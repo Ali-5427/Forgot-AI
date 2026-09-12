@@ -171,8 +171,6 @@ class SavedItem(BaseModel):
     source_title: Optional[str] = None
     source_domain: Optional[str] = None
     image_path: Optional[str] = None
-    og_image: Optional[str] = None
-    og_description: Optional[str] = None
     title: str = "Untitled"
     summary: str = ""
     keywords: List[str] = Field(default_factory=list)
@@ -463,10 +461,8 @@ async def enrich_item(item_id: str):
             update = {}
             if title and not doc.get("source_title"):
                 update["source_title"] = title
-            if og_image and not doc.get("og_image"):
-                update["og_image"] = og_image
-            if og_desc and not doc.get("og_description"):
-                update["og_description"] = og_desc
+            if og_image and not doc.get("image_path"):
+                update["image_path"] = og_image
             if update:
                 await db.items.update_one({"id": item_id}, {"$set": update})
             body = (f"URL: {doc['source_url']}\nDomain: {doc.get('source_domain')}\n"
