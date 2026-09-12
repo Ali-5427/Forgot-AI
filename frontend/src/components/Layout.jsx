@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { Home, Layers, Search, Settings, Plus, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
+import { ItemDetailView } from "./ItemDetailView";
 
 const nav = [
   { to: "/", label: "Home", Icon: Home, end: true },
@@ -11,10 +12,10 @@ const nav = [
 ];
 
 export const Layout = () => {
-  const { openSave } = useStore();
+  const { openSave, detailOpen, detailId, setDetailOpen, bumpRefresh } = useStore();
   return (
-    <div className="min-h-screen flex bg-neutral-50 text-foreground">
-      <aside className="w-60 shrink-0 border-r border-border bg-white flex flex-col fixed h-screen">
+    <div className="min-h-screen flex bg-neutral-50 text-foreground overflow-hidden">
+      <aside className="w-60 shrink-0 border-r border-border bg-white flex flex-col fixed h-screen z-20">
         <div className="px-5 py-5 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-md bg-neutral-900 flex items-center justify-center">
@@ -37,10 +38,11 @@ export const Layout = () => {
               key={to}
               to={to}
               end={end}
+              onClick={() => setDetailOpen(false)}
               data-testid={`nav-${label.toLowerCase().replace(" ", "-")}`}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
-                  isActive ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100"
+                  isActive && !detailOpen ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100"
                 }`
               }
             >
@@ -54,8 +56,12 @@ export const Layout = () => {
         </div>
       </aside>
 
-      <main className="flex-1 ml-60 min-h-screen">
-        <Outlet />
+      <main className="flex-1 ml-60 min-h-screen relative flex flex-col bg-white">
+        {detailOpen && detailId ? (
+          <ItemDetailView itemId={detailId} onClose={() => setDetailOpen(false)} onChanged={bumpRefresh} />
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   );

@@ -10,7 +10,6 @@ import { StoreProvider, useStore } from "@/store";
 import { AuthProvider, useAuth } from "@/auth";
 import { Layout } from "@/components/Layout";
 import { SaveDialog } from "@/components/SaveDialog";
-import { ItemDetailDialog } from "@/components/ItemDetailDialog";
 import { LandingPage } from "@/components/landing-page/landing-page";
 import AuthGate from "@/pages/AuthGate";
 import Home from "@/pages/Home";
@@ -35,7 +34,6 @@ function GlobalDialogs() {
   return (
     <>
       <SaveDialog open={saveOpen} onOpenChange={setSaveOpen} onSaved={() => bumpRefresh()} onOpenExisting={(id) => openItem(id)} />
-      <ItemDetailDialog itemId={detailId} open={detailOpen} onOpenChange={setDetailOpen} onChanged={() => bumpRefresh()} />
     </>
   );
 }
