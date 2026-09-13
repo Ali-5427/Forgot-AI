@@ -107,7 +107,7 @@ const SyncButton = () => {
       title="Sync latest saves"
       className="flex items-center gap-2 p-2 px-4 rounded-full border border-neutral-200 hover:bg-neutral-50 transition-colors disabled:opacity-50 text-neutral-600 font-medium text-sm shadow-sm"
     >
-      <RefreshCw className={h-4 w-4 } />
+      <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin text-neutral-900' : ''}`} />
       {syncing ? 'Syncing...' : 'Sync'}
     </button>
   );
