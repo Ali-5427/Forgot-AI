@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, Brain, Pin } from "lucide-react";
+import { Search, Plus, Brain, Pin, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ItemCard } from "@/components/ItemCard";
 import { useItems } from "@/lib/useItems";
@@ -21,9 +21,12 @@ export default function Home() {
 
   return (
     <div className="max-w-5xl mx-auto px-8 py-14">
-      <div className="mb-2">
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">Forgot AI</h1>
-        <p className="text-muted-foreground mt-2 text-base">Save anything now. Find it later.</p>
+      <div className="mb-2 flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">Forgot AI</h1>
+          <p className="text-muted-foreground mt-2 text-base">Save anything now. Find it later.</p>
+        </div>
+        <SyncButton />
       </div>
 
       <form onSubmit={submit} className="mt-8 relative max-w-2xl">
@@ -85,3 +88,27 @@ export default function Home() {
     </div>
   );
 }
+
+const SyncButton = () => {
+  const { reloadItems } = useStore();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    await reloadItems();
+    setTimeout(() => setSyncing(false), 400);
+  };
+
+  return (
+    <button
+      onClick={handleSync}
+      disabled={syncing}
+      title="Sync latest saves"
+      className="flex items-center gap-2 p-2 px-4 rounded-full border border-neutral-200 hover:bg-neutral-50 transition-colors disabled:opacity-50 text-neutral-600 font-medium text-sm shadow-sm"
+    >
+      <RefreshCw className={h-4 w-4 } />
+      {syncing ? 'Syncing...' : 'Sync'}
+    </button>
+  );
+};
