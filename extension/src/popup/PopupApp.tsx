@@ -112,67 +112,80 @@ export default function PopupApp() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-bg text-textPrimary overflow-hidden font-sans">
+    <div className="flex flex-col h-screen bg-white text-neutral-900 overflow-hidden font-sans">
       {/* Header */}
-      <div className="flex-none p-4 border-b border-border bg-surface flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center gap-2 font-bold text-[15px]">
+      <div className="flex-none p-4 border-b border-neutral-200 bg-white flex items-center justify-between shadow-sm z-10">
+        <div className="flex items-center gap-2 font-bold text-[15px] tracking-tight">
           <div className="w-7 h-7 bg-neutral-900 rounded-md flex items-center justify-center">
             <Brain className="w-4 h-4 text-white" />
           </div>
           Forgot AI
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={openApp} title="Open App" className="p-2 rounded-md text-textSecondary hover:bg-surfaceHover transition-colors">
+        <div className="flex items-center gap-1">
+          <button onClick={openApp} title="Open App" className="p-2 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition-colors">
             <ExternalLink className="w-4 h-4" />
           </button>
-          <button onClick={logout} title="Log out" className="p-2 rounded-md text-textSecondary hover:bg-surfaceHover hover:text-red-500 transition-colors">
+          <button onClick={logout} title="Log out" className="p-2 rounded-md text-neutral-500 hover:bg-red-50 hover:text-red-600 transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-8 bg-neutral-50/50" ref={scrollRef}>
         {/* Quick Save */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold tracking-wider text-textMuted uppercase">Quick Save</h3>
-          <div className="relative">
-            <textarea
-              value={saveText}
-              onChange={(e) => setSaveText(e.target.value)}
-              placeholder="Paste a link or type a note..."
-              className="w-full bg-surface border border-border rounded-xl p-3 pb-10 text-sm focus:outline-none focus:border-textPrimary resize-none min-h-[90px] shadow-sm"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSave();
-                }
-              }}
-            />
-            <button
-              onClick={handleSave}
-              disabled={!saveText.trim() || saving}
-              className="absolute bottom-2 right-2 p-1.5 bg-textPrimary text-bg rounded-lg disabled:opacity-50 hover:bg-neutral-800 transition-colors"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            </button>
+        <div className="space-y-3">
+          <h3 className="text-[11px] font-bold tracking-wider text-neutral-400 uppercase">Quick Save</h3>
+          <div className="relative group">
+            <div className="absolute inset-0 bg-neutral-200/50 rounded-xl blur-[2px] opacity-0 group-focus-within:opacity-100 transition-opacity" />
+            <div className="relative bg-white border border-neutral-200 rounded-xl shadow-sm focus-within:border-neutral-300 focus-within:shadow-md transition-all">
+              <textarea
+                value={saveText}
+                onChange={(e) => setSaveText(e.target.value)}
+                placeholder="Paste a link or type a note..."
+                className="w-full bg-transparent p-3 pb-12 text-sm focus:outline-none resize-none min-h-[100px] placeholder:text-neutral-400"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSave();
+                  }
+                }}
+              />
+              <div className="absolute bottom-2 right-2">
+                <button
+                  onClick={handleSave}
+                  disabled={!saveText.trim() || saving}
+                  className="p-1.5 px-3 bg-neutral-900 text-white text-xs font-semibold rounded-lg disabled:opacity-50 hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <hr className="border-border" />
+        <hr className="border-neutral-200" />
 
         {/* Chat Thread */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-semibold tracking-wider text-textMuted uppercase">Ask your memory</h3>
+        <div className="space-y-4 pb-4">
+          <h3 className="text-[11px] font-bold tracking-wider text-neutral-400 uppercase flex items-center gap-1.5">
+            Ask your memory
+          </h3>
           {messages.length === 0 ? (
-            <div className="text-center py-8 text-sm text-textMuted bg-surface/50 rounded-xl border border-dashed border-border">
+            <div className="text-center py-10 text-sm text-neutral-400 bg-white rounded-xl border border-dashed border-neutral-200">
               No messages yet.<br/> Ask me about what you've saved!
             </div>
           ) : (
-            <div className="space-y-4 pb-4">
+            <div className="space-y-5">
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed ${
-                    msg.role === 'user' ? 'bg-neutral-900 text-white rounded-br-sm' : 'bg-surface border border-border rounded-bl-sm text-textPrimary'
+                  {msg.role === 'ai' && (
+                     <div className="w-6 h-6 mr-2 mt-1 shrink-0 bg-neutral-900 rounded-md flex items-center justify-center">
+                       <Brain className="w-3.5 h-3.5 text-white" />
+                     </div>
+                  )}
+                  <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed shadow-sm ${
+                    msg.role === 'user' ? 'bg-neutral-900 text-white rounded-br-sm' : 'bg-white border border-neutral-200 rounded-tl-sm text-neutral-700'
                   }`}>
                     {msg.content}
                   </div>
@@ -180,10 +193,13 @@ export default function PopupApp() {
               ))}
               {chatting && (
                 <div className="flex justify-start">
-                  <div className="bg-surface border border-border rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-textMuted animate-bounce" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-textMuted animate-bounce" style={{animationDelay: '150ms'}} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-textMuted animate-bounce" style={{animationDelay: '300ms'}} />
+                   <div className="w-6 h-6 mr-2 mt-1 shrink-0 bg-neutral-900 rounded-md flex items-center justify-center">
+                     <Brain className="w-3.5 h-3.5 text-white" />
+                   </div>
+                  <div className="bg-white border border-neutral-200 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5 shadow-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" style={{animationDelay: '150ms'}} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" style={{animationDelay: '300ms'}} />
                   </div>
                 </div>
               )}
@@ -193,19 +209,19 @@ export default function PopupApp() {
       </div>
 
       {/* Chat Input */}
-      <div className="flex-none p-4 pt-2 bg-bg border-t border-border">
-        <form onSubmit={handleChat} className="relative">
+      <div className="flex-none p-4 bg-white border-t border-neutral-200 z-10">
+        <form onSubmit={handleChat} className="relative group">
           <input
             type="text"
             value={chatQuery}
             onChange={(e) => setChatQuery(e.target.value)}
             placeholder="Ask AI..."
-            className="w-full bg-surface border border-border rounded-full py-2.5 pl-4 pr-10 text-[13px] focus:outline-none focus:border-textPrimary shadow-sm"
+            className="w-full bg-neutral-50 border border-neutral-200 rounded-full py-3 pl-4 pr-12 text-[14px] focus:outline-none focus:border-neutral-300 focus:bg-white focus:shadow-sm transition-all placeholder:text-neutral-400"
           />
           <button
             type="submit"
             disabled={!chatQuery.trim() || chatting}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-neutral-900 text-white rounded-full disabled:opacity-50 hover:bg-neutral-800 transition-colors"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 bg-neutral-900 text-white rounded-full disabled:opacity-50 hover:bg-neutral-800 transition-colors shadow-sm"
           >
             <Send className="w-3.5 h-3.5" />
           </button>
