@@ -43,15 +43,14 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const logout = async () => {
-    try {
-      await api.logout();
-    } catch {
-      /* ignore */
-    }
+  const logout = () => {
+    // Instantly log out in the UI
     setToken(null);
     setRefreshToken(null);
     setUser(false);
+    
+    // Fire and forget the backend invalidation
+    api.logout().catch(() => {});
   };
 
   const confirmImport = async (doImport) => {
