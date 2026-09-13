@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { ItemCard } from "@/components/ItemCard";
 import { api } from "@/api";
 import { useStore } from "@/store";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const EXAMPLES = {
   search: ["that AI coding tool I saw", "the screenshot about Claude", "things I saved this week", "my SaaS idea"],
@@ -122,7 +124,9 @@ export default function SearchPage() {
                 <p className="mono-label text-[10px] text-amber-700 mb-2 flex items-center gap-1.5">
                   <Sparkles className="h-3 w-3" /> From your memory
                 </p>
-                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{answer}</p>
+                <div className="text-[14px] text-foreground leading-relaxed font-serif prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-100 prose-pre:text-neutral-800 prose-headings:font-semibold">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+                </div>
               </div>
             )}
 
