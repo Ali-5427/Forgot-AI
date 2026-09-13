@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bookmark, Lock, Mail, Loader2, Sparkles } from "lucide-react";
+import { Brain, Lock, Mail, Loader2, Sparkles } from "lucide-react";
 import { api, persistAuth } from "../lib/api";
 import { getSession } from "../lib/storage";
 
@@ -73,15 +73,17 @@ export default function AuthApp() {
         className="w-full max-w-[400px] bg-surface border border-border rounded-xl p-8 shadow-2xl space-y-6"
       >
         <div className="flex items-center justify-center space-x-2 text-textPrimary font-bold text-xl mb-2">
-          <Bookmark className="w-5 h-5" />
+          <div className="h-8 w-8 rounded-md bg-neutral-900 flex items-center justify-center">
+            <Brain className="h-4.5 w-4.5 text-white" />
+          </div>
           <span>Forgot AI</span>
         </div>
         <div className="text-center space-y-1">
-          <h1 className="text-lg font-semibold tracking-tight text-textPrimary">
-            {mode === "login" ? "Sign in to continue" : "Create your account"}
+          <h1 className="text-2xl font-bold tracking-tight text-textPrimary">
+            {mode === "login" ? "Welcome back" : "Create your account"}
           </h1>
-          <p className="text-xs text-textMuted">
-            Save highlights, tweets, AI responses, and articles in one click.
+          <p className="text-sm text-textMuted">
+            {mode === "login" ? "Sign in to your memory library." : "Start saving anything you want to remember."}
           </p>
         </div>
         <form onSubmit={submit} className="space-y-3">
