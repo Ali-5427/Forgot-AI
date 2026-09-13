@@ -14,6 +14,11 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
+// Allow the side panel to open when clicking the extension icon
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch(console.error);
+
 chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) => {
   (async () => {
     try {

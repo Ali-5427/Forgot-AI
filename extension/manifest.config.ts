@@ -6,13 +6,15 @@ export default defineManifest({
   description: "Save highlights, tweets, AI responses, and articles to Forgot AI in one click.",
   version: "1.0.0",
   action: {
-    default_popup: "src/popup/index.html",
     default_title: "Forgot AI",
     default_icon: {
       "16": "public/icons/icon-16.png",
       "48": "public/icons/icon-48.png",
       "128": "public/icons/icon-128.png",
     },
+  },
+  side_panel: {
+    default_path: "src/popup/index.html",
   },
   icons: {
     "16": "public/icons/icon-16.png",
@@ -37,6 +39,6 @@ export default defineManifest({
       matches: ["<all_urls>"],
     },
   ],
-  permissions: ["storage", "activeTab", "scripting", "tabs"],
+  permissions: ["storage", "activeTab", "scripting", "tabs", "sidePanel"],
   host_permissions: ["<all_urls>"],
 });
