@@ -640,7 +640,8 @@ async def login(payload: AuthIn, request: Request):
         if locked_until and locked_until > datetime.now(timezone.utc):
             raise HTTPException(429, "Too many attempts. Try again in a few minutes.")
     try:
-        session = supabase.auth.sign_in_with_password({"email": email, "password": payload.password})
+        temp_client = make_supabase_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
+        session = temp_client.auth.sign_in_with_password({"email": email, "password": payload.password})
         auth_user = session.user
     except Exception:
         count = (att.get("count", 0) if att else 0) + 1
@@ -676,7 +677,8 @@ async def login(payload: AuthIn, request: Request):
 @api_router.post("/auth/refresh")
 async def refresh_session(payload: RefreshIn):
     try:
-        session = supabase.auth.refresh_session(payload.refresh_token)
+        temp_client = make_supabase_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
+        session = temp_client.auth.refresh_session(payload.refresh_token)
         auth_user = session.user
     except Exception:
         raise HTTPException(401, "Invalid or expired refresh token")
