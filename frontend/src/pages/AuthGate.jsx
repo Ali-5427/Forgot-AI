@@ -106,7 +106,10 @@ export default function AuthGate() {
       <div className="hidden lg:flex w-1/2 bg-neutral-900 relative items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-neutral-800 via-neutral-900 to-black" />
         <div className="relative z-10 max-w-lg text-center p-12">
-          <Brain className="h-24 w-24 text-white/10 mx-auto mb-8" />
+          <div className="mx-auto mb-8 h-32 w-32 bg-white rounded-3xl shadow-xl p-2 flex items-center justify-center overflow-hidden">
+            <img src="/logo512.png" alt="Forgot AI Logo" className="w-full h-full object-contain rounded-2xl" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block'; }} />
+            <Brain className="h-16 w-16 text-neutral-900 hidden" />
+          </div>
           <h2 className="text-3xl font-bold text-white mb-4 tracking-tight">Your external brain.</h2>
           <p className="text-lg text-neutral-400 leading-relaxed">
             Save links, screenshots, and notes. Instantly find them later by asking your AI in plain English.
