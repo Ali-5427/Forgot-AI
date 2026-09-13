@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Layers } from "lucide-react";
+import { Plus, Layers, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ItemCard } from "@/components/ItemCard";
 import { useItems } from "@/lib/useItems";
@@ -51,68 +51,81 @@ export default function AllSaved() {
     }`;
 
   return (
-    <div className="max-w-5xl mx-auto px-8 py-12">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-6xl mx-auto px-4 sm:px-8 py-12 relative pb-24">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">All Saved</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-3xl font-bold tracking-tight">All Saved</h1>
+          <p className="text-[15px] text-muted-foreground mt-1">
             {filtered.length} of {items.length} item{items.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <Button onClick={openSave} data-testid="allsaved-save-btn">
-          <Plus className="h-4 w-4 mr-1.5" /> Save
+        <Button onClick={openSave} data-testid="allsaved-save-btn" className="rounded-full px-6 shadow-sm">
+          <Plus className="h-4 w-4 mr-2" /> Save
         </Button>
       </div>
 
-      {/* Type filter + recent + sort */}
-      <div className="flex items-center gap-2 flex-wrap mb-4">
-        {TYPES.map((t) => (
-          <button key={t.id} className={chip(type === t.id)} onClick={() => setType(t.id)} data-testid={`filter-type-${t.id}`}>
-            {t.label}
-          </button>
-        ))}
-        <span className="mx-1 h-4 w-px bg-border" />
-        <button className={chip(recent)} onClick={() => setRecent((v) => !v)} data-testid="filter-recent">
-          Recently saved
-        </button>
-        <div className="ml-auto">
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            data-testid="sort-select"
-            className="text-xs border border-border rounded-md px-2 py-1.5 bg-white outline-none"
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-          </select>
-        </div>
-      </div>
+      {/* Sticky Filters Container */}
+      <div className="sticky top-0 z-20 -mx-4 sm:-mx-8 px-4 sm:px-8 py-4 bg-neutral-50/80 backdrop-blur-xl border-b border-neutral-200/50 mb-8 shadow-sm">
+        <div className="flex flex-col gap-4 max-w-6xl mx-auto">
+          {/* Top row: Type, Recent, Sort */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              {TYPES.map((t) => (
+                <button key={t.id} className={chip(type === t.id)} onClick={() => setType(t.id)} data-testid={`filter-type-${t.id}`}>
+                  {t.label}
+                </button>
+              ))}
+              <span className="mx-2 h-5 w-px bg-neutral-200" />
+              <button className={chip(recent)} onClick={() => setRecent((v) => !v)} data-testid="filter-recent">
+                Recently saved
+              </button>
+            </div>
+            
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              data-testid="sort-select"
+              className="text-[13px] border border-neutral-200 rounded-lg px-3 py-1.5 bg-white outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-100 transition-all font-medium text-neutral-600 shadow-sm"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </div>
 
-      {/* Smart Collections */}
-      {collections.length > 0 && (
-        <div className="mb-6">
-          <p className="mono-label text-[10px] text-muted-foreground mb-2 flex items-center gap-1.5">
-            <Layers className="h-3 w-3" /> Smart Collections
-          </p>
-          <div className="flex flex-wrap gap-2" data-testid="collections">
-            <button className={chip(category === "all")} onClick={() => setCategory("all")} data-testid="collection-all">
-              All
+          {/* Bottom row: Categories (Scrollable) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide snap-x">
+            <button className={chip(category === "all")} onClick={() => setCategory("all")} data-testid="filter-cat-all">
+              All categories
             </button>
             {collections.map(([cat, count]) => (
-              <button key={cat} className={chip(category === cat)} onClick={() => setCategory(cat)} data-testid={`collection-${cat}`}>
-                {cat} <span className="opacity-60">· {count}</span>
+              <button
+                key={cat}
+                className={`snap-start whitespace-nowrap ${chip(category === cat)}`}
+                onClick={() => setCategory(cat)}
+                data-testid={`filter-cat-${cat}`}
+              >
+                {cat} <span className="opacity-60 ml-1">({count})</span>
               </button>
             ))}
           </div>
         </div>
-      )}
+      </div>
 
+      {/* Grid / Empty State */}
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No items match this filter.</p>
+        <div className="text-center py-32">
+          <div className="h-16 w-16 mx-auto bg-neutral-100 rounded-2xl flex items-center justify-center mb-4">
+            <Search className="h-6 w-6 text-neutral-400" />
+          </div>
+          <p className="text-lg font-medium text-neutral-900 mb-1">Nothing found here</p>
+          <p className="text-[15px] text-neutral-500 max-w-sm mx-auto">
+            Try adjusting your filters or search terms.
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filtered.map((item) => (
             <ItemCard key={item.id} item={item} onClick={openItem} onPin={togglePin} />
           ))}
