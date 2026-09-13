@@ -1,5 +1,5 @@
 import { CONFIG } from "./config";
-import { getSession, setSession } from "./storage";
+import { getSession, setSession, clearSession } from "./storage";
 
 // Shape returned by POST /api/items/text on the live backend.
 // The real backend returns { id, title, status, ... } — we only need
@@ -31,7 +31,7 @@ interface AuthPayload {
   user: { id: string; email: string; [k: string]: any };
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   init: RequestInit & { auth?: boolean } = {}
 ): Promise<T> {
@@ -95,6 +95,11 @@ async function request<T>(
   }
 
   if (!res.ok) {
+    if (res.status === 401) {
+      // Automatic logout on permanent 401 (refresh failed or absent)
+      await clearSession();
+    }
+    
     let detail = res.statusText || `HTTP ${res.status}`;
     try {
       const j: any = await res.json();
