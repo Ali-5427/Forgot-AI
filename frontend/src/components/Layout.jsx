@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Home, Layers, Search, Settings, Plus, Brain } from "lucide-react";
+import { Home, Layers, Search, Settings, Plus, Brain, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
 import { ItemDetailView } from "./ItemDetailView";
@@ -51,7 +51,10 @@ export const Layout = () => {
           ))}
         </nav>
 
-        <div className="mt-auto p-4 text-[11px] text-muted-foreground">
+        <div className="mt-auto px-2 pb-2">
+          <SyncButton />
+        </div>
+        <div className="p-4 pt-2 text-[11px] text-muted-foreground">
           Your personal memory system.
         </div>
       </aside>
@@ -64,5 +67,31 @@ export const Layout = () => {
         )}
       </main>
     </div>
+  );
+};
+
+import { useState } from "react";
+
+const SyncButton = () => {
+  const { reloadItems } = useStore();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    await reloadItems();
+    // Tiny forced delay so the user actually sees the spin if their network is ultra fast
+    setTimeout(() => setSyncing(false), 400);
+  };
+
+  return (
+    <button
+      onClick={handleSync}
+      disabled={syncing}
+      className="flex items-center gap-2.5 px-3 py-2 w-full rounded-md text-sm transition-colors text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin text-neutral-900" : ""}`} />
+      {syncing ? "Syncing..." : "Sync now"}
+    </button>
   );
 };
