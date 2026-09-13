@@ -518,7 +518,7 @@ async def enrich_item(item_id: str):
         # Broadcast updated item to live sync
         updated_doc = await db.items.find_one({"id": item_id})
         if updated_doc:
-            await ws_manager.broadcast_user(updated_doc["user_id"], {"type": "ITEM_UPDATED", "item": updated_doc})
+            await ws_manager.broadcast_user(updated_doc["owner_user_id"], {"type": "ITEM_UPDATED", "item": clean(updated_doc)})
             
         logger.info(f"Enriched item {item_id}")
     except Exception as e:
@@ -527,7 +527,7 @@ async def enrich_item(item_id: str):
         
         updated_doc = await db.items.find_one({"id": item_id})
         if updated_doc:
-            await ws_manager.broadcast_user(updated_doc["user_id"], {"type": "ITEM_UPDATED", "item": updated_doc})
+            await ws_manager.broadcast_user(updated_doc["owner_user_id"], {"type": "ITEM_UPDATED", "item": clean(updated_doc)})
 
 
 def clean(doc: dict) -> dict:
