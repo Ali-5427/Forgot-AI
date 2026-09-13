@@ -11,15 +11,16 @@ import { useStore } from "@/store";
 import { typeMeta, timeAgo } from "@/lib/format";
 import { toast } from "sonner";
 import {
-  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon, MessageSquare, ArrowLeft
+  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon, MessageSquare, ArrowLeft, Brain, FileText, Image as ImageIcon, Link2, Network
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ItemCard } from "@/components/ItemCard";
 
 const QUICK = ["What is this?", "Why did I save this?", "Explain this simply.", "Key points?", "How can I use this?"];
 
 export const ItemDetailView = ({ itemId, onClose }) => {
-  const { updateItemLocal, deleteItemLocal, togglePin } = useStore();
+  const { updateItemLocal, deleteItemLocal, togglePin, openItem } = useStore();
   const [item, setItem] = useState(null);
   const [related, setRelated] = useState([]);
   const [editing, setEditing] = useState(false);
@@ -352,6 +353,20 @@ export const ItemDetailView = ({ itemId, onClose }) => {
                 </>
               )}
             </section>
+
+            {/* Related Memories */}
+            {!editing && related.length > 0 && (
+              <section className="pt-6 border-t border-neutral-100">
+                <h3 className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <Network className="w-3.5 h-3.5" /> Related Memories
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {related.map((r) => (
+                    <ItemCard key={r.id} item={r} onClick={() => openItem(r)} onPin={() => togglePin(r)} />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Chat History */}
             {!editing && (
