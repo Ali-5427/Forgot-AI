@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Brain, Loader2 } from "lucide-react";
+import { Brain, Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/auth";
@@ -10,6 +10,7 @@ export default function AuthGate() {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -62,16 +63,26 @@ export default function AuthGate() {
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Password</label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                required
-                data-testid="auth-password"
-                className="h-11 bg-neutral-50/50"
-              />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  required
+                  data-testid="auth-password"
+                  className="h-11 bg-neutral-50/50 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             {error && (
               <p className="text-[13px] text-red-600 bg-red-50 border border-red-100 p-3 rounded-lg flex items-center gap-2" data-testid="auth-error">
