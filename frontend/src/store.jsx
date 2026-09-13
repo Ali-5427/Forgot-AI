@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { api } from "@/api";
+import { api, API, getToken } from "@/api";
 import { toast } from "sonner";
 import { useAuth } from "@/auth";
 
@@ -33,13 +33,52 @@ export const StoreProvider = ({ children }) => {
   }, [user]);
 
   useEffect(() => {
+    let ws = null;
+
     if (user) {
       loadItems();
+      
+      // Connect to Live Sync WebSocket
+      const token = getToken();
+      if (token) {
+        const wsUrl = API.replace(/^http/, "ws") + `/ws/sync?token=${token}`;
+        ws = new WebSocket(wsUrl);
+        
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "NEW_ITEM") {
+              setItems((prev) => {
+                // Ignore if we already have it to prevent duplicates
+                if (prev.find(i => i.id === data.item.id)) return prev;
+                return [data.item, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              });
+            } else if (data.type === "ITEM_UPDATED") {
+              setItems((prev) => prev.map(i => i.id === data.item.id ? data.item : i));
+            }
+          } catch (err) {
+            console.error("WebSocket message error", err);
+          }
+        };
+
+        // Keep alive
+        const interval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send("ping");
+          }
+        }, 30000);
+        
+        ws.onclose = () => clearInterval(interval);
+      }
     } else {
       setItems([]);
       setLoading(true);
     }
-    return () => clearTimeout(timer.current);
+    
+    return () => {
+      clearTimeout(timer.current);
+      if (ws) ws.close();
+    };
   }, [user, loadItems]);
 
   const openSave = () => setSaveOpen(true);

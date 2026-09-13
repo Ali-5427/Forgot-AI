@@ -15,7 +15,7 @@ from collections import defaultdict
 import asyncio
 import aiohttp
 import requests
-from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Query, Request, Depends
+from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Query, Request, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -36,6 +36,31 @@ OLLAMA_API_KEY = os.environ.get('OLLAMA_API_KEY', '').strip()
 OLLAMA_BASE_URL = (os.environ.get('OLLAMA_BASE_URL') or "https://ollama.com/api/chat").rstrip('/')
 AI_MODEL = ("ollama", "gpt-oss:20b")
 APP_NAME = "forgot-ai"
+
+# WebSocket Manager for real-time Live Sync
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[str, list[WebSocket]] = {}
+
+    async def connect(self, ws: WebSocket, user_id: str):
+        await ws.accept()
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(ws)
+
+    def disconnect(self, ws: WebSocket, user_id: str):
+        if user_id in self.active_connections and ws in self.active_connections[user_id]:
+            self.active_connections[user_id].remove(ws)
+
+    async def broadcast_user(self, user_id: str, message: dict):
+        if user_id in self.active_connections:
+            for ws in self.active_connections[user_id]:
+                try:
+                    await ws.send_json(message)
+                except Exception:
+                    pass
+
+ws_manager = ConnectionManager()
 STORAGE_BUCKET = os.environ.get("STORAGE_BUCKET", "forgot-ai-assets")
 
 app = FastAPI()
@@ -489,10 +514,20 @@ async def enrich_item(item_id: str):
             "status": "ready",
         }
         await db.items.update_one({"id": item_id}, {"$set": update})
+        
+        # Broadcast updated item to live sync
+        updated_doc = await db.items.find_one({"id": item_id})
+        if updated_doc:
+            await ws_manager.broadcast_user(updated_doc["user_id"], {"type": "ITEM_UPDATED", "item": updated_doc})
+            
         logger.info(f"Enriched item {item_id}")
     except Exception as e:
         logger.error(f"Enrichment failed for {item_id}: {e}")
         await db.items.update_one({"id": item_id}, {"$set": {"status": "failed"}})
+        
+        updated_doc = await db.items.find_one({"id": item_id})
+        if updated_doc:
+            await ws_manager.broadcast_user(updated_doc["user_id"], {"type": "ITEM_UPDATED", "item": updated_doc})
 
 
 def clean(doc: dict) -> dict:
@@ -574,6 +609,23 @@ async def import_library(source_lib: str, user_id: str) -> int:
     )
     return res.modified_count
 
+
+# ---------------- WebSocket Sync ----------------
+@api_router.websocket("/ws/sync")
+async def websocket_sync(websocket: WebSocket, token: str = Query(...)):
+    try:
+        auth_user = supabase.auth.get_user(token).user
+        user_id = str(auth_user.id)
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
+    await ws_manager.connect(websocket, user_id)
+    try:
+        while True:
+            await websocket.receive_text() # Keep alive
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, user_id)
 
 # ---------------- Auth routes ----------------
 @api_router.post("/auth/register")
@@ -756,6 +808,7 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str =
     values["owner_user_id"] = lib
     await db.items.insert_one(values)
     background.add_task(enrich_item, item.id)
+    await ws_manager.broadcast_user(lib, {"type": "NEW_ITEM", "item": clean(values)})
     return item
 
 
@@ -774,6 +827,7 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
     values["owner_user_id"] = lib
     await db.items.insert_one(values)
     background.add_task(enrich_item, item.id)
+    await ws_manager.broadcast_user(lib, {"type": "NEW_ITEM", "item": clean(values)})
     return item
 
 
@@ -805,6 +859,7 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
     values["owner_user_id"] = lib
     await db.items.insert_one(values)
     background.add_task(enrich_item, item.id)
+    await ws_manager.broadcast_user(lib, {"type": "NEW_ITEM", "item": clean(values)})
     return item
 
 
