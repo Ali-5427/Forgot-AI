@@ -134,45 +134,8 @@ export default function PopupApp() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-8 bg-neutral-50/50" ref={scrollRef}>
-        {/* Quick Save */}
-        <div className="space-y-3">
-          <h3 className="text-[11px] font-bold tracking-wider text-neutral-400 uppercase">Quick Save</h3>
-          <div className="relative group">
-            <div className="absolute inset-0 bg-neutral-200/50 rounded-xl blur-[2px] opacity-0 group-focus-within:opacity-100 transition-opacity" />
-            <div className="relative bg-white border border-neutral-200 rounded-xl shadow-sm focus-within:border-neutral-300 focus-within:shadow-md transition-all">
-              <textarea
-                value={saveText}
-                onChange={(e) => setSaveText(e.target.value)}
-                placeholder="Paste a link or type a note..."
-                className="w-full bg-transparent p-3 pb-12 text-sm focus:outline-none resize-none min-h-[100px] placeholder:text-neutral-400"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSave();
-                  }
-                }}
-              />
-              <div className="absolute bottom-2 right-2">
-                <button
-                  onClick={handleSave}
-                  disabled={!saveText.trim() || saving}
-                  className="p-1.5 px-3 bg-neutral-900 text-white text-xs font-semibold rounded-lg disabled:opacity-50 hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-sm"
-                >
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                  Save
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <hr className="border-neutral-200" />
-
         {/* Chat Thread */}
         <div className="space-y-4 pb-4">
-          <h3 className="text-[11px] font-bold tracking-wider text-neutral-400 uppercase flex items-center gap-1.5">
-            Ask your memory
-          </h3>
           {messages.length === 0 ? (
             <div className="text-center py-10 text-sm text-neutral-400 bg-white rounded-xl border border-dashed border-neutral-200">
               No messages yet.<br/> Ask me about what you've saved!
@@ -216,22 +179,46 @@ export default function PopupApp() {
         </div>
       </div>
 
-      {/* Chat Input */}
-      <div className="flex-none p-4 bg-white border-t border-neutral-200 z-10">
-        <form onSubmit={handleChat} className="relative group">
-          <input
-            type="text"
+      {/* Hybrid Chat Input */}
+      <div className="flex-none p-3 bg-white border-t border-neutral-200 z-10">
+        <form onSubmit={handleChat} className="flex gap-2 items-end bg-neutral-50 border border-neutral-200 rounded-2xl p-1.5 focus-within:border-neutral-300 focus-within:bg-white focus-within:shadow-sm transition-all">
+          <button
+            type="button"
+            className="p-2.5 text-neutral-400 hover:text-neutral-900 transition-colors shrink-0 disabled:opacity-50"
+            title="Save note or link"
+            disabled={!chatQuery.trim() || saving}
+            onClick={() => {
+              if (chatQuery.trim()) { 
+                setSaveText(chatQuery); 
+                setTimeout(() => handleSave(), 0); 
+                setChatQuery(""); 
+              }
+            }}
+          >
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+          </button>
+          
+          <textarea
             value={chatQuery}
             onChange={(e) => setChatQuery(e.target.value)}
-            placeholder="Ask AI..."
-            className="w-full bg-neutral-50 border border-neutral-200 rounded-full py-3 pl-4 pr-12 text-[14px] focus:outline-none focus:border-neutral-300 focus:bg-white focus:shadow-sm transition-all placeholder:text-neutral-400"
+            placeholder="Ask AI, paste a link, or save a note..."
+            className="w-full bg-transparent py-2.5 text-[14px] focus:outline-none resize-none max-h-[120px] placeholder:text-neutral-400"
+            rows={1}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleChat(e as any);
+              }
+            }}
           />
+          
           <button
             type="submit"
             disabled={!chatQuery.trim() || chatting}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 bg-neutral-900 text-white rounded-full disabled:opacity-50 hover:bg-neutral-800 transition-colors shadow-sm"
+            className="p-2.5 bg-neutral-900 text-white rounded-xl disabled:opacity-50 hover:bg-neutral-800 transition-colors shrink-0 shadow-sm"
+            title="Send to AI"
           >
-            <Send className="w-3.5 h-3.5" />
+             <Send className="w-4 h-4" />
           </button>
         </form>
       </div>
