@@ -92,14 +92,47 @@ export default function PopupApp() {
     setMessages((prev) => [...prev, { role: "user", content: q }]);
     setChatting(true);
     try {
-      const res = await request<{ answer: string }>("/api/chat", {
+      const s = await getSession();
+      const res = await fetch(`${CONFIG.BACKEND_URL}/api/chat`, {
         method: "POST",
-        body: JSON.stringify({ query: q }),
-        auth: true,
+        headers: {
+          "Content-Type": "application/json",
+          ...(s?.token ? { Authorization: `Bearer ${s.token}` } : {})
+        },
+        body: JSON.stringify({ query: q, stream: true }),
       });
-      setMessages((prev) => [...prev, { role: "ai", content: res.answer }]);
+
+      if (!res.ok) throw new Error("Network error");
+      if (!res.body) throw new Error("No response body");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      
+      let answerText = "";
+      setMessages((prev) => [...prev, { role: "ai", content: "" }]);
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        answerText += chunk;
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: "ai", content: answerText };
+          return updated;
+        });
+      }
     } catch (e) {
-      setMessages((prev) => [...prev, { role: "ai", content: "Sorry, I couldn't process that right now." }]);
+      setMessages((prev) => {
+        // If it failed partway through, leave what it had, otherwise show error
+        const updated = [...prev];
+        if (updated[updated.length - 1]?.role === "ai" && updated[updated.length - 1].content) {
+          updated[updated.length - 1].content += "\n\n*(Error: Connection lost)*";
+        } else if (updated[updated.length - 1]?.role === "user") {
+          updated.push({ role: "ai", content: "Sorry, I couldn't process that right now." });
+        }
+        return updated;
+      });
     } finally {
       setChatting(false);
     }

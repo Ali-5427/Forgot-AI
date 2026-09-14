@@ -237,6 +237,7 @@ class SearchIn(BaseModel):
 
 class ChatIn(BaseModel):
     query: str
+    stream: bool = False
 
 
 class PinIn(BaseModel):
@@ -1075,6 +1076,16 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
         "3. If they ask about something specific and it is NOT in their memories, politely let them know it's not in their notes, but feel free to offer a general answer or help them brainstorm anyway.\n\n"
         + memory_context
     )
+    if payload.stream:
+        return StreamingResponse(
+            llm_stream(system, q),
+            media_type="application/octet-stream",
+            headers={
+                "X-Accel-Buffering": "no",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive"
+            }
+        )
     answer = await llm_text(system, q)
     return {"answer": answer, "results": results, "query": q}
 
