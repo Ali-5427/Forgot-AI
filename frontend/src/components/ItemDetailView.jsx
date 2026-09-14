@@ -288,7 +288,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           )}
           
           {item.content_type === "text" && (
-            <div className="relative group flex-1 text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-5 md:p-6 shadow-sm font-serif min-h-0">
+            <div className="relative group text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-5 md:p-6 shadow-sm font-serif max-h-[70vh] overflow-auto">
               <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="absolute top-3 right-3 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-900 bg-white/80 backdrop-blur-sm border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm rounded-lg" title="Copy">
                 {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
               </Button>
@@ -297,7 +297,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           )}
           
           {item.content_type === "url" && (
-            <div className="bg-white border border-neutral-200/60 rounded-2xl overflow-hidden shadow-sm flex flex-col group relative flex-1 min-h-0">
+            <div className="bg-white border border-neutral-200/60 rounded-2xl shadow-sm flex flex-col group relative max-h-[70vh] overflow-auto">
               {item.image_path && (
                 <div className="w-full h-48 bg-neutral-100 border-b border-neutral-200/60 overflow-hidden shrink-0">
                   <img src={item.image_path} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />
