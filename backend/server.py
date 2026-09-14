@@ -1021,8 +1021,15 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
         f"Extracted text: {doc.get('extracted_text') or ''}\n"
         f"Source URL: {doc.get('source_url') or 'none'}\n"
     )
-    system = ("You are Forgot AI. Answer the user's question about ONE saved item using only its content below. "
-              "Be concise and practical. If the item lacks the info, say so briefly.\n\nSAVED ITEM:\n" + context)
+    system = (
+        "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
+        "The user is viewing a specific saved item (content below) and is chatting with you about it. "
+        "RULES: "
+        "1. If the user asks a general question, says hello, asks how you are, or wants to chat casually, respond naturally and warmly just like a human friend! Do NOT mention the saved item or say 'I don't have a memory for this'. "
+        "2. If the user asks a question about the item, answer it using the content below. "
+        "3. If the item lacks the info, politely let them know, but feel free to offer general knowledge or brainstorm with them if helpful.\n\n"
+        "SAVED ITEM CONTENT:\n" + context
+    )
     return StreamingResponse(
         llm_stream(system, payload.question), 
         media_type="application/octet-stream",
@@ -1055,14 +1062,9 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     
     ctx_parts = []
     if results:
-        for i, it in enumerate(results, 1):
-            ctx_parts.append(
-                f"[{i}] Title: {it.get('title')} | Type: {it.get('content_type')} | Saved: {rel_age(it.get('created_at',''))}\n"
-                f"Summary: {it.get('summary')}\nKeywords: {', '.join(it.get('keywords', []))}\n"
-                f"Text: {(it.get('extracted_text') or it.get('original_text') or '')[:400]}\n"
-                f"Source: {it.get('source_url') or 'none'}"
-            )
-        memory_context = "SAVED MEMORIES:\n" + "\n\n".join(ctx_parts)
+        for r in results:
+            ctx_parts.append(f"Title: {r.get('title')}\nURL: {r.get('source_url')}\nSummary: {r.get('summary')}\nKeywords: {', '.join(r.get('keywords', []))}\nText: {r.get('extracted_text') or r.get('original_text') or ''}")
+        memory_context = "SAVED MEMORIES:\n" + "\n\n---\n\n".join(ctx_parts)
     else:
         memory_context = "SAVED MEMORIES:\nThe user has no saved memories relevant to this specific query."
 
@@ -1070,8 +1072,8 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
         "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
         "Your primary job is to help the user recall things they have saved in their memories. "
         "However, you must act like a normal, helpful AI chatting with a friend. "
-        "RULES: "
-        "1. If the user asks a general question, says hello, or wants to chat casually, respond naturally and warmly. Do NOT say 'I don't have a memory for this' for general chat. "
+        "CRITICAL RULES: "
+        "1. If the user says hello, asks how you are, or makes casual conversation, respond naturally and warmly as a human would! NEVER say 'I don't have a memory for this' for general greetings or pleasantries. "
         "2. If the user asks a question that requires facts, check their SAVED MEMORIES below. If the answer is there, use it and reference it. "
         "3. If they ask about something specific and it is NOT in their memories, politely let them know it's not in their notes, but feel free to offer a general answer or help them brainstorm anyway.\n\n"
         + memory_context
