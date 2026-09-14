@@ -127,7 +127,7 @@ export default function PopupApp() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-50/50 text-neutral-900 overflow-hidden font-sans relative">
+    <div className="flex flex-col h-screen bg-white text-neutral-900 overflow-hidden font-sans relative">
       
       {/* Save Overlay Modal */}
       {isSaveModalOpen && (
@@ -251,7 +251,7 @@ export default function PopupApp() {
       </div>
 
       {/* Floating Glass Chat Input */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-neutral-50 via-neutral-50/90 to-transparent pointer-events-none z-10">
+      <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-white via-white/90 to-transparent pointer-events-none z-10">
         <form onSubmit={handleChat} className="relative group w-full pointer-events-auto shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-full border border-neutral-200/50 bg-white/70 backdrop-blur-xl">
           {/* Plus Button inside left edge */}
           <button
