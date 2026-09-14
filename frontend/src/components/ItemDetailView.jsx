@@ -11,17 +11,18 @@ import { useStore } from "@/store";
 import { typeMeta, timeAgo } from "@/lib/format";
 import { toast } from "sonner";
 import {
-  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon, MessageSquare, ArrowLeft, Brain, FileText, Image as ImageIcon, Link2, Network, Copy
+  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon, MessageSquare, ArrowLeft, Brain, FileText, Image as ImageIcon, Link2, Network, Copy, RotateCcw, Edit2, Square
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ItemCard } from "@/components/ItemCard";
 
-const QUICK = ["What is this?", "Why did I save this?", "Explain this simply.", "Key points?", "How can I use this?"];
+const QUICK = ["What is this?", "Key points?", "How can I use this?"];
 
 export const ItemDetailView = ({ itemId, onClose }) => {
-  const { updateItemLocal, deleteItemLocal, togglePin, openItem } = useStore();
-  const [item, setItem] = useState(null);
+  const { updateItemLocal, deleteItemLocal, togglePin, openItem, items } = useStore();
+  const cachedItem = items.find(i => i.id === itemId);
+  const [item, setItem] = useState(cachedItem || null);
   const [related, setRelated] = useState([]);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
@@ -29,6 +30,37 @@ export const ItemDetailView = ({ itemId, onClose }) => {
   const [chatHistory, setChatHistory] = useState([]);
   const [asking, setAsking] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const [copiedIdx, setCopiedIdx] = useState(null);
+
+  const abortControllerRef = useRef(null);
+  const chatInputRef = useRef(null);
+
+  const handleMsgCopy = (text, idx) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleRetry = (index) => {
+    const targetUserMsg = chatHistory[index - 1];
+    if (targetUserMsg && targetUserMsg.role === 'user') {
+      setChatHistory(prev => prev.slice(0, index - 1));
+      ask(targetUserMsg.content);
+    }
+  };
+
+  const handleEdit = (text) => {
+    setQuestion(text);
+    chatInputRef.current?.focus();
+  };
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
@@ -45,7 +77,12 @@ export const ItemDetailView = ({ itemId, onClose }) => {
       setQuestion("");
       setChatHistory([]);
       setRelated([]);
-      api.getItem(itemId).then(setItem);
+      
+      // Instantly load from cache to eliminate the 5s loading delay
+      const cached = items.find(i => i.id === itemId);
+      if (cached) setItem(cached);
+      
+      api.getItem(itemId).then(setItem).catch(console.error);
       api.related(itemId).then(setRelated).catch(() => setRelated([]));
     }
   }, [itemId]);
@@ -140,6 +177,9 @@ export const ItemDetailView = ({ itemId, onClose }) => {
       { role: "ai", content: "", thinking: true }
     ]);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       await api.ask(item.id, query, (chunk) => {
         setChatHistory(prev => {
@@ -149,8 +189,9 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           lastMsg.thinking = false;
           return newHistory;
         });
-      });
-    } catch {
+      }, controller.signal);
+    } catch (e) {
+      if (e.name === 'AbortError') return;
       setChatHistory(prev => {
         const newHistory = [...prev];
         const lastMsg = newHistory[newHistory.length - 1];
@@ -161,6 +202,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
       });
     } finally {
       setAsking(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -404,67 +446,95 @@ export const ItemDetailView = ({ itemId, onClose }) => {
                   </h3>
                 )}
                 
-                <div className="space-y-6">
-                  {chatHistory.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div 
-                        className={`max-w-[88%] rounded-[20px] px-5 py-4 text-[15px] leading-relaxed shadow-sm overflow-hidden ${
-                          msg.role === 'user' 
-                            ? 'bg-neutral-900 text-white rounded-br-sm' 
-                            : msg.error 
-                              ? 'bg-red-50 text-red-700 border border-red-100 rounded-bl-sm' 
-                              : 'bg-white border border-neutral-200 text-neutral-800 rounded-bl-sm'
-                        }`}
-                      >
-                        {msg.thinking ? (
-                          <span className="flex items-center gap-2 text-neutral-500 font-medium">
-                            <Loader2 className="h-4 w-4 animate-spin" /> Thinking...
-                          </span>
-                        ) : msg.role === 'user' ? (
-                          msg.content
-                        ) : (
-                          <ReactMarkdown 
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props} />,
-                              a: ({node, ...props}) => <a className="text-blue-600 hover:underline font-medium" target="_blank" rel="noreferrer" {...props} />,
-                              ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
-                              ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
-                              h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-3 mt-5 first:mt-0" {...props} />,
-                              h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-3 mt-5 first:mt-0" {...props} />,
-                              h3: ({node, ...props}) => <h3 className="text-base font-bold mb-2 mt-4" {...props} />,
-                              table: ({node, ...props}) => <div className="overflow-x-auto mb-4 border border-neutral-200 rounded-lg"><table className="w-full text-left border-collapse text-[14px]" {...props} /></div>,
-                              th: ({node, ...props}) => <th className="border-b border-neutral-200 p-3 font-semibold bg-neutral-50" {...props} />,
-                              td: ({node, ...props}) => <td className="border-b border-neutral-200 p-3" {...props} />,
-                              blockquote: ({node, ...props}) => <blockquote className="border-l-3 border-neutral-300 pl-4 italic text-neutral-500 mb-4" {...props} />,
-                              strong: ({node, ...props}) => <strong className="font-bold text-neutral-900" {...props} />,
-                              code: ({node, inline, ...props}) => inline 
-                                ? <code className="bg-neutral-100 text-pink-600 px-1.5 py-0.5 rounded text-[13px] font-mono" {...props} />
-                                : <code className="block bg-neutral-900 text-neutral-100 p-4 rounded-xl text-[14px] font-mono overflow-x-auto mb-4 leading-normal" {...props} />
-                            }}
+                  <div className="space-y-6 pb-6">
+                    {chatHistory.map((msg, idx) => (
+                      <div key={idx} className={`group flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
+                          {msg.role === 'ai' && (
+                             <div className="w-7 h-7 mr-3 mt-0.5 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
+                               <Brain className="w-3.5 h-3.5 text-white" />
+                             </div>
+                          )}
+                          <div 
+                            className={`text-[15px] leading-relaxed ${
+                              msg.role === 'user' 
+                                ? 'max-w-[85%] bg-neutral-900 text-white rounded-3xl rounded-br-md px-5 py-3 shadow-sm' 
+                                : msg.error 
+                                  ? 'text-red-700' 
+                                  : 'max-w-[90%] text-neutral-800'
+                            }`}
                           >
-                            {msg.content}
-                          </ReactMarkdown>
-                        )}
+                            {msg.thinking ? (
+                              <div className="flex items-center gap-1.5 py-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" style={{animationDelay: '150ms'}} />
+                                <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" style={{animationDelay: '300ms'}} />
+                              </div>
+                            ) : msg.role === 'user' ? (
+                              msg.content
+                            ) : (
+                              <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
+                                <ReactMarkdown 
+                                  remarkPlugins={[remarkGfm]}
+                                  components={{
+                                    p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props} />,
+                                    a: ({node, ...props}) => <a className="text-blue-600 hover:underline font-medium" target="_blank" rel="noreferrer" {...props} />,
+                                    ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
+                                    ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
+                                    h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-3 mt-5 first:mt-0" {...props} />,
+                                    h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-3 mt-5 first:mt-0" {...props} />,
+                                    h3: ({node, ...props}) => <h3 className="text-base font-bold mb-2 mt-4" {...props} />,
+                                    table: ({node, ...props}) => <div className="overflow-x-auto mb-4 border border-neutral-200 rounded-lg"><table className="w-full text-left border-collapse text-[14px]" {...props} /></div>,
+                                    th: ({node, ...props}) => <th className="border-b border-neutral-200 p-3 font-semibold bg-neutral-50" {...props} />,
+                                    td: ({node, ...props}) => <td className="border-b border-neutral-200 p-3" {...props} />,
+                                    blockquote: ({node, ...props}) => <blockquote className="border-l-3 border-neutral-300 pl-4 italic text-neutral-500 mb-4" {...props} />,
+                                    strong: ({node, ...props}) => <strong className="font-bold text-neutral-900" {...props} />,
+                                    code: ({node, inline, ...props}) => inline 
+                                      ? <code className="bg-neutral-100 text-pink-600 px-1.5 py-0.5 rounded text-[13px] font-mono" {...props} />
+                                      : <code className="block bg-neutral-900 text-neutral-100 p-4 rounded-xl text-[14px] font-mono overflow-x-auto mb-4 leading-normal" {...props} />
+                                  }}
+                                >
+                                  {msg.content}
+                                </ReactMarkdown>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className={`flex items-center gap-2 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === 'user' ? 'pr-2' : 'pl-10'}`}>
+                          <button type="button" onClick={() => handleMsgCopy(msg.content, idx)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Copy">
+                            {copiedIdx === idx ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          {msg.role === 'ai' && !asking && idx === chatHistory.length - 1 && !msg.thinking && (
+                            <button type="button" onClick={() => handleRetry(idx)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Retry">
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {msg.role === 'user' && !asking && (
+                            <button type="button" onClick={() => handleEdit(msg.content)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Edit">
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  <div ref={chatEndRef} />
-                </div>
+                    ))}
+                    <div ref={chatEndRef} />
+                  </div>
               </section>
             )}
           </div>
 
           {/* Fixed Bottom Input Area */}
           {!editing && (
-            <div className="shrink-0 p-6 bg-white border-t border-neutral-100 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.03)] z-10">
+            <div className="shrink-0 p-6 bg-transparent z-10">
               {chatHistory.length === 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="grid grid-cols-3 gap-2 mb-4">
                   {QUICK.map((q) => (
                     <button
                       key={q}
                       onClick={() => ask(q)}
-                      className="text-[13px] font-medium bg-neutral-50 hover:bg-neutral-100 text-neutral-700 transition-colors rounded-full px-4 py-2 border border-neutral-200"
+                      className="text-[13px] font-medium bg-white hover:bg-neutral-50 text-neutral-700 transition-colors rounded-xl px-2 py-3 border border-neutral-200 text-center shadow-sm"
                       data-testid={`quick-ask-${q}`}
                     >
                       {q}
@@ -473,23 +543,37 @@ export const ItemDetailView = ({ itemId, onClose }) => {
                 </div>
               )}
               
-              <div className="flex gap-2 bg-neutral-50 p-1.5 rounded-2xl border border-neutral-200 focus-within:border-neutral-400 focus-within:ring-4 focus-within:ring-neutral-100/50 transition-all shadow-sm">
-                <Input
+              <div className="relative group w-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-full border border-neutral-200/70 bg-white/80 backdrop-blur-xl focus-within:border-black focus-within:ring-1 focus-within:ring-black transition-all duration-200">
+                <input
+                  ref={chatInputRef}
+                  type="text"
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), ask())}
                   placeholder="Message Forgot AI..."
-                  className="border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-4 text-[15px] shadow-none h-11"
+                  className="w-full bg-transparent py-4 pl-6 pr-14 text-[14px] focus:outline-none placeholder:text-neutral-400 rounded-full"
                   data-testid="ask-input"
                 />
-                <Button 
-                  onClick={() => ask()} 
-                  disabled={asking || !question.trim()} 
-                  className="rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white shrink-0 h-11 w-11 p-0 transition-transform active:scale-95"
-                  data-testid="ask-submit-btn"
-                >
-                  {asking ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}
-                </Button>
+                
+                {asking ? (
+                  <button 
+                    type="button"
+                    onClick={handleStop} 
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2.5 bg-neutral-900 text-white rounded-full hover:bg-neutral-800 transition-colors shadow-sm"
+                  >
+                    <Square className="h-4 w-4 fill-current" />
+                  </button>
+                ) : (
+                  <button 
+                    type="button"
+                    onClick={() => ask()} 
+                    disabled={!question.trim()} 
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2.5 bg-neutral-900 text-white rounded-full disabled:opacity-50 hover:bg-neutral-800 transition-colors shadow-sm"
+                    data-testid="ask-submit-btn"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           )}

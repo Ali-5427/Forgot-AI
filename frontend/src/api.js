@@ -98,7 +98,7 @@ export const api = {
   deleteItem: (id) => axios.delete(`${API}/items/${id}`).then((r) => r.data),
   retryItem: (id) => axios.post(`${API}/items/${id}/retry`).then((r) => r.data),
   pinItem: (id, pinned) => axios.post(`${API}/items/${id}/pin`, { pinned }).then((r) => r.data),
-  ask: async (id, question, onChunk) => {
+  ask: async (id, question, onChunk, signal) => {
     const t = getToken();
     const headers = {
       "Content-Type": "application/json",
@@ -110,6 +110,7 @@ export const api = {
       method: "POST",
       headers,
       body: JSON.stringify({ question }),
+      signal,
     });
 
     if (!res.ok) throw new Error("Network response was not ok");
