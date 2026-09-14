@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon } from "lucide-react";
+import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon, Copy, Check, RotateCcw, Edit2, Square } from "lucide-react";
 import { api, request, fetchStream } from "../lib/api";
 import { CONFIG } from "../lib/config";
 import { clearSession, getSession, onSessionChange } from "../lib/storage";
@@ -28,6 +28,9 @@ export default function PopupApp() {
   
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     getSession().then((s) => {
@@ -84,17 +87,51 @@ export default function PopupApp() {
     }
   };
 
-  const handleChat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatQuery.trim() || chatting) return;
-    const q = chatQuery.trim();
-    setChatQuery("");
-    setMessages((prev) => [...prev, { role: "user", content: q }]);
+  const handleCopy = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  const stopStream = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleRetry = (index: number) => {
+    const targetUserMsg = messages[index - 1];
+    if (targetUserMsg && targetUserMsg.role === 'user') {
+      setMessages(prev => prev.slice(0, index - 1));
+      handleChat(null, targetUserMsg.content);
+    }
+  };
+
+  const handleEdit = (text: string) => {
+    setChatQuery(text);
+    chatInputRef.current?.focus();
+  };
+
+  const handleChat = async (e: React.FormEvent | null, retryQuery?: string) => {
+    if (e) e.preventDefault();
+    const q = retryQuery || chatQuery.trim();
+    if (!q || chatting) return;
+    
+    if (!retryQuery) {
+      setChatQuery("");
+      setMessages((prev) => [...prev, { role: "user", content: q }]);
+    }
     setChatting(true);
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const res = await fetchStream("/api/chat", {
         method: "POST",
         body: JSON.stringify({ query: q, stream: true }),
+        signal: controller.signal
       });
 
       if (!res.body) throw new Error("No response body");
@@ -116,9 +153,9 @@ export default function PopupApp() {
           return updated;
         });
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError') return;
       setMessages((prev) => {
-        // If it failed partway through, leave what it had, otherwise show error
         const updated = [...prev];
         if (updated[updated.length - 1]?.role === "ai" && updated[updated.length - 1].content) {
           updated[updated.length - 1].content += "\n\n*(Error: Connection lost)*";
@@ -129,6 +166,7 @@ export default function PopupApp() {
       });
     } finally {
       setChatting(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -241,21 +279,40 @@ export default function PopupApp() {
           ) : (
             <div className="space-y-6">
               {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.role === 'ai' && (
-                     <div className="w-7 h-7 mr-3 mt-0.5 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
-                       <Brain className="w-3.5 h-3.5 text-white" />
-                     </div>
-                  )}
-                  <div className={`text-[14px] leading-relaxed ${
-                    msg.role === 'user' ? 'max-w-[85%] bg-neutral-900 text-white rounded-3xl rounded-br-md px-4 py-3 shadow-sm' : 'max-w-[90%] text-neutral-800'
-                  }`}>
-                    {msg.role === 'ai' ? (
-                      <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      msg.content
+                <div key={i} className={`group flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
+                    {msg.role === 'ai' && (
+                       <div className="w-7 h-7 mr-3 mt-0.5 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
+                         <Brain className="w-3.5 h-3.5 text-white" />
+                       </div>
+                    )}
+                    <div className={`text-[14px] leading-relaxed ${
+                      msg.role === 'user' ? 'max-w-[85%] bg-neutral-900 text-white rounded-3xl rounded-br-md px-4 py-3 shadow-sm' : 'max-w-[90%] text-neutral-800'
+                    }`}>
+                      {msg.role === 'ai' ? (
+                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        msg.content
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className={`flex items-center gap-2 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === 'user' ? 'pr-2' : 'pl-10'}`}>
+                    <button type="button" onClick={() => handleCopy(msg.content, i)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Copy">
+                      {copiedIdx === i ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                    {msg.role === 'ai' && !chatting && i === messages.length - 1 && (
+                      <button type="button" onClick={() => handleRetry(i)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Retry">
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {msg.role === 'user' && !chatting && (
+                      <button type="button" onClick={() => handleEdit(msg.content)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Edit">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -291,6 +348,7 @@ export default function PopupApp() {
           </button>
 
           <input
+            ref={chatInputRef}
             type="text"
             value={chatQuery}
             onChange={(e) => setChatQuery(e.target.value)}
@@ -298,13 +356,23 @@ export default function PopupApp() {
             className="w-full bg-transparent py-4 pl-14 pr-14 text-[14px] focus:outline-none placeholder:text-neutral-400"
           />
           
-          <button
-            type="submit"
-            disabled={!chatQuery.trim() || chatting}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2.5 bg-neutral-900 text-white rounded-full disabled:opacity-50 hover:bg-neutral-800 transition-colors shadow-sm"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+          {chatting ? (
+            <button
+              type="button"
+              onClick={stopStream}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2.5 bg-neutral-900 text-white rounded-full hover:bg-neutral-800 transition-colors shadow-sm"
+            >
+              <Square className="w-4 h-4 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!chatQuery.trim()}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2.5 bg-neutral-900 text-white rounded-full disabled:opacity-50 hover:bg-neutral-800 transition-colors shadow-sm"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          )}
         </form>
       </div>
     </div>
