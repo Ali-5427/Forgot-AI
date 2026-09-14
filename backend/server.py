@@ -1048,23 +1048,32 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     limiter.check(lib, 30, 60)
     q = payload.query.strip()
     if not q:
-        return {"answer": "Ask me anything about what you've saved.", "results": []}
+        return {"answer": "Ask me anything about what you've saved, or just say hi!", "results": []}
+    
     results, by_id = await rank_items(q, lib, limit=8)
-    if not results:
-        return {"answer": "I couldn't find anything relevant in your saved memories. Try describing it differently.", "results": []}
+    
     ctx_parts = []
-    for i, it in enumerate(results, 1):
-        ctx_parts.append(
-            f"[{i}] Title: {it.get('title')} | Type: {it.get('content_type')} | Saved: {rel_age(it.get('created_at',''))}\n"
-            f"Summary: {it.get('summary')}\nKeywords: {', '.join(it.get('keywords', []))}\n"
-            f"Text: {(it.get('extracted_text') or it.get('original_text') or '')[:400]}\n"
-            f"Source: {it.get('source_url') or 'none'}"
-        )
+    if results:
+        for i, it in enumerate(results, 1):
+            ctx_parts.append(
+                f"[{i}] Title: {it.get('title')} | Type: {it.get('content_type')} | Saved: {rel_age(it.get('created_at',''))}\n"
+                f"Summary: {it.get('summary')}\nKeywords: {', '.join(it.get('keywords', []))}\n"
+                f"Text: {(it.get('extracted_text') or it.get('original_text') or '')[:400]}\n"
+                f"Source: {it.get('source_url') or 'none'}"
+            )
+        memory_context = "SAVED MEMORIES:\n" + "\n\n".join(ctx_parts)
+    else:
+        memory_context = "SAVED MEMORIES:\nThe user has no saved memories relevant to this specific query."
+
     system = (
-        "You are Forgot AI's memory assistant. Answer the user ONLY using their saved memories provided below. "
-        "Do NOT use outside knowledge and do NOT make things up. Be concise, reference which memories are relevant "
-        "(e.g. 'you saved...'), and if the memories don't answer it, say so plainly.\n\nSAVED MEMORIES:\n"
-        + "\n\n".join(ctx_parts)
+        "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
+        "Your primary job is to help the user recall things they have saved in their memories. "
+        "However, you must act like a normal, helpful AI chatting with a friend. "
+        "RULES: "
+        "1. If the user asks a general question, says hello, or wants to chat casually, respond naturally and warmly. Do NOT say 'I don't have a memory for this' for general chat. "
+        "2. If the user asks a question that requires facts, check their SAVED MEMORIES below. If the answer is there, use it and reference it. "
+        "3. If they ask about something specific and it is NOT in their memories, politely let them know it's not in their notes, but feel free to offer a general answer or help them brainstorm anyway.\n\n"
+        + memory_context
     )
     answer = await llm_text(system, q)
     return {"answer": answer, "results": results, "query": q}
