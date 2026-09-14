@@ -274,21 +274,21 @@ export const ItemDetailView = ({ itemId, onClose }) => {
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         
         {/* LEFT COLUMN: Original Content */}
-        <div className="md:w-1/2 flex flex-col overflow-y-auto border-r border-neutral-100 bg-neutral-50/50 p-8">
-          <h3 className="text-[11px] uppercase tracking-widest font-bold text-neutral-400 mb-6 flex items-center gap-3">
+        <div className="md:w-1/2 flex flex-col overflow-y-auto border-r border-neutral-100 bg-neutral-50/50 p-4 md:p-6">
+          <h3 className="text-[11px] uppercase tracking-widest font-bold text-neutral-400 mb-4 flex items-center gap-3 shrink-0">
             <span className="h-px w-6 bg-neutral-200"></span>
             Original Source
             <span className="h-px flex-1 bg-neutral-200"></span>
           </h3>
           
           {item.content_type === "image" && item.image_path && (
-            <div className="rounded-2xl border border-neutral-200/60 bg-white p-2 shadow-sm">
+            <div className="rounded-2xl border border-neutral-200/60 bg-white p-2 shadow-sm shrink-0">
               <img src={fileUrl(item.image_path)} alt={item.title} className="rounded-xl max-h-[70vh] object-contain w-full" />
             </div>
           )}
           
           {item.content_type === "text" && (
-            <div className="relative group text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-6 shadow-sm font-serif max-h-[60vh] overflow-auto">
+            <div className="relative group flex-1 text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-5 md:p-6 shadow-sm font-serif min-h-0">
               <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="absolute top-3 right-3 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-900 bg-white/80 backdrop-blur-sm border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm rounded-lg" title="Copy">
                 {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
               </Button>
@@ -297,7 +297,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           )}
           
           {item.content_type === "url" && (
-            <div className="bg-white border border-neutral-200/60 rounded-2xl overflow-hidden shadow-sm flex flex-col group relative">
+            <div className="bg-white border border-neutral-200/60 rounded-2xl overflow-hidden shadow-sm flex flex-col group relative flex-1 min-h-0">
               {item.image_path && (
                 <div className="w-full h-48 bg-neutral-100 border-b border-neutral-200/60 overflow-hidden shrink-0">
                   <img src={item.image_path} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />
