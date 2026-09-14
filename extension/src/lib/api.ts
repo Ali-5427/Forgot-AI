@@ -118,6 +118,52 @@ export async function request<T>(
   return (await res.json()) as T;
 }
 
+export async function fetchStream(
+  path: string,
+  init: RequestInit = {}
+): Promise<Response> {
+  const headers = new Headers(init.headers || {});
+  headers.set("Content-Type", "application/json");
+  const s = await getSession();
+  if (s?.token) headers.set("Authorization", `Bearer ${s.token}`);
+
+  let res = await fetch(`${CONFIG.BACKEND_URL}${path}`, { ...init, headers });
+
+  if (res.status === 401 && s?.refresh_token) {
+    try {
+      const refreshRes = await fetch(`${CONFIG.BACKEND_URL}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: s.refresh_token }),
+      });
+      if (refreshRes.ok) {
+        const newAuth: AuthPayload = await refreshRes.json();
+        await setSession({
+          token: newAuth.token,
+          refresh_token: newAuth.refresh_token,
+          user: {
+            id: newAuth.user.id,
+            email: newAuth.user.email,
+            created_at: newAuth.user.created_at || newAuth.user.createdAt || new Date().toISOString(),
+          },
+        });
+        headers.set("Authorization", `Bearer ${newAuth.token}`);
+        res = await fetch(`${CONFIG.BACKEND_URL}${path}`, { ...init, headers });
+      } else {
+        await clearSession();
+      }
+    } catch {
+      await clearSession();
+    }
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) await clearSession();
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res;
+}
+
 export const api = {
   // Live backend uses /register (not /signup). Kept exported as `signup`
   // so AuthApp.tsx doesn't need to change.

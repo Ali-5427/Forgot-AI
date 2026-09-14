@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon } from "lucide-react";
-import { api, request } from "../lib/api";
+import { api, request, fetchStream } from "../lib/api";
 import { CONFIG } from "../lib/config";
 import { clearSession, getSession, onSessionChange } from "../lib/storage";
 import ReactMarkdown from "react-markdown";
@@ -92,17 +92,11 @@ export default function PopupApp() {
     setMessages((prev) => [...prev, { role: "user", content: q }]);
     setChatting(true);
     try {
-      const s = await getSession();
-      const res = await fetch(`${CONFIG.BACKEND_URL}/api/chat`, {
+      const res = await fetchStream("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(s?.token ? { Authorization: `Bearer ${s.token}` } : {})
-        },
         body: JSON.stringify({ query: q, stream: true }),
       });
 
-      if (!res.ok) throw new Error("Network error");
       if (!res.body) throw new Error("No response body");
 
       const reader = res.body.getReader();
