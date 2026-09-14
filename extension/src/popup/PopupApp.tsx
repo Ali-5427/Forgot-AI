@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from "react";
-import { Brain, ExternalLink, LogOut, Send, Plus, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon } from "lucide-react";
 import { api, request } from "../lib/api";
 import { CONFIG } from "../lib/config";
 import { clearSession, getSession, onSessionChange } from "../lib/storage";
@@ -12,25 +12,29 @@ interface ChatMessage {
 }
 
 export default function PopupApp() {
-  const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Save State
-  const [saveText, setSaveText] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  // Chat State
+  const [email, setEmail] = useState<string | null>(null);
+  
   const [chatQuery, setChatQuery] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatting, setChatting] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  
+  // Save Modal State
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [saveText, setSaveText] = useState("");
+  const [userNote, setUserNote] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  
+  const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getSession().then((s) => {
-      setEmail(s?.user.email || null);
+      setEmail(s?.user?.email || null);
       setLoading(false);
     });
-    const off = onSessionChange((s) => setEmail(s?.user.email || null));
+    const off = onSessionChange((s) => setEmail(s?.user?.email || null));
     return off;
   }, []);
 
@@ -52,18 +56,27 @@ export default function PopupApp() {
     setEmail(null);
   };
 
-  const handleSave = async () => {
-    if (!saveText.trim() || saving) return;
+  const handleSmartSave = async () => {
+    if (saving) return;
+    if (!file && !saveText.trim()) return;
+    
     setSaving(true);
     try {
-      await api.createMemory({
-        original_content: saveText.trim(),
-        capture_type: "text",
-        source_url: "",
-        source_title: "Manual Note",
-        source_domain: "forgot.ai"
-      } as any);
+      if (file) {
+        const fd = new FormData();
+        fd.append("file", file);
+        if (userNote) fd.append("user_note", userNote);
+        await api.saveImage(fd);
+      } else if (saveText.trim().startsWith("http")) {
+        await api.saveUrl({ url: saveText.trim(), user_note: userNote });
+      } else {
+        await api.saveText({ text: saveText.trim(), user_note: userNote });
+      }
+      // Reset and close
       setSaveText("");
+      setUserNote("");
+      setFile(null);
+      setIsSaveModalOpen(false);
     } catch (e) {
       console.error("Save failed", e);
     } finally {
@@ -114,7 +127,63 @@ export default function PopupApp() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white text-neutral-900 overflow-hidden font-sans">
+    <div className="flex flex-col h-screen bg-white text-neutral-900 overflow-hidden font-sans relative">
+      
+      {/* Save Overlay Modal */}
+      {isSaveModalOpen && (
+        <div className="absolute inset-0 bg-white z-50 flex flex-col animate-in slide-in-from-bottom-full duration-200">
+          <div className="flex-none p-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50/50">
+            <h2 className="font-bold text-[15px]">Save to Memory</h2>
+            <button onClick={() => setIsSaveModalOpen(false)} className="p-1.5 rounded-md hover:bg-neutral-200 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {!file ? (
+              <textarea
+                value={saveText}
+                onChange={(e) => setSaveText(e.target.value)}
+                placeholder="Paste a link or type a note..."
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-[14px] min-h-[120px] focus:outline-none focus:border-neutral-300 focus:bg-white transition-all placeholder:text-neutral-400"
+              />
+            ) : (
+              <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-xl flex items-center justify-between">
+                <span className="text-sm font-medium truncate">{file.name}</span>
+                <button onClick={() => setFile(null)} className="text-neutral-400 hover:text-red-500"><X className="w-4 h-4" /></button>
+              </div>
+            )}
+
+            {!file && !saveText && (
+              <button onClick={() => fileRef.current?.click()} className="w-full py-3 border-2 border-dashed border-neutral-200 rounded-xl text-neutral-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-neutral-50 transition-colors">
+                <ImageIcon className="w-4 h-4" /> Upload Screenshot / Image
+              </button>
+            )}
+            <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={(e) => { if (e.target.files?.[0]) setFile(e.target.files[0]); }} />
+
+            <div className="pt-2">
+              <input
+                type="text"
+                value={userNote}
+                onChange={(e) => setUserNote(e.target.value)}
+                placeholder="Why are you saving this? (Optional)"
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-lg py-2.5 px-3 text-[13px] focus:outline-none focus:border-neutral-300 focus:bg-white transition-all placeholder:text-neutral-400"
+              />
+            </div>
+          </div>
+          
+          <div className="flex-none p-4 border-t border-neutral-200">
+            <button
+              onClick={handleSmartSave}
+              disabled={(!file && !saveText.trim()) || saving}
+              className="w-full py-2.5 bg-neutral-900 text-white rounded-xl font-medium disabled:opacity-50 hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 shadow-sm"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex-none p-4 border-b border-neutral-200 bg-white flex items-center justify-between shadow-sm z-10">
         <div className="flex items-center gap-2 font-bold text-[15px] tracking-tight">
@@ -179,51 +248,35 @@ export default function PopupApp() {
         </div>
       </div>
 
-      {/* Hybrid Chat Input */}
-      <div className="flex-none p-3 bg-white border-t border-neutral-200 z-10">
-        <form onSubmit={handleChat} className="flex gap-2 items-end bg-neutral-50 border border-neutral-200 rounded-2xl p-1.5 focus-within:border-neutral-300 focus-within:bg-white focus-within:shadow-sm transition-all">
+      {/* Pill Chat Input */}
+      <div className="flex-none p-4 bg-white border-t border-neutral-200 z-10">
+        <div className="flex items-center gap-2">
           <button
-            type="button"
-            className="p-2.5 text-neutral-400 hover:text-neutral-900 transition-colors shrink-0 disabled:opacity-50"
-            title="Save note or link"
-            disabled={!chatQuery.trim() || saving}
-            onClick={() => {
-              if (chatQuery.trim()) { 
-                setSaveText(chatQuery); 
-                setTimeout(() => handleSave(), 0); 
-                setChatQuery(""); 
-              }
-            }}
+            onClick={() => setIsSaveModalOpen(true)}
+            className="p-3 bg-neutral-100 text-neutral-600 rounded-full hover:bg-neutral-200 hover:text-neutral-900 transition-colors shrink-0"
+            title="Save to Memory"
           >
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+            <Plus className="w-5 h-5" />
           </button>
           
-          <textarea
-            value={chatQuery}
-            onChange={(e) => setChatQuery(e.target.value)}
-            placeholder="Ask AI, paste a link, or save a note..."
-            className="w-full bg-transparent py-2.5 text-[14px] focus:outline-none resize-none max-h-[120px] placeholder:text-neutral-400"
-            rows={1}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleChat(e as any);
-              }
-            }}
-          />
-          
-          <button
-            type="submit"
-            disabled={!chatQuery.trim() || chatting}
-            className="p-2.5 bg-neutral-900 text-white rounded-xl disabled:opacity-50 hover:bg-neutral-800 transition-colors shrink-0 shadow-sm"
-            title="Send to AI"
-          >
-             <Send className="w-4 h-4" />
-          </button>
-        </form>
+          <form onSubmit={handleChat} className="relative group flex-1">
+            <input
+              type="text"
+              value={chatQuery}
+              onChange={(e) => setChatQuery(e.target.value)}
+              placeholder="Ask AI..."
+              className="w-full bg-neutral-50 border border-neutral-200 rounded-full py-3 pl-4 pr-12 text-[14px] focus:outline-none focus:border-neutral-300 focus:bg-white focus:shadow-sm transition-all placeholder:text-neutral-400"
+            />
+            <button
+              type="submit"
+              disabled={!chatQuery.trim() || chatting}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 bg-neutral-900 text-white rounded-full disabled:opacity-50 hover:bg-neutral-800 transition-colors shadow-sm"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
 }
-
-

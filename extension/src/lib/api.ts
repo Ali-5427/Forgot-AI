@@ -170,6 +170,13 @@ export const api = {
       deduped: false,
     };
   },
+
+  saveText: (data: { text: string; user_note?: string }) => 
+    request<any>("/api/items/text", { method: "POST", body: JSON.stringify(data), auth: true }),
+  saveUrl: (data: { url: string; user_note?: string }) => 
+    request<any>("/api/items/url", { method: "POST", body: JSON.stringify(data), auth: true }),
+  saveImage: (fd: FormData) => 
+    request<any>("/api/items/image", { method: "POST", body: fd, auth: true })
 };
 
 // Helper used by AuthApp: persist token + optional refresh_token in the
