@@ -260,7 +260,7 @@ export default function PopupApp() {
                   </div>
                 </div>
               ))}
-              {chatting && (
+              {chatting && messages[messages.length - 1]?.role !== 'ai' && (
                 <div className="flex justify-start">
                    <div className="w-7 h-7 mr-3 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
                      <Brain className="w-3.5 h-3.5 text-white" />
