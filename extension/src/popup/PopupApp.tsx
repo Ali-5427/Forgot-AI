@@ -251,8 +251,8 @@ export default function PopupApp() {
       </div>
 
       {/* Floating Glass Chat Input */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-white via-white/90 to-transparent pointer-events-none z-10">
-        <form onSubmit={handleChat} className="relative group w-full pointer-events-auto shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-full border border-neutral-200/50 bg-white/70 backdrop-blur-xl">
+      <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none z-10">
+        <form onSubmit={handleChat} className="relative group w-full pointer-events-auto shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-full border border-neutral-200/70 bg-white/80 backdrop-blur-xl focus-within:border-black focus-within:ring-1 focus-within:ring-black transition-all duration-200">
           {/* Plus Button inside left edge */}
           <button
             type="button"
