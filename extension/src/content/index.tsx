@@ -254,12 +254,15 @@ function startModeB() {
 }
 
 // Kick off after DOM is ready-ish.
+// TODO: Re-enable Mode B when the feature is fixed. Currently disabled per user request.
+/*
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", startModeB, { once: true });
 } else {
   // Small delay for generic sites to finish rendering
   setTimeout(startModeB, isGeneric ? 800 : 200);
 }
+*/
 
 // Handle SPA navigations
 let lastHref = location.href;
@@ -267,10 +270,10 @@ setInterval(() => {
   if (location.href !== lastHref) {
     lastHref = location.href;
     // Rebuild Mode B on SPA route change
-    for (const [t, p] of modeBPills.entries()) {
-      p.destroy();
-      modeBPills.delete(t);
-    }
-    setTimeout(refreshModeB, 400);
+    // for (const [t, p] of modeBPills.entries()) {
+    //   p.destroy();
+    //   modeBPills.delete(t);
+    // }
+    // setTimeout(refreshModeB, 400);
   }
 }, 800);
