@@ -11,7 +11,7 @@ import { useStore } from "@/store";
 import { typeMeta, timeAgo } from "@/lib/format";
 import { toast } from "sonner";
 import {
-  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon, MessageSquare, ArrowLeft, Brain, FileText, Image as ImageIcon, Link2, Network
+  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon, MessageSquare, ArrowLeft, Brain, FileText, Image as ImageIcon, Link2, Network, Copy
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -280,18 +280,34 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           )}
           
           {item.content_type === "text" && (
-            <div className="text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-6 shadow-sm font-serif">
-              {item.original_text}
+            <div className="bg-white border border-neutral-200/60 rounded-2xl flex flex-col overflow-hidden shadow-sm group">
+              <div className="flex items-center justify-between bg-neutral-50/80 border-b border-neutral-200/60 px-4 py-2.5">
+                <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Raw Text</span>
+                <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(item.original_text); toast.success("Copied to clipboard"); }} className="h-7 px-2 text-xs text-neutral-500 hover:text-neutral-900 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Copy className="h-3 w-3 mr-1.5" /> Copy
+                </Button>
+              </div>
+              <div className="text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 p-6 font-serif overflow-auto max-h-[60vh]">
+                {item.original_text}
+              </div>
             </div>
           )}
           
           {item.content_type === "url" && (
-            <div className="bg-white border border-neutral-200/60 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+            <div className="bg-white border border-neutral-200/60 rounded-2xl overflow-hidden shadow-sm flex flex-col group">
               {item.image_path && (
                 <div className="w-full h-48 bg-neutral-100 border-b border-neutral-200/60 overflow-hidden shrink-0">
                   <img src={item.image_path} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />
                 </div>
               )}
+              <div className="flex items-center justify-between bg-neutral-50/80 border-b border-neutral-200/60 px-4 py-2.5">
+                <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Web Page Extract</span>
+                {item.original_text && (
+                  <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(item.original_text); toast.success("Copied to clipboard"); }} className="h-7 px-2 text-xs text-neutral-500 hover:text-neutral-900 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Copy className="h-3 w-3 mr-1.5" /> Copy Text
+                  </Button>
+                )}
+              </div>
               <div className="p-6 space-y-4">
                 <a
                   href={item.source_url}
