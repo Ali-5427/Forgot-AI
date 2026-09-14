@@ -199,6 +199,7 @@ class SavedItem(BaseModel):
     image_path: Optional[str] = None
     title: str = "Untitled"
     summary: str = ""
+    why_saved: Optional[str] = None
     keywords: List[str] = Field(default_factory=list)
     category: str = "Uncategorized"
     extracted_text: str = ""
@@ -213,12 +214,14 @@ class TextSaveIn(BaseModel):
     text: str
     source_url: Optional[str] = None
     source_title: Optional[str] = None
+    user_note: Optional[str] = None
 
 
 class UrlSaveIn(BaseModel):
     url: str
     context_text: Optional[str] = None
     source_title: Optional[str] = None
+    user_note: Optional[str] = None
 
 
 class ItemUpdate(BaseModel):
@@ -460,16 +463,21 @@ ENRICH_SYSTEM = (
 )
 
 
-def enrich_prompt(kind: str, body: str) -> str:
+def enrich_prompt(kind: str, body: str, user_note: Optional[str] = None) -> str:
+    note_context = ""
+    if user_note and user_note.strip():
+        note_context = f'\nUSER NOTE (Context on why they saved this):\n"{user_note}"\n'
+
     return (
         f"The user saved this {kind}. Analyze it and return JSON with keys: "
         '"title" (short, specific, max 8 words), '
         '"summary" (1-2 plain sentences explaining what it is and why it may be useful), '
+        '"why_saved" (1 short sentence starting with \'You likely saved this because...\' incorporating the USER NOTE if provided, or inferred from content if not), '
         '"keywords" (array of 4-8 lowercase topical keywords, include synonyms/related concepts, not just literal words), '
         '"category" (one short label like Ideas, AI Tools, Coding, Marketing, Productivity, Reference, Design, Finance, Personal), '
         '"extracted_text" (any readable text found in the content, or empty string), '
         '"searchable_text" (a rich paragraph combining literal content AND its meaning, topics, and likely search intents).\n\n'
-        f"CONTENT:\n{body}"
+        f"CONTENT:\n{body}{note_context}"
     )
 
 
@@ -503,7 +511,7 @@ async def fetch_url_content(url: str):
     return title, text, og_image, og_desc
 
 
-async def enrich_item(item_id: str):
+async def enrich_item(item_id: str, user_note: Optional[str] = None):
     doc = await db.items.find_one({"id": item_id})
     if not doc:
         return
@@ -521,7 +529,7 @@ async def enrich_item(item_id: str):
             
             # Pass the extracted text to Ollama for categorization
             raw = await llm_text(ENRICH_SYSTEM,
-                                 enrich_prompt("screenshot/image extracted text", extracted_text))
+                                 enrich_prompt("screenshot/image extracted text", extracted_text, user_note))
         elif ct == "url":
             title, text, og_image, og_desc = await fetch_url_content(doc["source_url"])
             update = {}
@@ -535,9 +543,9 @@ async def enrich_item(item_id: str):
                     f"Page title: {title or doc.get('source_title') or 'unknown'}\n"
                     f"Page description: {og_desc or doc.get('og_description') or 'none'}\n"
                     f"Extracted page content: {text or doc.get('original_text') or 'not accessible'}")
-            raw = await llm_text(ENRICH_SYSTEM, enrich_prompt("web page / URL", body))
+            raw = await llm_text(ENRICH_SYSTEM, enrich_prompt("web page / URL", body, user_note))
         else:
-            raw = await llm_text(ENRICH_SYSTEM, enrich_prompt("text note", doc.get("original_text") or ""))
+            raw = await llm_text(ENRICH_SYSTEM, enrich_prompt("text note", doc.get("original_text") or "", user_note))
 
         meta = parse_json_block(raw)
         if not meta.get("title"):
@@ -545,15 +553,22 @@ async def enrich_item(item_id: str):
         kws = meta.get("keywords") or []
         if isinstance(kws, str):
             kws = [k.strip() for k in kws.split(",") if k.strip()]
+        
         update = {
             "title": str(meta.get("title", "Untitled"))[:200],
             "summary": str(meta.get("summary", "")),
+            "why_saved": str(meta.get("why_saved", "")),
             "keywords": [str(k) for k in kws][:12],
             "category": str(meta.get("category", "Uncategorized"))[:40],
             "extracted_text": str(meta.get("extracted_text", "")),
             "searchable_text": str(meta.get("searchable_text", "")),
             "status": "ready",
         }
+        
+        # Don't overwrite why_saved if it's empty but previously existed (though it should be a new insert usually)
+        if not update["why_saved"]:
+            del update["why_saved"]
+            
         await db.items.update_one({"id": item_id}, {"$set": update})
         
         # Broadcast updated item to live sync
@@ -848,7 +863,7 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str =
     values = item.model_dump()
     values["owner_user_id"] = lib
     await db.items.insert_one(values)
-    background.add_task(enrich_item, item.id)
+    background.add_task(enrich_item, item.id, payload.user_note)
     await ws_manager.broadcast_user(lib, {"type": "NEW_ITEM", "item": clean(values)})
     return item
 
@@ -867,7 +882,7 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
     values = item.model_dump()
     values["owner_user_id"] = lib
     await db.items.insert_one(values)
-    background.add_task(enrich_item, item.id)
+    background.add_task(enrich_item, item.id, payload.user_note)
     await ws_manager.broadcast_user(lib, {"type": "NEW_ITEM", "item": clean(values)})
     return item
 
@@ -875,6 +890,7 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
 @api_router.post("/items/image", response_model=SavedItem)
 async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
                      source_url: Optional[str] = Form(None), source_title: Optional[str] = Form(None),
+                     user_note: Optional[str] = Form(None),
                      lib: str = Depends(resolve_library)):
     limiter.check(lib, 60, 60)
     data = await file.read()
@@ -889,17 +905,17 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
         result = await put_object(path, data, ct)
         stored_path = result["path"]
     except Exception as e:
-        logger.error(f"Image upload failed: {e}")
-        raise HTTPException(500, "Image storage failed")
+        logger.error(f"Upload failed: {e}")
+        raise HTTPException(500, "Upload failed")
+
     item = SavedItem(library_id=lib, content_type="image", image_path=stored_path,
                      source_url=source_url, source_title=source_title,
                      source_domain=domain_of(source_url) if source_url else None,
-                     dedup_key="img:" + hashlib.sha256(data).hexdigest(),
-                     title=(file.filename or "Screenshot")[:60])
+                     title="Image")
     values = item.model_dump()
     values["owner_user_id"] = lib
     await db.items.insert_one(values)
-    background.add_task(enrich_item, item.id)
+    background.add_task(enrich_item, item.id, user_note)
     await ws_manager.broadcast_user(lib, {"type": "NEW_ITEM", "item": clean(values)})
     return item
 

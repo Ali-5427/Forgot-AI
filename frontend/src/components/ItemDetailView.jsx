@@ -342,6 +342,15 @@ export const ItemDetailView = ({ itemId, onClose }) => {
                 <span className="h-px flex-1 bg-neutral-200"></span>
               </h3>
               
+              {item.why_saved && !editing && (
+                <div className="bg-amber-50/80 border border-amber-100 p-5 rounded-2xl flex gap-3">
+                  <div className="mt-0.5 text-amber-500">💡</div>
+                  <p className="text-[15px] text-amber-900 leading-relaxed font-medium">
+                    {item.why_saved}
+                  </p>
+                </div>
+              )}
+              
               <div>
                 {editing ? (
                   <Textarea value={form.summary} rows={4} onChange={(e) => setForm({ ...form, summary: e.target.value })} className="shadow-sm bg-neutral-50" data-testid="edit-summary-input" />

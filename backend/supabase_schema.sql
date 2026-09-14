@@ -20,6 +20,7 @@ create table if not exists public.items (
     image_path text,
     title text not null default 'Untitled',
     summary text not null default '',
+    why_saved text,
     keywords jsonb not null default '[]'::jsonb,
     category text not null default 'Uncategorized',
     extracted_text text not null default '',

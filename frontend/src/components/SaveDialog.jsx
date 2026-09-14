@@ -13,6 +13,7 @@ export const SaveDialog = ({ open, onOpenChange, onSaved, onOpenExisting }) => {
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState(null);
+  const [userNote, setUserNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [dup, setDup] = useState(null); // existing item detected
   const fileRef = useRef(null);
@@ -21,21 +22,23 @@ export const SaveDialog = ({ open, onOpenChange, onSaved, onOpenExisting }) => {
     setText("");
     setUrl("");
     setFile(null);
+    setUserNote("");
     setDup(null);
   };
 
   const done = (item) => {
-    toast.success("Saved to Forgot AI ✓", { description: "Understanding your item…" });
+    toast.success("Saved to Forgot AI 🧠", { description: "Understanding your item..." });
     reset();
     onOpenChange(false);
     onSaved && onSaved(item);
   };
 
   const persist = async () => {
-    if (tab === "text") return done(await api.saveText({ text }));
-    if (tab === "url") return done(await api.saveUrl({ url }));
+    if (tab === "text") return done(await api.saveText({ text, user_note: userNote }));
+    if (tab === "url") return done(await api.saveUrl({ url, user_note: userNote }));
     const fd = new FormData();
     fd.append("file", file);
+    if (userNote) fd.append("user_note", userNote);
     return done(await api.saveImage(fd));
   };
 
@@ -138,6 +141,15 @@ export const SaveDialog = ({ open, onOpenChange, onSaved, onOpenExisting }) => {
             </div>
           </TabsContent>
         </Tabs>
+
+        <div className="mt-2 mb-4">
+          <Input
+            placeholder="Add context: Why are you saving this? (Optional)"
+            value={userNote}
+            onChange={(e) => setUserNote(e.target.value)}
+            className="w-full text-sm placeholder:text-muted-foreground/70"
+          />
+        </div>
 
         {dup ? (
           <div className="border border-amber-200 bg-amber-50 rounded-lg p-3" data-testid="duplicate-notice">
