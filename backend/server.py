@@ -332,7 +332,7 @@ async def groq_vision_scan(image_b64: str) -> str:
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "llama-3.2-11b-vision-preview",
+        "model": "qwen/qwen3.8-27b",
         "messages": [
             {
                 "role": "user",
@@ -343,7 +343,7 @@ async def groq_vision_scan(image_b64: str) -> str:
             }
         ],
         "temperature": 0.5,
-        "max_tokens": 1024
+        "max_tokens": 800
     }
     try:
         async with aiohttp.ClientSession() as session:
