@@ -28,6 +28,14 @@ export const ItemDetailView = ({ itemId, onClose }) => {
   const [question, setQuestion] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [asking, setAsking] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success("Copied to clipboard");
+    setTimeout(() => setCopied(false), 2000);
+  };
   
   const chatEndRef = useRef(null);
 
@@ -281,8 +289,8 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           
           {item.content_type === "text" && (
             <div className="relative group text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-6 shadow-sm font-serif max-h-[60vh] overflow-auto">
-              <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(item.original_text); toast.success("Copied to clipboard"); }} className="absolute top-3 right-3 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-900 bg-white/80 backdrop-blur-sm border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm rounded-lg" title="Copy">
-                <Copy className="h-4 w-4" />
+              <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="absolute top-3 right-3 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-900 bg-white/80 backdrop-blur-sm border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm rounded-lg" title="Copy">
+                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
               </Button>
               {item.original_text}
             </div>
@@ -296,8 +304,8 @@ export const ItemDetailView = ({ itemId, onClose }) => {
                 </div>
               )}
               {item.original_text && (
-                <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(item.original_text); toast.success("Copied to clipboard"); }} className="absolute top-3 right-3 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-900 bg-white/80 backdrop-blur-sm border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm rounded-lg" title="Copy text">
-                  <Copy className="h-4 w-4" />
+                <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="absolute top-3 right-3 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-900 bg-white/80 backdrop-blur-sm border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm rounded-lg" title="Copy text">
+                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                 </Button>
               )}
               <div className="p-6 space-y-4">
