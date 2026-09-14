@@ -3,6 +3,8 @@ import { Brain, ExternalLink, LogOut, Send, Plus, Loader2 } from "lucide-react";
 import { api, request } from "../lib/api";
 import { CONFIG } from "../lib/config";
 import { clearSession, getSession, onSessionChange } from "../lib/storage";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ChatMessage {
   role: "user" | "ai";
@@ -187,7 +189,13 @@ export default function PopupApp() {
                   <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed shadow-sm ${
                     msg.role === 'user' ? 'bg-neutral-900 text-white rounded-br-sm' : 'bg-white border border-neutral-200 rounded-tl-sm text-neutral-700'
                   }`}>
-                    {msg.content}
+                    {msg.role === 'ai' ? (
+                      <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      msg.content
+                    )}
                   </div>
                 </div>
               ))}
