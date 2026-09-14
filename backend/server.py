@@ -33,6 +33,7 @@ supabase = create_supabase_client()
 db = SupabaseDatabase(supabase)
 
 OLLAMA_API_KEY = os.environ.get('OLLAMA_API_KEY', '').strip()
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '').strip()
 OLLAMA_BASE_URL = (os.environ.get('OLLAMA_BASE_URL') or "https://ollama.com/api/chat").rstrip('/')
 AI_MODEL = ("ollama", "gpt-oss:20b")
 APP_NAME = "forgot-ai"
@@ -320,6 +321,40 @@ async def get_current_user(request: Request) -> dict:
 
 
 # ---------------- AI helpers ----------------
+async def groq_vision_scan(image_b64: str) -> str:
+    if not GROQ_API_KEY:
+        logger.warning("GROQ_API_KEY not set. Cannot use Groq vision model.")
+        return "No text extracted (Groq API Key missing)."
+        
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama-3.2-11b-vision-preview",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Describe what this image shows in detail and extract any readable text. Output only the description and extracted text."},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
+                ]
+            }
+        ],
+        "temperature": 0.5,
+        "max_tokens": 1024
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload, timeout=60) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+                return data["choices"][0]["message"]["content"]
+    except Exception as e:
+        logger.error(f"Groq Vision API failed: {e}")
+        return "No text extracted due to processing error."
+
 async def llm_text(system: str, prompt: str, image_b64: Optional[str] = None) -> str:
     user_msg = {"role": "user", "content": prompt}
     if image_b64:
@@ -477,10 +512,16 @@ async def enrich_item(item_id: str):
         if ct == "image":
             data, _ = await get_object(doc["image_path"])
             b64 = base64.b64encode(data).decode()
+            
+            # Use Groq to extract text and describe the image
+            extracted_text = await groq_vision_scan(b64)
+            
+            # Save the extracted text back to the database as original_text
+            await db.items.update_one({"id": item_id}, {"$set": {"original_text": extracted_text}})
+            
+            # Pass the extracted text to Ollama for categorization
             raw = await llm_text(ENRICH_SYSTEM,
-                                 enrich_prompt("screenshot/image",
-                                               "Describe what this image shows, extract any readable text, and infer its topic."),
-                                 image_b64=b64)
+                                 enrich_prompt("screenshot/image extracted text", extracted_text))
         elif ct == "url":
             title, text, og_image, og_desc = await fetch_url_content(doc["source_url"])
             update = {}
