@@ -85,6 +85,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
       api.getItem(itemId).then(setItem).catch(console.error);
       api.related(itemId).then(setRelated).catch(() => setRelated([]));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId]);
 
   useEffect(() => {
