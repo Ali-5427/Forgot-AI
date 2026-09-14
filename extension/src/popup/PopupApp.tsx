@@ -243,12 +243,12 @@ export default function PopupApp() {
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   {msg.role === 'ai' && (
-                     <div className="w-7 h-7 mr-3 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
+                     <div className="w-7 h-7 mr-3 mt-0.5 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
                        <Brain className="w-3.5 h-3.5 text-white" />
                      </div>
                   )}
-                  <div className={`max-w-[85%] rounded-3xl px-4 py-3 text-[14px] leading-relaxed shadow-sm ${
-                    msg.role === 'user' ? 'bg-neutral-900 text-white rounded-br-md' : 'bg-white border border-neutral-200 rounded-tl-md text-neutral-800'
+                  <div className={`text-[14px] leading-relaxed ${
+                    msg.role === 'user' ? 'max-w-[85%] bg-neutral-900 text-white rounded-3xl rounded-br-md px-4 py-3 shadow-sm' : 'max-w-[90%] text-neutral-800'
                   }`}>
                     {msg.role === 'ai' ? (
                       <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
@@ -261,11 +261,11 @@ export default function PopupApp() {
                 </div>
               ))}
               {chatting && messages[messages.length - 1]?.role !== 'ai' && (
-                <div className="flex justify-start">
+                <div className="flex justify-start items-center">
                    <div className="w-7 h-7 mr-3 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
                      <Brain className="w-3.5 h-3.5 text-white" />
                    </div>
-                  <div className="bg-white border border-neutral-200 rounded-3xl rounded-tl-md px-5 py-4 flex items-center gap-1.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 py-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" />
                     <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" style={{animationDelay: '150ms'}} />
                     <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-bounce" style={{animationDelay: '300ms'}} />
