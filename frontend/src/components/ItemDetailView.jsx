@@ -11,7 +11,7 @@ import { useStore } from "@/store";
 import { typeMeta, timeAgo } from "@/lib/format";
 import { toast } from "sonner";
 import {
-  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon, MessageSquare, ArrowLeft, Brain, FileText, Image as ImageIcon, Link2, Network, Copy, RotateCcw, Edit2, Square
+  Loader2, Trash2, Pencil, ExternalLink, Sparkles, RefreshCw, AlertTriangle, X, Send, Check, Pin, Link as LinkIcon, MessageSquare, ArrowLeft, FileText, Image as ImageIcon, Link2, Network, Copy, RotateCcw, Edit2, Square
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -452,9 +452,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
                       <div key={idx} className={`group flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                         <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
                           {msg.role === 'ai' && (
-                             <div className="w-7 h-7 mr-3 mt-0.5 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
-                               <Brain className="w-3.5 h-3.5 text-white" />
-                             </div>
+                             <img src="/logo.jpg" alt="AI Avatar" className="w-7 h-7 mr-3 mt-0.5 shrink-0 rounded-full object-cover shadow-sm border border-neutral-200" />
                           )}
                           <div 
                             className={`text-[15px] leading-relaxed ${

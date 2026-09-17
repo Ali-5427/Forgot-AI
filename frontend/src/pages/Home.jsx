@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, Brain, Pin, RefreshCw } from "lucide-react";
+import { Search, Plus, Pin, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ItemCard } from "@/components/ItemCard";
 import { useItems } from "@/lib/useItems";
@@ -67,9 +67,9 @@ export default function Home() {
         <p className="text-sm text-muted-foreground">Loading your memory…</p>
       ) : items.length === 0 ? (
         <div className="border border-dashed border-border rounded-xl py-16 text-center bg-white">
-          <div className="h-12 w-12 rounded-xl bg-neutral-900 flex items-center justify-center mx-auto mb-4">
-            <Brain className="h-6 w-6 text-white" />
-          </div>
+          <div className="h-12 w-12 mx-auto mb-4">
+              <img src="/logo.jpg" alt="Forgot AI Logo" className="w-full h-full object-cover rounded-xl shadow-sm" />
+            </div>
           <h3 className="text-base font-semibold">Save your first thing.</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
             Screenshots, text and links you want to remember later.
