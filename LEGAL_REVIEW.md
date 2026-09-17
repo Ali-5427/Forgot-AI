@@ -29,7 +29,7 @@ E. Retention behavior found:
 - Data is retained indefinitely while the account is active.
 
 F. Account deletion behavior found:
-- Currently, users can delete individual memories. Full account deletion is manual via support email (support@forgot-ai.vercel.app). Documented in the Data Deletion page.
+- Currently, users can delete individual memories. Full account deletion is manual via support email (jmohammadali5427@gmail.com). Documented in the Data Deletion page.
 
 G. Exact claims that are safe to make:
 - "Private to your account."
@@ -46,3 +46,4 @@ I. Missing legal/business information that I must provide:
 J. Items that should be reviewed by a qualified lawyer if appropriate:
 - Applicability of GDPR/CCPA based on the userbase.
 - Liability regarding third-party content that users upload.
+

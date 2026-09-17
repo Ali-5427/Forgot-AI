@@ -33,11 +33,12 @@ export default function SecurityPage() {
           <p>Security is continuously improved as the product evolves. We regularly audit our dependencies, monitor error logs for anomalies, and adhere to least-privilege architecture principles.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">Report a Vulnerability</h2>
-          <p>If you believe you have discovered a security vulnerability in Forgot AI, please report it to us immediately at <a href="mailto:support@forgot-ai.vercel.app">support@forgot-ai.vercel.app</a>.</p>
+          <p>If you believe you have discovered a security vulnerability in Forgot AI, please report it to us immediately at <a href="mailto:jmohammadali5427@gmail.com">jmohammadali5427@gmail.com</a>.</p>
         </div>
       </div>
       
     </div>
   );
 }
+
 

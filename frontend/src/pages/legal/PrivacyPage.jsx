@@ -49,11 +49,12 @@ export default function PrivacyPage() {
           <p>We retain your account information and saved memories as long as your account is active. You can request full deletion of your account and all associated data at any time. For more information, see our <Link to="/data-deletion" className="underline">Data & Account Deletion</Link> page.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">8. Contact Us</h2>
-          <p>For privacy questions or data deletion requests, please contact us at: <a href="mailto:support@forgot-ai.vercel.app">support@forgot-ai.vercel.app</a></p>
+          <p>For privacy questions or data deletion requests, please contact us at: <a href="mailto:jmohammadali5427@gmail.com">jmohammadali5427@gmail.com</a></p>
         </div>
       </div>
       
     </div>
   );
 }
+
 

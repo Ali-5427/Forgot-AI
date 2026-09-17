@@ -19,7 +19,7 @@ export default function ContactPage() {
           <div className="bg-neutral-50 p-6 rounded-lg border border-border mt-8">
             <h2 className="text-ink font-medium text-xl mb-4 mt-0">Support Email</h2>
             <p className="mb-0">Please reach out to us directly at:</p>
-            <p className="mt-2 mb-0"><a href="mailto:support@forgot-ai.vercel.app" className="text-ink font-medium text-lg">support@forgot-ai.vercel.app</a></p>
+            <p className="mt-2 mb-0"><a href="mailto:jmohammadali5427@gmail.com" className="text-ink font-medium text-lg">jmohammadali5427@gmail.com</a></p>
           </div>
 
           <h3 className="text-ink font-medium mt-8 mb-2">When contacting us, please indicate if your request is regarding:</h3>
@@ -37,4 +37,5 @@ export default function ContactPage() {
     </div>
   );
 }
+
 

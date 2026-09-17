@@ -24,7 +24,7 @@ export default function DataDeletionPage() {
           <p>To request the complete deletion of your account and all associated data, please contact our support team:</p>
           
           <div className="bg-neutral-50 p-4 rounded-lg border border-border mt-4 mb-4">
-            <p className="mb-0">Email: <a href="mailto:support@forgot-ai.vercel.app" className="text-ink font-medium">support@forgot-ai.vercel.app</a></p>
+            <p className="mb-0">Email: <a href="mailto:jmohammadali5427@gmail.com" className="text-ink font-medium">jmohammadali5427@gmail.com</a></p>
             <p className="mt-2 mb-0">Subject: <strong>Account Deletion Request</strong></p>
           </div>
 
@@ -42,4 +42,5 @@ export default function DataDeletionPage() {
     </div>
   );
 }
+
 

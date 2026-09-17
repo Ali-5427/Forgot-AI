@@ -34,8 +34,9 @@ Whether you're researching, reading long articles, or chatting with AI, Forgot A
   - Perplexity
 
 ## Support/contact details
-- Email: support@forgot-ai.vercel.app
+- Email: jmohammadali5427@gmail.com
 - Website: https://forgot-ai.vercel.app
 
 ## Privacy policy URL
 https://forgot-ai.vercel.app/privacy
+

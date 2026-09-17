@@ -42,11 +42,12 @@ export default function TermsPage() {
           <p>We are continuously improving Forgot AI. We may add, modify, or remove features at any time. We will notify users of any significant changes to the service or these Terms.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">9. Contact</h2>
-          <p>For questions about these Terms, contact us at: <a href="mailto:support@forgot-ai.vercel.app">support@forgot-ai.vercel.app</a></p>
+          <p>For questions about these Terms, contact us at: <a href="mailto:jmohammadali5427@gmail.com">jmohammadali5427@gmail.com</a></p>
         </div>
       </div>
       
     </div>
   );
 }
+
 
