@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Home, Layers, Search, Settings, Plus, Brain, RefreshCw } from "lucide-react";
+import { Home, Layers, Search, Settings, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
 import { ItemDetailView } from "./ItemDetailView";
@@ -18,9 +18,7 @@ export const Layout = () => {
       <aside className="w-60 shrink-0 border-r border-border bg-white flex flex-col fixed h-screen z-20">
         <div className="px-5 py-5 border-b border-border">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-md bg-neutral-900 flex items-center justify-center">
-              <Brain className="h-4 w-4 text-white" />
-            </div>
+            <img src="/logo.jpg" alt="Forgot AI Logo" className="h-7 w-7 rounded-md object-cover" />
             <span className="font-semibold text-[15px] tracking-tight">Forgot AI</span>
           </div>
           <p className="text-[11px] text-muted-foreground mt-1.5">Save anything. Find it later.</p>

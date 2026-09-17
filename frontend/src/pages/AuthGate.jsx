@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Brain, Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/auth";
@@ -34,9 +34,7 @@ export default function AuthGate() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-2 mb-10">
-            <div className="h-8 w-8 rounded-md bg-neutral-900 flex items-center justify-center">
-              <Brain className="h-4.5 w-4.5 text-white" />
-            </div>
+            <img src="/logo.jpg" alt="Forgot AI Logo" className="h-8 w-8 rounded-md object-cover" />
             <span className="font-semibold text-xl tracking-tight">Forgot AI</span>
           </div>
 
@@ -118,8 +116,7 @@ export default function AuthGate() {
         <div className="absolute inset-0 bg-gradient-to-br from-neutral-800 via-neutral-900 to-black" />
         <div className="relative z-10 max-w-lg text-center p-12">
           <div className="mx-auto mb-8 h-32 w-32 bg-white rounded-3xl shadow-xl p-2 flex items-center justify-center overflow-hidden">
-            <img src="/logo512.png" alt="Forgot AI Logo" className="w-full h-full object-contain rounded-2xl" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block'; }} />
-            <Brain className="h-16 w-16 text-neutral-900 hidden" />
+            <img src="/logo.jpg" alt="Forgot AI Logo" className="w-full h-full object-contain rounded-2xl" />
           </div>
           <h2 className="text-3xl font-bold text-white mb-4 tracking-tight">Your external brain.</h2>
           <p className="text-lg text-neutral-400 leading-relaxed">
