@@ -44,7 +44,7 @@ export const PILL_CSS = `
 .pill svg { width: 14px; height: 14px; display: block; }
 
 .pill.saving  { background: #18181B; border-color: #3F3F46; color: #A1A1AA; }
-.pill.saved   { background: #022C22; border-color: #065F46; color: #34D399; }
+.pill.saved   { background: #FAFAFA; border-color: #E4E4E7; color: #09090B; }
 .pill.error   { background: #450A0A; border-color: #991B1B; color: #FCA5A5; }
 
 .spinner {
