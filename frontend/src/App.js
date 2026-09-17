@@ -1,6 +1,6 @@
 ﻿import "@/App.css";
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, useSearchParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useSearchParams, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -11,11 +11,13 @@ import { AuthProvider, useAuth } from "@/auth";
 import { Layout } from "@/components/Layout";
 import { SaveDialog } from "@/components/SaveDialog";
 import { LandingPage } from "@/components/landing-page/landing-page";
+import { PublicLayout } from "@/components/PublicLayout";
 import AuthGate from "@/pages/AuthGate";
 import Home from "@/pages/Home";
 import AllSaved from "@/pages/AllSaved";
 import SearchPage from "@/pages/SearchPage";
 import Settings from "@/pages/Settings";
+import NotFound from "@/pages/NotFound";
 
 // Legal Pages
 import PrivacyPage from "@/pages/legal/PrivacyPage";
@@ -74,30 +76,9 @@ function ImportPrompt() {
   );
 }
 
-function LoggedOut() {
-  const [showAuth, setShowAuth] = useState(false);
-
-  if (showAuth) {
-    return (
-      <div className="relative min-h-screen">
-        <button
-          type="button"
-          onClick={() => setShowAuth(false)}
-          className="absolute left-4 top-4 z-10 text-sm text-muted-foreground hover:text-foreground"
-          data-testid="auth-back"
-        >
-          Back
-        </button>
-        <AuthGate />
-      </div>
-    );
-  }
-
-  return <LandingPage onOpenApp={() => setShowAuth(true)} />;
-}
-
 function AppContent() {
   const { user } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
 
   if (user === null) {
     return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Loading...</div>;
@@ -106,13 +87,20 @@ function AppContent() {
   return (
     <>
       <Routes>
-        <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/terms" element={<TermsPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/security" element={<SecurityPage />} />
-        <Route path="/data-deletion" element={<DataDeletionPage />} />
-        
-        {user ? (
+        {/* Public Marketing & Legal Pages */}
+        <Route element={<PublicLayout onOpenApp={() => setShowAuth(true)} />}>
+          {!user && <Route path="/" element={<LandingPage onOpenApp={() => setShowAuth(true)} />} />}
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/security" element={<SecurityPage />} />
+          <Route path="/data-deletion" element={<DataDeletionPage />} />
+          
+          {!user && <Route path="*" element={<NotFound />} />}
+        </Route>
+
+        {/* Logged-In App Routes */}
+        {user && (
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
             <Route path="/all" element={<AllSaved />} />
@@ -120,11 +108,25 @@ function AppContent() {
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Home />} />
           </Route>
-        ) : (
-          <Route path="*" element={<LoggedOut />} />
         )}
       </Routes>
       
+      {!user && showAuth && (
+        <div className="fixed inset-0 z-[100] bg-white overflow-y-auto flex flex-col">
+          <button
+            type="button"
+            onClick={() => setShowAuth(false)}
+            className="absolute left-4 top-4 z-[110] text-sm text-muted-foreground hover:text-foreground"
+            data-testid="auth-back"
+          >
+            Back
+          </button>
+          <div className="relative min-h-screen">
+            <AuthGate />
+          </div>
+        </div>
+      )}
+
       {user && <GlobalDialogs />}
       {user && <ImportPrompt />}
     </>

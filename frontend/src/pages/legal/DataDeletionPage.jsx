@@ -1,9 +1,14 @@
-﻿import { Footer } from "@/components/Footer";
+﻿
 import { Link } from "react-router-dom";
+import { useEffect } from "react";
 
 export default function DataDeletionPage() {
+  useEffect(() => {
+    document.title = "Data & Account Deletion | Forgot AI";
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col bg-white text-ink">
+    <div className="flex-1 flex flex-col mx-auto max-w-5xl w-full text-ink">
       <div className="flex-1 mx-auto max-w-3xl px-5 py-16 sm:py-24">
         <Link to="/" className="text-sm text-ink-muted hover:text-ink mb-8 inline-block">&larr; Back to Home</Link>
         <h1 className="font-display text-4xl font-medium tracking-tight mb-4">Data & Account Deletion</h1>
@@ -33,7 +38,8 @@ export default function DataDeletionPage() {
           </ul>
         </div>
       </div>
-      <Footer />
+      
     </div>
   );
 }
+

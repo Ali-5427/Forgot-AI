@@ -1,4 +1,4 @@
-import {
+﻿import {
   Bookmark,
   Image,
   LayoutPanelTop,
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Footer } from "@/components/Footer";
+
 import { Reveal } from "./reveal";
 import "./landing.css";
 
@@ -33,15 +33,15 @@ const STEPS = [
     n: "03",
     icon: Search,
     title: "Find later",
-    body: "Search the way you remember it — or just ask your memory.",
+    body: "Search the way you remember it â€” or just ask your memory.",
   },
 ];
 
 const SAVED = [
   { icon: Image, label: "Screenshots", hint: "The ones you meant to come back to" },
-  { icon: Link2, label: "Links", hint: "Pages you didn’t want to lose" },
+  { icon: Link2, label: "Links", hint: "Pages you didnâ€™t want to lose" },
   { icon: Moon, label: "2 AM ideas", hint: "The thought that showed up late" },
-  { icon: MessageSquareQuote, label: "Posts", hint: "Things you liked but couldn’t say why" },
+  { icon: MessageSquareQuote, label: "Posts", hint: "Things you liked but couldnâ€™t say why" },
   { icon: Phone, label: "Notes from calls", hint: "Already half gone by evening" },
   { icon: LayoutPanelTop, label: "UI inspiration", hint: "Something you wanted to steal, in a good way" },
 ];
@@ -53,7 +53,7 @@ const FAQ = [
   },
   {
     q: "Do I need to organize folders?",
-    a: "No. Forgot AI gives what you save a title, a short summary, and a sense of meaning. You find it later by remembering the idea — not the folder name.",
+    a: "No. Forgot AI gives what you save a title, a short summary, and a sense of meaning. You find it later by remembering the idea â€” not the folder name.",
   },
   {
     q: "Is it private?",
@@ -103,7 +103,7 @@ function SearchDemo() {
             Why some software feels fast
           </h3>
           <p className="mt-2 leading-relaxed text-ink-muted">
-            A short piece on latency, waiting, and why some tools feel instant even when they aren’t.
+            A short piece on latency, waiting, and why some tools feel instant even when they arenâ€™t.
           </p>
         </div>
       </div>
@@ -116,18 +116,8 @@ function SearchDemo() {
 
 export function LandingPage({ onOpenApp }) {
   return (
-    <div className="forgot-landing paper-grain relative text-ink">
-      <header className="sticky top-0 z-20 border-b border-line bg-paper/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-5 sm:h-16 sm:px-8">
-          <div className="flex items-center gap-2 text-ink">
-            <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-ink text-cream">
-              <Bookmark className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-            </span>
-            <span className="font-display text-lg font-medium tracking-tight">Forgot AI</span>
-          </div>
-          <AppButton onOpenApp={onOpenApp}>Open app</AppButton>
-        </div>
-      </header>
+    <div>
+      
 
       <main>
         <section className="mx-auto grid max-w-5xl items-center gap-10 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-2 lg:gap-16 lg:py-24">
@@ -139,7 +129,7 @@ export function LandingPage({ onOpenApp }) {
               Save anything now. Find it later.
             </h1>
             <p className="hero-enter hero-enter-delay-2 mt-5 max-w-xl text-lg leading-relaxed text-ink-muted">
-              Drop a link, a screenshot, or a note — then find it later in the words you remember.
+              Drop a link, a screenshot, or a note â€” then find it later in the words you remember.
             </p>
             <div className="hero-enter hero-enter-delay-3 mt-8">
               <AppButton size="lg" onOpenApp={onOpenApp}>
@@ -161,7 +151,7 @@ export function LandingPage({ onOpenApp }) {
         <section className="border-t border-line">
           <Reveal className="mx-auto max-w-2xl px-5 py-16 sm:px-8 sm:py-24">
             <h2 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">
-              You saved it. You just can’t find it.
+              You saved it. You just canâ€™t find it.
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-ink-muted">
               You saw something useful. You saved it. You know you saved it. And now it is buried in bookmarks, the
@@ -174,7 +164,7 @@ export function LandingPage({ onOpenApp }) {
           </Reveal>
         </section>
 
-        <section className="border-t border-line">
+        <section id="how-it-works" className="border-t border-line">
           <div className="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-24">
             <Reveal>
               <h2 className="font-display max-w-2xl text-3xl font-medium tracking-tight text-ink sm:text-4xl">
@@ -216,7 +206,7 @@ export function LandingPage({ onOpenApp }) {
           </div>
         </section>
 
-        <section className="border-t border-line">
+        <section id="use-cases" className="border-t border-line">
           <div className="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-24">
             <Reveal>
               <h2 className="font-display max-w-2xl text-3xl font-medium tracking-tight text-ink sm:text-4xl">
@@ -256,7 +246,7 @@ export function LandingPage({ onOpenApp }) {
           </Reveal>
         </section>
 
-        <section className="border-t border-line">
+        <section id="faq" className="border-t border-line">
           <div className="mx-auto max-w-2xl px-5 py-16 sm:px-8 sm:py-24">
             <Reveal>
               <h2 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">
@@ -293,12 +283,8 @@ export function LandingPage({ onOpenApp }) {
         </section>
       </main>
 
-      <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-5xl flex-col gap-1 px-5 py-8 sm:flex-row sm:items-baseline sm:justify-between sm:px-8">
-          <p className="font-display text-sm font-medium text-ink">Forgot AI</p>
-          <p className="text-sm text-ink-muted">Private to your account.</p>
-        </div>
-      </footer>
+      
     </div>
   );
 }
+
