@@ -95,11 +95,6 @@ export async function request<T>(
   }
 
   if (!res.ok) {
-    if (res.status === 401) {
-      // Automatic logout on permanent 401 (refresh failed or absent)
-      await clearSession();
-    }
-    
     let detail = res.statusText || `HTTP ${res.status}`;
     try {
       const j: any = await res.json();
@@ -149,16 +144,13 @@ export async function fetchStream(
         });
         headers.set("Authorization", `Bearer ${newAuth.token}`);
         res = await fetch(`${CONFIG.BACKEND_URL}${path}`, { ...init, headers });
-      } else {
-        await clearSession();
       }
     } catch {
-      await clearSession();
+      // Keep session
     }
   }
 
   if (!res.ok) {
-    if (res.status === 401) await clearSession();
     throw new Error(`HTTP ${res.status}`);
   }
   return res;
