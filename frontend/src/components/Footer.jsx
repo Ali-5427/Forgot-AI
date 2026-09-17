@@ -1,5 +1,5 @@
 ﻿import { Link } from "react-router-dom";
-import { Bookmark } from "lucide-react";
+import { Brain } from "lucide-react";
 
 export function Footer() {
   return (
@@ -9,8 +9,8 @@ export function Footer() {
           {/* Brand Column */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-2 text-ink mb-4">
-              <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-ink text-cream">
-                <Bookmark className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-neutral-900 text-cream">
+                <Brain className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
               </span>
               <span className="font-display text-lg font-medium tracking-tight">Forgot AI</span>
             </div>

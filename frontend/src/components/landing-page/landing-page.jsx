@@ -39,9 +39,9 @@ const STEPS = [
 
 const SAVED = [
   { icon: Image, label: "Screenshots", hint: "The ones you meant to come back to" },
-  { icon: Link2, label: "Links", hint: "Pages you didnâ€™t want to lose" },
+  { icon: Link2, label: "Links", hint: "Pages you didn't want to lose" },
   { icon: Moon, label: "2 AM ideas", hint: "The thought that showed up late" },
-  { icon: MessageSquareQuote, label: "Posts", hint: "Things you liked but couldnâ€™t say why" },
+  { icon: MessageSquareQuote, label: "Posts", hint: "Things you liked but couldn't say why" },
   { icon: Phone, label: "Notes from calls", hint: "Already half gone by evening" },
   { icon: LayoutPanelTop, label: "UI inspiration", hint: "Something you wanted to steal, in a good way" },
 ];
@@ -53,7 +53,7 @@ const FAQ = [
   },
   {
     q: "Do I need to organize folders?",
-    a: "No. Forgot AI gives what you save a title, a short summary, and a sense of meaning. You find it later by remembering the idea â€” not the folder name.",
+    a: "No. Forgot AI gives what you save a title, a short summary, and a sense of meaning. You find it later by remembering the idea � not the folder name.",
   },
   {
     q: "Is it private?",
@@ -103,7 +103,7 @@ function SearchDemo() {
             Why some software feels fast
           </h3>
           <p className="mt-2 leading-relaxed text-ink-muted">
-            A short piece on latency, waiting, and why some tools feel instant even when they arenâ€™t.
+            A short piece on latency, waiting, and why some tools feel instant even when they aren't.
           </p>
         </div>
       </div>
@@ -129,7 +129,7 @@ export function LandingPage({ onOpenApp }) {
               Save anything now. Find it later.
             </h1>
             <p className="hero-enter hero-enter-delay-2 mt-5 max-w-xl text-lg leading-relaxed text-ink-muted">
-              Drop a link, a screenshot, or a note â€” then find it later in the words you remember.
+              Drop a link, a screenshot, or a note � then find it later in the words you remember.
             </p>
             <div className="hero-enter hero-enter-delay-3 mt-8">
               <AppButton size="lg" onOpenApp={onOpenApp}>
@@ -151,7 +151,7 @@ export function LandingPage({ onOpenApp }) {
         <section className="border-t border-line">
           <Reveal className="mx-auto max-w-2xl px-5 py-16 sm:px-8 sm:py-24">
             <h2 className="font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl">
-              You saved it. You just canâ€™t find it.
+              You saved it. You just can't find it.
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-ink-muted">
               You saw something useful. You saved it. You know you saved it. And now it is buried in bookmarks, the
