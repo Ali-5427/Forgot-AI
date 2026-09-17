@@ -23,6 +23,7 @@ export interface SaveMemoryInput {
   source_url: string;
   source_title: string;
   source_domain: string;
+  user_note?: string;
 }
 
 interface AuthPayload {
@@ -195,6 +196,7 @@ export const api = {
     };
     if (input.source_url) body.source_url = input.source_url;
     if (input.source_title) body.source_title = input.source_title;
+    if (input.user_note) body.user_note = input.user_note;
 
     const saved = await request<SavedItem>("/api/items/text", {
       method: "POST",

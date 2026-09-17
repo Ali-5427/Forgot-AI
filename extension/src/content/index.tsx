@@ -56,6 +56,7 @@ async function saveMemory(payload: {
   capture_type: "highlight" | "content";
   original_content: string;
   source_title: string;
+  user_note?: string;
 }): Promise<SaveResponse> {
   return new Promise((resolve) => {
     const timeoutId = setTimeout(() => {
@@ -71,6 +72,7 @@ async function saveMemory(payload: {
           source_url: url(),
           source_title: payload.source_title || document.title || "",
           source_domain: location.hostname,
+          user_note: payload.user_note,
         },
       },
       (resp: SaveResponse) => {
@@ -115,7 +117,7 @@ function refreshModeA() {
   if (!modeAPill) {
     modeAPill = createPill({
       testId: "forgot-ai-mode-a-pill",
-      onClick: async () => {
+      onSubmit: async (userNote) => {
         const snapshot = currentSelectionText();
         const content = snapshot.text || text;
         modeAPill?.setState("saving");
@@ -124,6 +126,7 @@ function refreshModeA() {
             capture_type: "highlight",
             original_content: content,
             source_title: document.title || "",
+            user_note: userNote,
           });
           if (resp.ok) {
             modeAPill?.setState("saved");
@@ -132,7 +135,7 @@ function refreshModeA() {
             modeAPill?.setState("error", "Sign in to save");
             chrome.runtime.sendMessage({ type: "OPEN_AUTH_TAB" });
           } else {
-            modeAPill?.setState("error", "Save failed — retry");
+            modeAPill?.setState("error", "Save failed - retry");
           }
         } catch (err) {
           modeAPill?.setState("error", "Extension reloaded. Please refresh the page.");
@@ -176,13 +179,14 @@ function injectModeBFor(target: HTMLElement): boolean {
   if (!extracted || !extracted.text || extracted.text.length < 20) return false;
   const pill = createPill({
     testId: "forgot-ai-mode-b-pill",
-    onClick: async () => {
+    onSubmit: async (userNote) => {
       pill.setState("saving");
       try {
         const resp = await saveMemory({
           capture_type: "content",
           original_content: extracted.text,
           source_title: extracted.title || document.title || "",
+          user_note: userNote,
         });
         if (resp.ok) {
           pill.setState("saved");
@@ -195,7 +199,7 @@ function injectModeBFor(target: HTMLElement): boolean {
           pill.setState("error", "Sign in to save");
           chrome.runtime.sendMessage({ type: "OPEN_AUTH_TAB" });
         } else {
-          pill.setState("error", "Save failed — retry");
+          pill.setState("error", "Save failed - retry");
         }
       } catch (err) {
         pill.setState("error", "Extension reloaded. Please refresh the page.");

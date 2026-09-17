@@ -2,11 +2,12 @@
 // to keep bundle tiny and avoid React DOM re-mount issues on host pages.
 import { PILL_CSS, ICONS } from "./styles";
 
-export type PillState = "idle" | "saving" | "saved" | "error";
+export type PillState = "idle" | "prompting" | "saving" | "saved" | "error";
 
 export interface PillOptions {
   label?: string;
-  onClick: () => void;
+  onClick?: () => void; // Optional if using onSubmit
+  onSubmit?: (note: string) => void;
   testId?: string;
 }
 
@@ -37,21 +38,47 @@ export function createPill(opts: PillOptions): PillHandle {
   const wrap = document.createElement("div");
   wrap.className = "wrap";
 
-  const btn = document.createElement("button");
-  btn.type = "button";
+  // Use a form so we can easily handle Enter to submit the input
+  const btn = document.createElement("form");
   btn.className = "pill floating";
   btn.setAttribute("data-testid", opts.testId || "forgot-ai-pill-button");
-  btn.innerHTML = `<span class="icon">${ICONS.bookmark}</span><span class="label" data-testid="forgot-ai-pill-status">${opts.label || "Save to Forgot AI"}</span>`;
+  
+  const renderIdle = () => {
+    btn.innerHTML = `<button type="button" class="prompt-form" style="background:transparent;border:none;color:inherit;font:inherit;cursor:pointer;padding:0;outline:none;"><span class="icon">${ICONS.bookmark}</span><span class="label" data-testid="forgot-ai-pill-status">${opts.label || "Save to Forgot AI"}</span></button>`;
+  };
+  
+  renderIdle();
 
   // Prevent selection loss on click.
   btn.addEventListener("mousedown", (e) => {
     e.preventDefault();
     e.stopPropagation();
   });
+
+  // Handle click on the pill itself (for idle state)
   btn.addEventListener("click", (e) => {
+    // If we're already prompting, clicking the pill shouldn't do anything
+    // unless they clicked the actual submit button which is handled by submit event.
+    if (btn.classList.contains("prompting")) return;
+    
     e.preventDefault();
     e.stopPropagation();
-    opts.onClick();
+    
+    if (opts.onSubmit) {
+      setState("prompting");
+    } else if (opts.onClick) {
+      opts.onClick();
+    }
+  });
+
+  // Handle form submission (for prompt state)
+  btn.addEventListener("submit", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (opts.onSubmit) {
+      const input = btn.querySelector(".prompt-input") as HTMLInputElement;
+      opts.onSubmit(input ? input.value : "");
+    }
   });
 
   wrap.appendChild(btn);
@@ -61,7 +88,29 @@ export function createPill(opts: PillOptions): PillHandle {
   document.documentElement.appendChild(host);
 
   const setState: PillHandle["setState"] = (state, message) => {
-    btn.classList.remove("saving", "saved", "error");
+    btn.classList.remove("saving", "saved", "error", "prompting");
+    
+    if (state === "prompting") {
+      btn.classList.add("prompting");
+      btn.innerHTML = `
+        <div class="prompt-form">
+          <input type="text" class="prompt-input" placeholder="Why are you saving this?" autofocus />
+          <button type="submit" class="prompt-submit">${ICONS.arrow}</button>
+        </div>
+      `;
+      // focus input
+      setTimeout(() => {
+        const input = btn.querySelector(".prompt-input") as HTMLInputElement;
+        if (input) input.focus();
+      }, 50);
+      return;
+    }
+
+    // Restore standard HTML structure if coming from prompting
+    if (!btn.querySelector(".icon")) {
+      renderIdle();
+    }
+
     const label = btn.querySelector(".label") as HTMLElement;
     const icon = btn.querySelector(".icon") as HTMLElement;
     switch (state) {
@@ -69,7 +118,7 @@ export function createPill(opts: PillOptions): PillHandle {
         btn.classList.add("saving");
         btn.setAttribute("disabled", "true");
         icon.innerHTML = `<span class="spinner"></span>`;
-        label.textContent = message || "Saving…";
+        label.textContent = message || "Saving...";
         break;
       case "saved":
         btn.classList.add("saved");
@@ -115,7 +164,7 @@ export function positionNearSelectionRect(
 ): void {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const w = 180;
+  const w = 240; // increased slightly to accommodate input
   const h = 36;
   let left = rect.left + rect.width / 2 - w / 2;
   let top = rect.top - h - 8;
@@ -131,7 +180,7 @@ export function positionNearSelectionRect(
 export function positionAnchored(handle: PillHandle, el: HTMLElement): void {
   const rect = el.getBoundingClientRect();
   const vw = window.innerWidth;
-  const w = 180;
+  const w = 240;
   let left = rect.right - w;
   let top = rect.top + 8;
   if (left < 8) left = rect.left + 8;

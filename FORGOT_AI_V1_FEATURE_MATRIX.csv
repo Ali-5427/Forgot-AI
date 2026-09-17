@@ -1,0 +1,19 @@
+﻿id,feature,category,website,extension,backend,database,ai,status,tested,notes,limitations
+1,Highlight Save,Capture,No,Yes,Yes,Yes,Yes,WORKING,Yes,Content script injects pill,Only captures selected text
+2,Webpage Save,Capture,Yes,Yes,Yes,Yes,Yes,WORKING,Yes,Extracts OG tags,Fails on JS-heavy sites
+3,Image Upload,Capture,Yes,Yes,Yes,Yes,Yes,WORKING,Yes,File upload in UI,Requires manual file selection
+4,Screenshot Save,Capture,No,No,No,No,No,NOT_IMPLEMENTED,Yes,No extension API used,Must use OS tool then upload
+5,Twitter Save,Capture,No,No,No,No,No,BROKEN,Yes,Mode B disabled in code,Code exists but disabled
+6,ChatGPT Save,Capture,No,No,No,No,No,BROKEN,Yes,Mode B disabled in code,Code exists but disabled
+7,Article Extractor,Capture,No,No,No,No,No,BROKEN,Yes,Mode B disabled in code,Code exists but disabled
+8,Voice Save,Capture,No,No,No,No,No,NOT_IMPLEMENTED,Yes,No UI or API exists,None
+9,AI Title Gen,AI,No,No,Yes,Yes,Yes,WORKING,Yes,Runs via Groq background task,None
+10,AI Summary Gen,AI,No,No,Yes,Yes,Yes,WORKING,Yes,Runs via Groq background task,None
+11,AI Keyword Gen,AI,No,No,Yes,Yes,Yes,WORKING,Yes,Runs via Groq background task,None
+12,Keyword Search,Search,Yes,Yes,Yes,Yes,Yes,PARTIAL,Yes,Matches via LLM prompt,Limited to 50 recent items
+13,Semantic Search,Search,Yes,Yes,Yes,Yes,Yes,PARTIAL,Yes,No vectors used,Limited to 50 recent items
+14,Ask My Memory,Search,Yes,Yes,Yes,No,Yes,WORKING,Yes,Streams LLM response,Context limited to recent items
+15,Collections,Organization,No,No,No,No,No,NOT_IMPLEMENTED,Yes,No schema or UI,None
+16,Auth Login/Register,Auth,Yes,Yes,Yes,Yes,No,WORKING,Yes,Supabase Auth,None
+17,Account Deletion,Auth,Yes,No,No,No,No,PARTIAL,Yes,UI exists but no API,Requires manual email support
+18,Data Export,Data,Yes,No,No,No,No,PARTIAL,Yes,UI button exists,Requires manual email support
