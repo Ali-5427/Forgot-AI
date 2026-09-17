@@ -1,4 +1,4 @@
-import "@/App.css";
+﻿import "@/App.css";
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useSearchParams } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
@@ -16,6 +16,13 @@ import Home from "@/pages/Home";
 import AllSaved from "@/pages/AllSaved";
 import SearchPage from "@/pages/SearchPage";
 import Settings from "@/pages/Settings";
+
+// Legal Pages
+import PrivacyPage from "@/pages/legal/PrivacyPage";
+import TermsPage from "@/pages/legal/TermsPage";
+import ContactPage from "@/pages/legal/ContactPage";
+import SecurityPage from "@/pages/legal/SecurityPage";
+import DataDeletionPage from "@/pages/legal/DataDeletionPage";
 
 function GlobalDialogs() {
   const { saveOpen, setSaveOpen, openItem, reloadItems } = useStore();
@@ -89,39 +96,52 @@ function LoggedOut() {
   return <LandingPage onOpenApp={() => setShowAuth(true)} />;
 }
 
-function Shell() {
+function AppContent() {
   const { user } = useAuth();
 
   if (user === null) {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Loading…</div>;
+    return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Loading...</div>;
   }
-  if (!user) return <LoggedOut />;
 
   return (
-    <BrowserRouter>
+    <>
       <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/all" element={<AllSaved />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route path="/settings" element={<Settings />} />
-        </Route>
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/security" element={<SecurityPage />} />
+        <Route path="/data-deletion" element={<DataDeletionPage />} />
+        
+        {user ? (
+          <Route element={<Layout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/all" element={<AllSaved />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Home />} />
+          </Route>
+        ) : (
+          <Route path="*" element={<LoggedOut />} />
+        )}
       </Routes>
-      <GlobalDialogs />
-      <ImportPrompt />
-    </BrowserRouter>
+      
+      {user && <GlobalDialogs />}
+      {user && <ImportPrompt />}
+    </>
   );
 }
 
 function App() {
   return (
     <div className="App">
-      <AuthProvider>
-        <StoreProvider>
-          <Shell />
-          <Toaster position="bottom-right" />
-        </StoreProvider>
-      </AuthProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <StoreProvider>
+            <AppContent />
+            <Toaster position="bottom-right" />
+          </StoreProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </div>
   );
 }
