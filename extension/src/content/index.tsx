@@ -17,6 +17,7 @@ const isGeneric = adapter.name === genericArticleAdapter.name;
 
 // Mode A
 let modeAPill: PillHandle | null = null;
+let modeALastText = "";
 let selectionActive = false;
 
 // Mode B
@@ -104,22 +105,27 @@ function destroyModeA() {
 function refreshModeA() {
   const { text, rect } = currentSelectionText();
   if (!text || !rect) {
+    // Don't destroy if the user is interacting with the pill's input field
+    if (modeAPill && document.activeElement === modeAPill.host) {
+      return;
+    }
     selectionActive = false;
     destroyModeA();
     // Re-show any Mode B pills that were hidden
     for (const p of modeBPills.values()) p.host.style.display = "";
     return;
   }
+  
+  modeALastText = text;
   selectionActive = true;
-  // Priority: Mode A wins — hide all Mode B pills
+  // Priority: Mode A wins - hide all Mode B pills
   for (const p of modeBPills.values()) p.host.style.display = "none";
 
   if (!modeAPill) {
     modeAPill = createPill({
       testId: "forgot-ai-mode-a-pill",
       onSubmit: async (userNote) => {
-        const snapshot = currentSelectionText();
-        const content = snapshot.text || text;
+        const content = modeALastText;
         modeAPill?.setState("saving");
         try {
           const resp = await saveMemory({

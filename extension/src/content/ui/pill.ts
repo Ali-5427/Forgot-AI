@@ -14,6 +14,7 @@ export interface PillOptions {
 export interface PillHandle {
   host: HTMLElement;
   setState: (state: PillState, message?: string) => void;
+  getState: () => PillState;
   setPosition: (rect: { top: number; left: number; fixed?: boolean }) => void;
   destroy: () => void;
   el: HTMLDivElement;
@@ -49,8 +50,14 @@ export function createPill(opts: PillOptions): PillHandle {
   
   renderIdle();
 
-  // Prevent selection loss on click.
+  // Prevent selection loss on click, EXCEPT when clicking the input field.
   btn.addEventListener("mousedown", (e) => {
+    const target = e.target as HTMLElement;
+    if (target && target.tagName === "INPUT") {
+      // allow default to let the input gain focus!
+      e.stopPropagation();
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
   });
@@ -141,6 +148,14 @@ export function createPill(opts: PillOptions): PillHandle {
     }
   };
 
+  const getState: PillHandle["getState"] = () => {
+    if (btn.classList.contains("prompting")) return "prompting";
+    if (btn.classList.contains("saving")) return "saving";
+    if (btn.classList.contains("saved")) return "saved";
+    if (btn.classList.contains("error")) return "error";
+    return "idle";
+  };
+
   const setPosition: PillHandle["setPosition"] = ({ top, left, fixed = true }) => {
     host.style.position = fixed ? "fixed" : "absolute";
     host.style.top = `${Math.max(4, top)}px`;
@@ -154,7 +169,7 @@ export function createPill(opts: PillOptions): PillHandle {
     setTimeout(() => host.remove(), 180);
   };
 
-  return { host, setState, setPosition, destroy, el: btn as unknown as HTMLDivElement };
+  return { host, setState, getState, setPosition, destroy, el: btn as unknown as HTMLDivElement };
 }
 
 // Position the pill near a selection rect, viewport-edge aware.
