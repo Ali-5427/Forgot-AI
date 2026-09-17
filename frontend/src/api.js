@@ -59,9 +59,7 @@ axios.interceptors.response.use(
           isRefreshing = false;
         }
       }
-      setToken(null);
-      setRefreshToken(null);
-      window.location.reload();
+      return Promise.reject(error);
     }
     return Promise.reject(error);
   }
