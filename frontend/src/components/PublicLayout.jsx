@@ -16,15 +16,17 @@ export function PublicLayout({ onOpenApp }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Handle hash scrolling on page load
+  // Handle hash scrolling and scroll restoration
   useEffect(() => {
     if (location.hash) {
       setTimeout(() => {
         const el = document.querySelector(location.hash);
         if (el) el.scrollIntoView({ behavior: "smooth" });
       }, 100);
+    } else {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
-  }, [location]);
+  }, [location.pathname, location.hash]);
 
   const handleNav = (hash) => {
     if (location.pathname !== "/") {
