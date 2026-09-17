@@ -1,6 +1,6 @@
-import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+﻿import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import { Brain } from "lucide-react";
+
 import { Footer } from "./Footer";
 import { Button } from "@/components/ui/button";
 
@@ -42,9 +42,7 @@ export function PublicLayout({ onOpenApp }) {
       <header className="sticky top-0 z-50 border-b border-line bg-paper/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-5 sm:px-8">
           <Link to="/" className="flex items-center gap-2 text-ink hover:opacity-80 transition-opacity">
-            <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-neutral-900 text-cream">
-              <Brain className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-            </span>
+            <img src="/logo.jpg" alt="Forgot AI Logo" className="h-8 w-8 rounded-md object-cover" />
             <span className="font-display text-lg font-medium tracking-tight">Forgot AI</span>
           </Link>
 
@@ -71,3 +69,4 @@ export function PublicLayout({ onOpenApp }) {
     </div>
   );
 }
+

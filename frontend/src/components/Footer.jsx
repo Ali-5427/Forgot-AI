@@ -1,5 +1,5 @@
 ﻿import { Link } from "react-router-dom";
-import { Brain } from "lucide-react";
+
 
 export function Footer() {
   return (
@@ -9,9 +9,7 @@ export function Footer() {
           {/* Brand Column */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-2 text-ink mb-4">
-              <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-neutral-900 text-cream">
-                <Brain className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-              </span>
+              <img src="/logo.jpg" alt="Forgot AI Logo" className="h-8 w-8 rounded-md object-cover" />
               <span className="font-display text-lg font-medium tracking-tight">Forgot AI</span>
             </div>
             <p className="text-sm text-ink-muted leading-relaxed">
@@ -50,9 +48,10 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-12 pt-8 border-t border-line flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-ink-muted">
-          <p>© {new Date().getFullYear()} Forgot AI. All rights reserved.</p>
+          <p>Â© {new Date().getFullYear()} Forgot AI. All rights reserved.</p>
         </div>
       </div>
     </footer>
   );
 }
+
