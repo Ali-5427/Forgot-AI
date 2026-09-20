@@ -268,15 +268,6 @@ class ImportIn(BaseModel):
     library_id: str
 
 
-class FeedbackIn(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    tried: Optional[str] = None
-    worked: Optional[str] = None
-    confusing: Optional[str] = None
-    improve: Optional[str] = None
-
-
 # ---------------- Auth dependencies ----------------
 def public_user(u: dict) -> dict:
     return {"id": u["id"], "email": u["email"], "name": u.get("name", ""), "created_at": u.get("created_at")}
@@ -1114,30 +1105,6 @@ async def download_file(path: str, request: Request, token: Optional[str] = Quer
         raise HTTPException(404, "File not found")
     data, content_type = await get_object(path)
     return Response(content=data, media_type=content_type)
-
-
-# ---------------- Feedback ----------------
-@api_router.post("/feedback")
-async def submit_feedback(payload: FeedbackIn, request: Request):
-    user_id = None
-    token = _bearer(request)
-    if token:
-        u = await _user_from_token(token)
-        if u:
-            user_id = u["id"]
-    
-    doc = {
-        "user_id": user_id,
-        "name": payload.name or "",
-        "email": payload.email or "",
-        "tried": payload.tried or "",
-        "worked": payload.worked or "",
-        "confusing": payload.confusing or "",
-        "improve": payload.improve or "",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.beta_feedback.insert_one(doc)
-    return {"status": "ok"}
 
 
 # ---------------- Health check ----------------
