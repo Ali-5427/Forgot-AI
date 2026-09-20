@@ -34,6 +34,7 @@ db = SupabaseDatabase(supabase)
 
 OLLAMA_API_KEY = os.environ.get('OLLAMA_API_KEY', '').strip()
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '').strip()
+NVIDIA_API_KEY = os.environ.get('NVIDIA_API_KEY', '').strip()
 OLLAMA_BASE_URL = (os.environ.get('OLLAMA_BASE_URL') or "https://ollama.com/api/chat").rstrip('/')
 AI_MODEL = ("ollama", "gpt-oss:20b")
 APP_NAME = "forgot-ai"
@@ -325,6 +326,30 @@ async def get_current_user(request: Request) -> dict:
 
 
 # ---------------- AI helpers ----------------
+async def get_embedding(text: str) -> Optional[List[float]]:
+    if not NVIDIA_API_KEY:
+        logger.warning("NVIDIA_API_KEY not set. Cannot generate embeddings.")
+        return None
+    url = "https://integrate.api.nvidia.com/v1/embeddings"
+    headers = {
+        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "input": [text],
+        "model": "nvidia/nemotron-3-embed-1b",
+        "encoding_format": "float"
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload, timeout=30) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+                return data["data"][0]["embedding"]
+    except Exception as e:
+        logger.error(f"NVIDIA Embedding API failed: {e}")
+        return None
+
 async def groq_vision_scan(image_b64: str) -> str:
     if not GROQ_API_KEY:
         logger.warning("GROQ_API_KEY not set. Cannot use Groq vision model.")
@@ -570,6 +595,12 @@ async def enrich_item(item_id: str, user_note: Optional[str] = None):
         if not update["why_saved"]:
             del update["why_saved"]
             
+        # Generate semantic embedding
+        embedding_text = f"{update['title']}\n{update['summary']}\n{' '.join(update['keywords'])}"
+        embedding = await get_embedding(embedding_text)
+        if embedding:
+            update["embedding"] = embedding
+            
         await db.items.update_one({"id": item_id}, {"$set": update})
         
         # Broadcast updated item to live sync
@@ -611,46 +642,47 @@ def rel_age(iso: str) -> str:
 
 
 async def rank_items(query: str, lib: str, limit: int = 30):
-    docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(50)
-    if not docs:
+    query_embedding = await get_embedding(query)
+    if not query_embedding:
+        logger.error("Failed to generate query embedding for search.")
         return [], {}
-    catalog = []
-    for d in docs:
-        catalog.append({
-            "id": d["id"],
-            "title": d.get("title"),
-            "type": d.get("content_type"),
-            "category": d.get("category"),
-            "domain": d.get("source_domain"),
-            "keywords": d.get("keywords", []),
-            "summary": d.get("summary"),
-            "saved": rel_age(d.get("created_at", "")),
-            "saved_at": d.get("created_at"),
-            "text": ((d.get("searchable_text") or "") + " " + (d.get("extracted_text") or ""))[:600],
-        })
-    now = datetime.now(timezone.utc).isoformat()
-    system = (
-        "You are Forgot AI's semantic search over a person's saved memories. Match by MEANING using ALL signals: "
-        "meaning/summary, text (including text read from images), title, keywords, category, domain/source and type. "
-        "Be TIME-AWARE: if the query mentions today/yesterday/this week/last month, use each item's 'saved'/'saved_at' "
-        "relative to the current time to filter and rank; never invent exact dates. Do NOT surface an item just because "
-        "one generic word matched. Rank by true relevance. "
-        f"Current time is {now}. "
-        'Respond ONLY with JSON: {"results":[{"id":"...","reason":"short why it matched"}]} (max 20). '
-        "If nothing is genuinely relevant, return an empty results array."
-    )
-    prompt = f"USER QUERY: {query}\n\nSAVED MEMORIES:\n{json.dumps(catalog)}"
-    raw = await llm_text(system, prompt)
-    parsed = parse_json_block(raw)
-    ranked = parsed.get("results", []) if isinstance(parsed, dict) else []
+
+    # Call the Supabase RPC function for vector matching
+    # We pass the query vector, a similarity threshold, the limit, and the library_id
+    try:
+        response = supabase.rpc(
+            'match_items',
+            {
+                'query_embedding': query_embedding,
+                'match_threshold': 0.1,  # Adjust as needed (0.0 to 1.0)
+                'match_count': limit,
+                'p_library_id': lib
+            }
+        ).execute()
+        
+        matches = response.data or []
+    except Exception as e:
+        logger.error(f"Vector search RPC failed: {e}")
+        matches = []
+
+    if not matches:
+        return [], {}
+
+    # The RPC returns a limited set of fields. We need to fetch the full items
+    # to maintain compatibility with the rest of the application (or we could just 
+    # update the RPC to return the full rows, but fetching them by ID is easy enough).
+    matched_ids = [m['id'] for m in matches]
+    docs = await db.items.find({"id": {"in": matched_ids}}).to_list(limit)
     by_id = {d["id"]: clean(d) for d in docs}
+    
     results = []
-    for r in ranked[:limit]:
-        item = by_id.get(r.get("id"))
+    for m in matches:
+        item = by_id.get(m['id'])
         if item:
             item = dict(item)
-            item["match_reason"] = r.get("reason", "")
+            item["match_reason"] = f"Semantic Match (Score: {m['similarity']:.2f})"
             results.append(item)
+            
     return results, by_id
 
 
