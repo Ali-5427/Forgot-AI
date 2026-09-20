@@ -1,4 +1,4 @@
-﻿import "@/App.css";
+import "@/App.css";
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useSearchParams, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
@@ -18,6 +18,7 @@ import AllSaved from "@/pages/AllSaved";
 import SearchPage from "@/pages/SearchPage";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
+import BetaPage from "@/pages/BetaPage";
 
 // Legal Pages
 import PrivacyPage from "@/pages/legal/PrivacyPage";
@@ -90,6 +91,7 @@ function AppContent() {
         {/* Public Marketing & Legal Pages */}
         <Route element={<PublicLayout onOpenApp={() => setShowAuth(true)} />}>
           {!user && <Route path="/" element={<LandingPage onOpenApp={() => setShowAuth(true)} />} />}
+          <Route path="/beta" element={<BetaPage onOpenApp={() => setShowAuth(true)} />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/contact" element={<ContactPage />} />

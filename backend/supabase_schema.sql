@@ -82,3 +82,20 @@ with check (bucket_id = 'forgot-ai-assets' and (storage.foldername(name))[1] = a
 drop policy if exists assets_owner_delete on storage.objects;
 create policy assets_owner_delete on storage.objects for delete to authenticated
 using (bucket_id = 'forgot-ai-assets' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create table if not exists public.beta_feedback (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references auth.users(id) on delete set null,
+    name text,
+    email text,
+    tried text,
+    worked text,
+    confusing text,
+    improve text,
+    created_at timestamptz not null default now()
+);
+
+alter table public.beta_feedback enable row level security;
+-- allow anyone to insert feedback, but only service_role (admins) can view
+drop policy if exists beta_feedback_insert on public.beta_feedback;
+create policy beta_feedback_insert on public.beta_feedback for insert with check (true);
