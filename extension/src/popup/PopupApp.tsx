@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon, Copy, Check, RotateCcw, Edit2, Square } from "lucide-react";
+import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon, Copy, Check, RotateCcw, Edit2, Square, Settings } from "lucide-react";
 import { api, request, fetchStream } from "../lib/api";
 import { CONFIG } from "../lib/config";
 import { clearSession, getSession, onSessionChange } from "../lib/storage";
@@ -30,6 +30,7 @@ export default function PopupApp() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -259,13 +260,41 @@ export default function PopupApp() {
           </div>
           Forgot AI
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={openApp} title="Open App" className="p-2 rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition-colors">
-            <ExternalLink className="w-4 h-4" />
+        
+        {/* Settings Menu */}
+        <div className="relative">
+          <button 
+            onClick={() => setIsMenuOpen(!isMenuOpen)} 
+            className={`p-2 rounded-full transition-colors ${isMenuOpen ? 'bg-neutral-100 text-neutral-900' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}`}
+            title="Menu"
+          >
+            <Settings className="w-4 h-4" />
           </button>
-          <button onClick={logout} title="Log out" className="p-2 rounded-full text-neutral-500 hover:bg-red-50 hover:text-red-600 transition-colors">
-            <LogOut className="w-4 h-4" />
-          </button>
+          
+          {isMenuOpen && (
+            <>
+              {/* Invisible overlay to catch clicks outside */}
+              <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
+              
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <button 
+                  onClick={() => { openApp(); setIsMenuOpen(false); }} 
+                  className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-neutral-700 hover:bg-neutral-50 flex items-center gap-2.5 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4 text-neutral-500" />
+                  Open Dashboard
+                </button>
+                <div className="h-[1px] bg-neutral-100 w-full my-0.5"></div>
+                <button 
+                  onClick={() => { logout(); setIsMenuOpen(false); }} 
+                  className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-red-600 hover:bg-red-50 flex items-center gap-2.5 transition-colors"
+                >
+                  <LogOut className="w-4 h-4 text-red-500" />
+                  Log Out
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
