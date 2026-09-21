@@ -31,9 +31,16 @@ async def backfill():
             title = item.get("title", "")
             summary = item.get("summary", "")
             keywords = item.get("keywords", [])
+            category = item.get("category", "")
             
-            # Combine into the same format used in server.py
-            embedding_text = f"{title}\n{summary}\n{' '.join(keywords)}"
+            content_type_str = f"Type: {item.get('content_type', 'unknown')}"
+            if item.get("content_type") == "image":
+                content_type_str += " (image screenshot picture)"
+                
+            ext_text = item.get("extracted_text", "")[:1500]
+            search_text = item.get("searchable_text", "")[:1500]
+            
+            embedding_text = f"{title}\n{summary}\nKeywords: {' '.join(keywords)}\nCategory: {category}\n{content_type_str}\n{ext_text}\n{search_text}"
             
             embedding = await get_embedding(embedding_text)
             

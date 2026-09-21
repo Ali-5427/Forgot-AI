@@ -596,10 +596,20 @@ async def enrich_item(item_id: str, user_note: Optional[str] = None):
             del update["why_saved"]
             
         # Generate semantic embedding
-        embedding_text = f"{update['title']}\n{update['summary']}\n{' '.join(update['keywords'])}"
+        # Include content_type for image/screenshot searchability
+        content_type_str = f"Type: {doc.get('content_type', 'unknown')}"
+        if doc.get("content_type") == "image":
+            content_type_str += " (image screenshot picture)"
+            
+        ext_text = update.get("extracted_text", "")[:1500]
+        search_text = update.get("searchable_text", "")[:1500]
+        
+        embedding_text = f"{update.get('title', '')}\n{update.get('summary', '')}\nKeywords: {' '.join(update.get('keywords', []))}\nCategory: {update.get('category', '')}\n{content_type_str}\n{ext_text}\n{search_text}"
         embedding = await get_embedding(embedding_text)
         if embedding:
             update["embedding"] = embedding
+        else:
+            logger.warning(f"Embedding failed for item {item_id}, saving as ready anyway.")
             
         await db.items.update_one({"id": item_id}, {"$set": update})
         
@@ -645,10 +655,16 @@ async def retrieve(query: str, lib: str, limit: int = 30):
     q_lower = query.lower()
     time_filter = ""
     
-    # 1. Simple Intent Router (Time Parsing)
-    if any(word in q_lower for word in ["latest", "just saved", "most recent", "last save"]):
-        time_filter = "latest"
-    elif "yesterday" in q_lower:
+    # 1. Recency path (NO embedding, NO hybrid RPC)
+    recency_words = ["latest", "just saved", "most recent", "last save", "last saved", "last note"]
+    if any(word in q_lower for word in recency_words):
+        logger.info(f"Using pure recency path for query: {query}")
+        docs = await db.items.find({"library_id": lib, "status": "ready"}).sort("created_at", -1).to_list(limit)
+        results = [clean(d) for d in docs]
+        return results, {d["id"]: d for d in results}
+
+    # Time window path
+    if "yesterday" in q_lower:
         time_filter = "yesterday"
     elif "today" in q_lower:
         time_filter = "today"
@@ -656,45 +672,68 @@ async def retrieve(query: str, lib: str, limit: int = 30):
         time_filter = "week"
         
     query_embedding = await get_embedding(query)
-    if not query_embedding:
-        logger.error("Failed to generate query embedding for search.")
-        return [], {}
-
-    # Call the new Supabase Hybrid RPC
-    try:
-        response = supabase.rpc(
-            'hybrid_search_items',
-            {
-                'query_embedding': query_embedding,
-                'query_text': query,
-                'time_filter': time_filter,
-                'match_count': limit,
-                'p_library_id': lib
-            }
-        ).execute()
+    
+    matches = []
+    if query_embedding:
+        try:
+            logger.info(f"Using hybrid search RPC for query: {query}")
+            response = supabase.rpc(
+                'hybrid_search_items',
+                {
+                    'query_embedding': query_embedding,
+                    'query_text': query,
+                    'time_filter': time_filter,
+                    'match_count': limit,
+                    'p_library_id': lib
+                }
+            ).execute()
+            
+            matches = response.data or []
+        except Exception as e:
+            logger.error(f"Hybrid search RPC failed: {e}")
+            matches = []
+            
+    # Fallback 1 & 2: If RPC failed or returned nothing (or if embedding failed)
+    if not matches:
+        logger.info("Hybrid search returned empty or failed. Trying keyword fallback.")
+        # Keyword fallback
+        regex = {"$regex": query, "$options": "i"}
+        fb_docs = await db.items.find({
+            "library_id": lib,
+            "status": "ready",
+            "$or": [
+                {"title": regex},
+                {"summary": regex},
+                {"extracted_text": regex},
+                {"searchable_text": regex},
+            ]
+        }).to_list(limit)
         
-        matches = response.data or []
-    except Exception as e:
-        logger.error(f"Hybrid search RPC failed: {e}")
-        matches = []
+        if fb_docs:
+            matches = fb_docs
+        else:
+            # Fallback 2: Recent items
+            logger.info("Keyword fallback empty. Returning latest 10 items as fallback.")
+            matches = await db.items.find({"library_id": lib, "status": "ready"}).sort("created_at", -1).to_list(min(limit, 10))
 
     if not matches:
         return [], {}
 
-    matched_ids = [m['id'] for m in matches]
-    docs = await db.items.find({"id": {"in": matched_ids}}).to_list(limit)
-    by_id = {d["id"]: clean(d) for d in docs}
+    # matches might be from RPC (which omits MongoDB _id but returns all cols) or from fallback.
+    results = [clean(d) for d in matches]
     
-    results = []
-    # Ensure results are ordered as returned by the RPC (which handles the scoring/sorting)
-    for m in matches:
-        item = by_id.get(m['id'])
-        if item:
-            item = dict(item)
-            item["match_reason"] = f"Match Score: {m.get('similarity', 0):.2f}"
-            results.append(item)
-            
-    return results, by_id
+    # Optional: re-fetch from db if the RPC didn't return all fields
+    matched_ids = [m['id'] for m in results]
+    full_docs = await db.items.find({"id": {"in": matched_ids}}).to_list(len(matched_ids))
+    by_id = {d["id"]: clean(d) for d in full_docs}
+    
+    # Sort them back into the order matches provided
+    final_results = []
+    for m in results:
+        if m['id'] in by_id:
+            final_results.append(by_id[m['id']])
+
+    return final_results, by_id
 
 
 async def import_library(source_lib: str, user_id: str) -> int:
@@ -1121,9 +1160,18 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
         "- If the user asks for both, do both: answer the memory part from data, the rest normally.\n\n"
         + memory_context
     )
+    
+    async def _safe_llm_stream():
+        try:
+            async for chunk in llm_stream(system, q):
+                yield chunk
+        except Exception as e:
+            logger.error(f"LLM stream failed: {e}")
+            yield b" (Sorry, I'm having trouble connecting to my brain right now, but here are your search results!)"
+
     if payload.stream:
         return StreamingResponse(
-            llm_stream(system, q),
+            _safe_llm_stream(),
             media_type="application/octet-stream",
             headers={
                 "X-Accel-Buffering": "no",
@@ -1131,7 +1179,17 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
                 "Connection": "keep-alive"
             }
         )
-    answer = await llm_text(system, q)
+        
+    # Non-streaming with retry
+    for attempt in range(2):
+        try:
+            answer = await llm_text(system, q)
+            break
+        except Exception as e:
+            logger.error(f"LLM text failed (attempt {attempt+1}): {e}")
+            if attempt == 1:
+                answer = "Sorry, I couldn't process that right now, but I've attached your relevant search results below if any were found!"
+    
     return {"answer": answer, "results": results, "query": q}
 
 

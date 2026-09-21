@@ -82,3 +82,71 @@ with check (bucket_id = 'forgot-ai-assets' and (storage.foldername(name))[1] = a
 drop policy if exists assets_owner_delete on storage.objects;
 create policy assets_owner_delete on storage.objects for delete to authenticated
 using (bucket_id = 'forgot-ai-assets' and (storage.foldername(name))[1] = auth.uid()::text);
+-- VECTOR SEARCH & HYBRID RPC
+create extension if not exists vector;
+alter table public.items add column if not exists embedding vector(1024);
+create index if not exists items_embedding_idx on public.items 
+using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+
+create or replace function hybrid_search_items(
+  query_embedding vector(1024),
+  query_text text,
+  time_filter text,
+  match_count int,
+  p_library_id text
+)
+returns setof public.items
+language plpgsql
+as $body
+declare
+  time_cutoff timestamptz;
+begin
+  if time_filter = 'yesterday' then
+    time_cutoff := date_trunc('day', now()) - interval '1 day';
+  elsif time_filter = 'today' then
+    time_cutoff := date_trunc('day', now());
+  elsif time_filter = 'week' then
+    time_cutoff := now() - interval '7 days';
+  else
+    time_cutoff := '1970-01-01'::timestamptz;
+  end if;
+
+  return query
+  with vector_matches as (
+    select
+      items.id,
+      1 - (items.embedding <=> query_embedding) as vector_score
+    from items
+    where items.library_id = p_library_id
+      and items.status = 'ready'
+      and items.embedding is not null
+      and items.created_at >= time_cutoff
+  ),
+  keyword_matches as (
+    select
+      items.id,
+      1.0 as kw_score
+    from items
+    where items.library_id = p_library_id
+      and items.status = 'ready'
+      and items.created_at >= time_cutoff
+      and (
+        items.title ilike '%' || query_text || '%'
+        or items.summary ilike '%' || query_text || '%'
+        or items.extracted_text ilike '%' || query_text || '%'
+        or items.searchable_text ilike '%' || query_text || '%'
+      )
+  )
+  select i.*
+  from items i
+  left join vector_matches vm on vm.id = i.id
+  left join keyword_matches km on km.id = i.id
+  where i.library_id = p_library_id
+    and i.status = 'ready'
+    and i.created_at >= time_cutoff
+    and (vm.id is not null or km.id is not null)
+  order by coalesce(vm.vector_score, 0) + coalesce(km.kw_score, 0) desc
+  limit match_count;
+end;
+$body;
+
