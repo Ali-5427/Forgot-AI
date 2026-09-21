@@ -17,11 +17,16 @@ def create_supabase_client() -> Client:
 
 
 def _apply_filter(query, key: str, value: Any):
-    if isinstance(value, dict) and "$ne" in value:
-        ne_value = value["$ne"]
-        if ne_value is None:
-            return query.not_.is_(key, "null")
-        return query.neq(key, ne_value)
+    if isinstance(value, dict):
+        if "$ne" in value:
+            ne_value = value["$ne"]
+            if ne_value is None:
+                return query.not_.is_(key, "null")
+            return query.neq(key, ne_value)
+        if "$in" in value:
+            return query.in_(key, value["$in"])
+        if "in" in value:
+            return query.in_(key, value["in"])
     if value is None:
         return query.is_(key, "null")
     return query.eq(key, value)
