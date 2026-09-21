@@ -641,20 +641,33 @@ def rel_age(iso: str) -> str:
         return ""
 
 
-async def rank_items(query: str, lib: str, limit: int = 30):
+async def retrieve(query: str, lib: str, limit: int = 30):
+    q_lower = query.lower()
+    time_filter = ""
+    
+    # 1. Simple Intent Router (Time Parsing)
+    if any(word in q_lower for word in ["latest", "just saved", "most recent", "last save"]):
+        time_filter = "latest"
+    elif "yesterday" in q_lower:
+        time_filter = "yesterday"
+    elif "today" in q_lower:
+        time_filter = "today"
+    elif any(word in q_lower for word in ["this week", "last week", "recent"]):
+        time_filter = "week"
+        
     query_embedding = await get_embedding(query)
     if not query_embedding:
         logger.error("Failed to generate query embedding for search.")
         return [], {}
 
-    # Call the Supabase RPC function for vector matching
-    # We pass the query vector, a similarity threshold, the limit, and the library_id
+    # Call the new Supabase Hybrid RPC
     try:
         response = supabase.rpc(
-            'match_items',
+            'hybrid_search_items',
             {
                 'query_embedding': query_embedding,
-                'match_threshold': 0.1,  # Adjust as needed (0.0 to 1.0)
+                'query_text': query,
+                'time_filter': time_filter,
                 'match_count': limit,
                 'p_library_id': lib
             }
@@ -662,25 +675,23 @@ async def rank_items(query: str, lib: str, limit: int = 30):
         
         matches = response.data or []
     except Exception as e:
-        logger.error(f"Vector search RPC failed: {e}")
+        logger.error(f"Hybrid search RPC failed: {e}")
         matches = []
 
     if not matches:
         return [], {}
 
-    # The RPC returns a limited set of fields. We need to fetch the full items
-    # to maintain compatibility with the rest of the application (or we could just 
-    # update the RPC to return the full rows, but fetching them by ID is easy enough).
     matched_ids = [m['id'] for m in matches]
     docs = await db.items.find({"id": {"in": matched_ids}}).to_list(limit)
     by_id = {d["id"]: clean(d) for d in docs}
     
     results = []
+    # Ensure results are ordered as returned by the RPC (which handles the scoring/sorting)
     for m in matches:
         item = by_id.get(m['id'])
         if item:
             item = dict(item)
-            item["match_reason"] = f"Semantic Match (Score: {m['similarity']:.2f})"
+            item["match_reason"] = f"Match Score: {m.get('similarity', 0):.2f}"
             results.append(item)
             
     return results, by_id
@@ -1079,7 +1090,7 @@ async def search(payload: SearchIn, lib: str = Depends(resolve_library)):
     q = payload.query.strip()
     if not q:
         return {"results": []}
-    results, _ = await rank_items(q, lib)
+    results, _ = await retrieve(q, lib)
     return {"results": results, "query": q}
 
 
@@ -1090,7 +1101,7 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     if not q:
         return {"answer": "Ask me anything about what you've saved, or just say hi!", "results": []}
     
-    results, by_id = await rank_items(q, lib, limit=8)
+    results, by_id = await retrieve(q, lib, limit=8)
     
     ctx_parts = []
     if results:
@@ -1098,16 +1109,16 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
             ctx_parts.append(f"Title: {r.get('title')}\nURL: {r.get('source_url')}\nSummary: {r.get('summary')}\nKeywords: {', '.join(r.get('keywords', []))}\nText: {r.get('extracted_text') or r.get('original_text') or ''}")
         memory_context = "SAVED MEMORIES:\n" + "\n\n---\n\n".join(ctx_parts)
     else:
-        memory_context = "SAVED MEMORIES:\nThe user has no saved memories relevant to this specific query."
+        memory_context = "SAVED MEMORIES:\n(Empty - no relevant memories found)"
 
     system = (
         "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
-        "Your primary job is to help the user recall things they have saved in their memories. "
-        "However, you must act like a normal, helpful AI chatting with a friend. "
-        "CRITICAL RULES: "
-        "1. If the user says hello, asks how you are, or makes casual conversation, respond naturally and warmly as a human would! NEVER say 'I don't have a memory for this' for general greetings or pleasantries. "
-        "2. If the user asks a question that requires facts, check their SAVED MEMORIES below. If the answer is there, use it and reference it. "
-        "3. If they ask about something specific and it is NOT in their memories, politely let them know it's not in their notes, but feel free to offer a general answer or help them brainstorm anyway.\n\n"
+        "CRITICAL RULES:\n"
+        "- Be friendly and helpful.\n"
+        "- If the user is asking about THEIR saved items or notes, use ONLY the SAVED MEMORIES below. "
+        "If none match or the memories are empty, say you couldn't find it — do NOT invent or hallucinate saves.\n"
+        "- If they're asking general questions, how-to, or chitchat, answer normally without needing memories.\n"
+        "- If the user asks for both, do both: answer the memory part from data, the rest normally.\n\n"
         + memory_context
     )
     if payload.stream:
