@@ -150,3 +150,19 @@ begin
 end;
 $body;
 
+
+-- STRIPE SUBSCRIPTIONS
+create table if not exists public.user_subscriptions (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    stripe_customer_id text unique,
+    stripe_subscription_id text unique,
+    plan_type text not null default 'free' check (plan_type in ('free', 'pro', 'lifetime')),
+    status text not null default 'none' check (status in ('none', 'trial', 'active_pro', 'lifetime', 'canceled', 'expired')),
+    current_period_end timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+alter table public.user_subscriptions enable row level security;
+drop policy if exists user_subscriptions_self on public.user_subscriptions;
+create policy user_subscriptions_self on public.user_subscriptions for select using (user_id = auth.uid());
+

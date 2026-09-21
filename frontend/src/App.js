@@ -1,4 +1,4 @@
-﻿import "@/App.css";
+import "@/App.css";
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useSearchParams, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
@@ -18,6 +18,11 @@ import AllSaved from "@/pages/AllSaved";
 import SearchPage from "@/pages/SearchPage";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
+
+// Pricing & Checkout
+import PricingPage from "@/pages/PricingPage";
+import CheckoutSuccessPage from "@/pages/CheckoutSuccessPage";
+import CheckoutCancelPage from "@/pages/CheckoutCancelPage";
 
 // Legal Pages
 import PrivacyPage from "@/pages/legal/PrivacyPage";
@@ -90,6 +95,9 @@ function AppContent() {
         {/* Public Marketing & Legal Pages */}
         <Route element={<PublicLayout onOpenApp={() => setShowAuth(true)} />}>
           {!user && <Route path="/" element={<LandingPage onOpenApp={() => setShowAuth(true)} />} />}
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+          <Route path="/checkout/cancel" element={<CheckoutCancelPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/contact" element={<ContactPage />} />
