@@ -67,13 +67,13 @@ export default function PricingPage() {
         <Reveal>
           <p className="text-sm font-semibold uppercase tracking-wider text-ink-muted mb-4">Simple pricing for your memory</p>
           <h1 className="text-4xl md:text-5xl font-display font-medium tracking-tight mb-6">
-            Your memories shouldn't be complicated. Neither should pricing.
+            Forgot AI is simple to use, and simple to pay for.
           </h1>
           <p className="text-lg text-ink-muted max-w-2xl mx-auto">
             Start free for 7 days. Keep using Forgot AI for $5/month, or get Founding Lifetime access for $49 once.
           </p>
           <div className="mt-8 inline-block bg-cream rounded-full px-4 py-2 text-sm font-medium border border-line">
-            Try Forgot AI free for 7 days. No permanent free plan. After your trial, continue with Pro or choose the Founding Lifetime plan.
+            Enjoy a full 7-day free trial. No credit card required to start.
           </div>
         </Reveal>
       </section>
