@@ -80,10 +80,10 @@ export default function PricingPage() {
 
       {/* Pricing Cards */}
       <section className="px-5 sm:px-8 max-w-5xl mx-auto mb-24">
-        <div className="grid md:grid-cols-2 gap-8 items-start max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 items-stretch max-w-4xl mx-auto">
           {/* Pro Card */}
           <Reveal delay={0.1}>
-            <div className="rounded-3xl border border-line bg-paper p-8 shadow-soft flex flex-col h-full lift">
+            <div className="rounded-3xl border border-line bg-cream p-8 shadow-soft flex flex-col h-full lift">
               <div className="mb-6">
                 <h3 className="text-xl font-semibold mb-2">PRO</h3>
                 <div className="flex items-baseline gap-1 mb-2">
@@ -95,11 +95,11 @@ export default function PricingPage() {
               <Button 
                 onClick={() => handleCheckout(STRIPE_PRO_MONTHLY_PRICE_ID)}
                 variant="outline"
-                className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-cream"
+                className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper"
               >
                 Start 7-day free trial
               </Button>
-              <div className="space-y-4 flex-1">
+              <div className="space-y-4 flex-1 mb-8">
                 {PRO_FEATURES.map((feature, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-ink shrink-0" />
@@ -107,7 +107,7 @@ export default function PricingPage() {
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-ink-muted text-center mt-8">
+              <p className="text-xs text-ink-muted text-center mt-auto">
                 7 days free. Then $5/month. Cancel anytime.
               </p>
             </div>
@@ -130,11 +130,12 @@ export default function PricingPage() {
               </div>
               <Button 
                 onClick={() => handleCheckout(STRIPE_LIFETIME_PRICE_ID)}
-                className="w-full rounded-full h-12 text-base font-medium mb-8 bg-ink hover:opacity-90 text-paper"
+                variant="outline"
+                className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper text-ink"
               >
                 Get Lifetime Access
               </Button>
-              <div className="space-y-4 flex-1">
+              <div className="space-y-4 flex-1 mb-8">
                 {LIFETIME_FEATURES.map((feature, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-ink shrink-0" />
@@ -142,7 +143,7 @@ export default function PricingPage() {
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-ink-muted text-center mt-8">
+              <p className="text-xs text-ink-muted text-center mt-auto">
                 One-time payment.
               </p>
             </div>
