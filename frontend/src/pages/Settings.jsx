@@ -1,4 +1,4 @@
-﻿import { Puzzle, Database, Sparkles, LogOut, User, Trash2, ShieldAlert } from "lucide-react";
+import { Puzzle, Database, Sparkles, LogOut, User, Trash2, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { API } from "@/api";
 import { useAuth } from "@/auth";
@@ -19,11 +19,35 @@ export default function Settings() {
   const { user, logout } = useAuth();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
-  const handleDeleteRequest = () => {
-    // In a real app, this would call an API to purge the user's data.
-    // For now, we direct them to support per the Data Deletion policy, or simulate the request.
-    setDeleteModalOpen(false);
-    toast.success("Account deletion request initiated. Our support team will reach out within 24 hours to confirm.");
+  const handleExportRequest = async () => {
+    try {
+      toast.loading("Compiling your data...", { id: "export" });
+      const response = await API.get("/export");
+      const blob = new Blob([JSON.stringify(response, null, 2)], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `forgot_ai_export_${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Export complete!", { id: "export" });
+    } catch (e) {
+      toast.error("Export failed. Please try again.", { id: "export" });
+    }
+  };
+
+  const handleDeleteRequest = async () => {
+    try {
+      setDeleteModalOpen(false);
+      toast.loading("Deleting your account...", { id: "delete" });
+      await API.delete("/account");
+      toast.success("Account permanently deleted.", { id: "delete" });
+      logout();
+    } catch (e) {
+      toast.error("Failed to delete account. Please contact support.", { id: "delete" });
+    }
   };
 
   return (
@@ -118,7 +142,7 @@ export default function Settings() {
                 <h3 className="text-[15px] font-medium text-neutral-900 mb-1">Export Data</h3>
                 <p className="text-[14px] text-muted-foreground">Download a JSON file containing all your saved memories and metadata.</p>
               </div>
-              <Button variant="outline" className="shrink-0" onClick={() => toast.info("Your data is being compiled. We will email you a download link shortly.")}>
+              <Button variant="outline" className="shrink-0" onClick={handleExportRequest}>
                 Request Export
               </Button>
             </div>

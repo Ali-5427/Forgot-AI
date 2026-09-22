@@ -918,6 +918,38 @@ async def logout(request: Request, user: dict = Depends(get_current_user)):
             pass
     return {"ok": True}
 
+@api_router.get("/export")
+async def export_data(user: dict = Depends(get_current_user)):
+    items = await db.items.find({"library_id": user["id"]}).to_list(10000)
+    # Remove embeddings from export to keep file size small
+    for item in items:
+        item.pop("embedding", None)
+    return {"user": public_user(user), "items": items}
+
+@api_router.delete("/account")
+async def delete_account(request: Request, user: dict = Depends(get_current_user)):
+    token = _bearer(request)
+    # Delete all user's items
+    await db.items.delete_many({"library_id": user["id"]})
+    # Delete all user's libraries
+    await db.libraries.delete_many({"owner_id": user["id"]})
+    # Delete session
+    await db.sessions.delete_many({"user_id": user["id"]})
+    # Delete user profile
+    await db.users.delete_one({"id": user["id"]})
+    
+    # Try to delete from Supabase Auth if we have service role, otherwise just sign out
+    if token:
+        try:
+            supabase.auth.admin.delete_user(user["id"])
+        except Exception:
+            try:
+                supabase.auth.admin.sign_out(token)
+            except Exception:
+                pass
+                
+    return {"ok": True}
+
 
 @api_router.post("/auth/import")
 async def do_import(payload: ImportIn, request: Request, user: dict = Depends(get_current_user)):

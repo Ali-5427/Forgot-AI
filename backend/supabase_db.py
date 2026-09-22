@@ -86,6 +86,13 @@ class SupabaseCollection:
         response = query.execute()
         return SimpleNamespace(deleted_count=len(response.data or []))
 
+    async def delete_many(self, filters: dict):
+        query = self.client.table(self.table).delete()
+        for key, value in filters.items():
+            query = _apply_filter(query, key, value)
+        response = query.execute()
+        return SimpleNamespace(deleted_count=len(response.data or []))
+
     async def count_documents(self, filters: dict):
         query = self.client.table(self.table).select("id", count="exact")
         for key, value in filters.items():
