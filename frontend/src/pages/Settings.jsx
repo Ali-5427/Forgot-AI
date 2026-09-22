@@ -22,7 +22,12 @@ export default function Settings() {
   const handleExportRequest = async () => {
     try {
       toast.loading("Compiling your data...", { id: "export" });
-      const response = await API.get("/export");
+      const response = await fetch(`${API}/export`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("forgot_ai_token")}`,
+          "X-Library-Id": localStorage.getItem("forgot_ai_library")
+        }
+      }).then(r => r.json());
       const blob = new Blob([JSON.stringify(response, null, 2)], { type: "application/json" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -42,7 +47,13 @@ export default function Settings() {
     try {
       setDeleteModalOpen(false);
       toast.loading("Deleting your account...", { id: "delete" });
-      await API.delete("/account");
+      await fetch(`${API}/account`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("forgot_ai_token")}`,
+          "X-Library-Id": localStorage.getItem("forgot_ai_library")
+        }
+      });
       toast.success("Account permanently deleted.", { id: "delete" });
       logout();
     } catch (e) {
