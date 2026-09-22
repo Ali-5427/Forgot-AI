@@ -516,7 +516,23 @@ async def fetch_url_content(url: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0 (compatible; ForgotAI/1.0)"}) as r:
                 raw_bytes = await r.read()
-                html = raw_bytes.decode('utf-8', errors='replace')
+                
+                # Smart encoding detection
+                encoding = r.charset
+                if not encoding:
+                    # Look for <meta charset="..."> in the first 2KB of HTML
+                    m = re.search(br'<meta\s+[^>]*charset=["\']?([\w-]+)', raw_bytes[:2048], re.IGNORECASE)
+                    if m:
+                        encoding = m.group(1).decode('ascii')
+                    else:
+                        encoding = 'utf-8' # Default to utf-8 for modern web
+                
+                try:
+                    html = raw_bytes.decode(encoding)
+                except (UnicodeDecodeError, LookupError):
+                    # Fallback if the declared encoding is wrong
+                    html = raw_bytes.decode('utf-8', errors='replace')
+                    
         tm = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
         if tm:
             title = re.sub(r"\s+", " ", tm.group(1)).strip()[:200]
