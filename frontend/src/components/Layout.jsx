@@ -14,8 +14,8 @@ const nav = [
 export const Layout = () => {
   const { openSave, detailOpen, detailId, setDetailOpen } = useStore();
   return (
-    <div className="min-h-screen flex bg-neutral-50 text-foreground overflow-hidden">
-      <aside className="w-60 shrink-0 border-r border-border bg-white flex flex-col fixed h-screen z-20">
+    <div className="min-h-screen w-full bg-neutral-50 text-foreground">
+      <aside className="w-60 border-r border-border bg-white flex flex-col fixed inset-y-0 left-0 z-20">
         <div className="px-5 py-5 border-b border-border">
           <div className="flex items-center gap-2">
             <img src="/logo.jpg" alt="Forgot AI Logo" className="h-7 w-7 rounded-md object-cover" />
@@ -54,7 +54,7 @@ export const Layout = () => {
         </div>
       </aside>
 
-      <main className="flex-1 ml-60 min-h-screen relative flex flex-col bg-white">
+      <main className="ml-60 min-h-screen relative bg-white">
         {detailOpen && detailId ? (
           <ItemDetailView itemId={detailId} onClose={() => setDetailOpen(false)} />
         ) : (
