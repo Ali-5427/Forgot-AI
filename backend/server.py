@@ -515,7 +515,8 @@ async def fetch_url_content(url: str):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0 (compatible; ForgotAI/1.0)"}) as r:
-                html = await r.text()
+                raw_bytes = await r.read()
+                html = raw_bytes.decode('utf-8', errors='replace')
         tm = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
         if tm:
             title = re.sub(r"\s+", " ", tm.group(1)).strip()[:200]
