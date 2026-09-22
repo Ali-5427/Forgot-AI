@@ -931,8 +931,6 @@ async def delete_account(request: Request, user: dict = Depends(get_current_user
     token = _bearer(request)
     # Delete all user's items
     await db.items.delete_many({"library_id": user["id"]})
-    # Delete all user's libraries
-    await db.libraries.delete_many({"owner_id": user["id"]})
     # Delete session
     await db.sessions.delete_many({"user_id": user["id"]})
     # Delete user profile
