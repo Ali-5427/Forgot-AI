@@ -33,7 +33,7 @@ const STEPS = [
     n: "03",
     icon: Search,
     title: "Find later",
-    body: "Search the way you remember it â€” or just ask your memory.",
+    body: "Search the way you remember it — or just ask your memory.",
   },
 ];
 
@@ -53,7 +53,7 @@ const FAQ = [
   },
   {
     q: "Do I need to organize folders?",
-    a: "No. Forgot AI gives what you save a title, a short summary, and a sense of meaning. You find it later by remembering the idea � not the folder name.",
+    a: "No. Forgot AI gives what you save a title, a short summary, and a sense of meaning. You find it later by remembering the idea — not the folder name.",
   },
   {
     q: "Is it private?",
@@ -129,7 +129,7 @@ export function LandingPage({ onOpenApp }) {
               Save anything now. Find it later.
             </h1>
             <p className="hero-enter hero-enter-delay-2 mt-5 max-w-xl text-lg leading-relaxed text-ink-muted">
-              Drop a link, a screenshot, or a note � then find it later in the words you remember.
+              Drop a link, a screenshot, or a note — then find it later in the words you remember.
             </p>
             <div className="hero-enter hero-enter-delay-3 mt-8">
               <AppButton size="lg" onOpenApp={onOpenApp}>
