@@ -669,86 +669,50 @@ def rel_age(iso: str) -> str:
 
 
 async def retrieve(query: str, lib: str, limit: int = 30):
-    q_lower = query.lower()
-    time_filter = ""
+    docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(50)
     
-    # 1. Recency path (NO embedding, NO hybrid RPC)
-    recency_words = ["latest", "just saved", "most recent", "last save", "last saved", "last note"]
-    if any(word in q_lower for word in recency_words):
-        logger.info(f"Using pure recency path for query: {query}")
-        docs = await db.items.find({"library_id": lib, "status": "ready"}).sort("created_at", -1).to_list(limit)
-        results = [clean(d) for d in docs]
-        return results, {d["id"]: d for d in results}
-
-    # Time window path
-    if "yesterday" in q_lower:
-        time_filter = "yesterday"
-    elif "today" in q_lower:
-        time_filter = "today"
-    elif any(word in q_lower for word in ["this week", "last week", "recent"]):
-        time_filter = "week"
-        
-    query_embedding = await get_embedding(query)
-    
-    matches = []
-    if query_embedding:
-        try:
-            logger.info(f"Using hybrid search RPC for query: {query}")
-            response = supabase.rpc(
-                'hybrid_search_items',
-                {
-                    'query_embedding': query_embedding,
-                    'query_text': query,
-                    'time_filter': time_filter,
-                    'match_count': limit,
-                    'p_library_id': lib
-                }
-            ).execute()
-            
-            matches = response.data or []
-        except Exception as e:
-            logger.error(f"Hybrid search RPC failed: {e}")
-            matches = []
-            
-    # Fallback 1 & 2: If RPC failed or returned nothing (or if embedding failed)
-    if not matches:
-        logger.info("Hybrid search returned empty or failed. Trying keyword fallback.")
-        # Keyword fallback
-        regex = {"$regex": query, "$options": "i"}
-        fb_docs = await db.items.find({
-            "library_id": lib,
-            "status": "ready",
-            "$or": [
-                {"title": regex},
-                {"summary": regex},
-                {"extracted_text": regex},
-                {"searchable_text": regex},
-            ]
-        }).to_list(limit)
-        
-        if fb_docs:
-            matches = fb_docs
-        else:
-            # Fallback 2: Recent items
-            logger.info("Keyword fallback empty. Returning latest 10 items as fallback.")
-            matches = await db.items.find({"library_id": lib, "status": "ready"}).sort("created_at", -1).to_list(min(limit, 10))
-
-    if not matches:
+    if not docs:
         return [], {}
 
-    # matches might be from RPC (which omits MongoDB _id but returns all cols) or from fallback.
-    results = [clean(d) for d in matches]
+    catalog = []
+    for d in docs:
+        text_comb = (d.get("searchable_text", "") + " " + d.get("extracted_text", "")).strip()
+        catalog.append({
+            "id": d["id"],
+            "title": d.get("title", ""),
+            "type": d.get("content_type", ""),
+            "category": d.get("category", ""),
+            "domain": d.get("source_domain", ""),
+            "keywords": d.get("keywords", []),
+            "summary": d.get("summary", ""),
+            "saved": rel_age(d.get("created_at", "")),
+            "saved_at": d.get("created_at", ""),
+            "text": text_comb[:600]
+        })
+
+    current_time_utc = datetime.now(timezone.utc).isoformat()
+    system_prompt = (
+        f"You are a search ranker for a user's saved items. The current UTC time is {current_time_utc}. "
+        "Your job is to match the user's query by MEANING using all signals available. "
+        "Handle time-based queries (e.g. today, yesterday, this week, last month) using the 'saved' and 'saved_at' fields. "
+        "Return ONLY a JSON object in this exact format: {\"results\": [{\"id\": \"item_id\", \"reason\": \"match reason\"}]}. "
+        f"Return at most {min(limit, 20)} results. If nothing is relevant to the query, return an empty results array: {{\"results\": []}}."
+    )
+    user_prompt = f"Query: {query}\n\nCatalog:\n{json.dumps(catalog, indent=2)}"
+
+    raw_response = await llm_text(system_prompt, user_prompt)
+    parsed = parse_json_block(raw_response)
+    results_list = parsed.get("results", [])
+
+    by_id = {d["id"]: clean(d) for d in docs}
     
-    # Optional: re-fetch from db if the RPC didn't return all fields
-    matched_ids = [m['id'] for m in results]
-    full_docs = await db.items.find({"id": {"in": matched_ids}}).to_list(len(matched_ids))
-    by_id = {d["id"]: clean(d) for d in full_docs}
-    
-    # Sort them back into the order matches provided
     final_results = []
-    for m in results:
-        if m['id'] in by_id:
-            final_results.append(by_id[m['id']])
+    for r in results_list:
+        item_id = r.get("id")
+        if item_id in by_id:
+            item_copy = by_id[item_id].copy()
+            item_copy["match_reason"] = r.get("reason", "")
+            final_results.append(item_copy)
 
     return final_results, by_id
 
