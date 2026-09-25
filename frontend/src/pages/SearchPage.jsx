@@ -31,9 +31,12 @@ export default function SearchPage() {
     setParams({ q: query, mode: m });
     try {
       if (m === "ask") {
-        const r = await api.chat(query);
+        const r = await api.chat(query, [], contextIds);
         setAnswer(r.answer || "");
         setResults(r.results || []);
+        if (r.results && r.results.length > 0) {
+          setContextIds(r.results.map(item => item.id));
+        }
       } else {
         const r = await api.search(query);
         setResults(r.results || []);

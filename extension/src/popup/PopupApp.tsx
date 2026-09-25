@@ -18,6 +18,7 @@ export default function PopupApp() {
   const [chatQuery, setChatQuery] = useState("");
   const [chatting, setChatting] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [contextIds, setContextIds] = useState<string[]>([]);
   
   // Save Modal State
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -133,11 +134,13 @@ export default function PopupApp() {
     try {
       const res = await fetchStream("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ query: q, stream: true, history: historyToSend }),
+        body: JSON.stringify({ query: q, stream: true, history: historyToSend, context_item_ids: contextIds }),
         signal: controller.signal
       });
 
       if (!res.body) throw new Error("No response body");
+      const idsHeader = res.headers.get("X-Context-Ids");
+      if (idsHeader) setContextIds(idsHeader.split(",").filter(Boolean));
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
