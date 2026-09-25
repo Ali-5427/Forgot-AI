@@ -241,7 +241,6 @@ class ChatIn(BaseModel):
     query: str
     stream: bool = False
     history: List[dict] = Field(default_factory=list)
-    context_item_ids: List[str] = Field(default_factory=list)
 
 
 class PinIn(BaseModel):
@@ -251,7 +250,6 @@ class PinIn(BaseModel):
 class AskIn(BaseModel):
     question: str
     history: List[dict] = Field(default_factory=list)
-    context_item_ids: List[str] = Field(default_factory=list)
 
 
 class CheckIn(BaseModel):
@@ -1116,26 +1114,26 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
     doc = await db.items.find_one({"id": item_id, "library_id": lib})
     if not doc:
         raise HTTPException(404, "Not found")
-    parts = ["Memory 1"]
-    if doc.get('title'): parts.append(f"Title: {doc.get('title')}")
-    if doc.get('content_type'): parts.append(f"Type: {doc.get('content_type')}")
-    if doc.get('category'): parts.append(f"Category: {doc.get('category')}")
-    if doc.get('source_url'): parts.append(f"URL: {doc.get('source_url')}")
-    if doc.get('summary'): parts.append(f"Summary: {doc.get('summary')}")
-    if doc.get('user_note'): parts.append(f"Your note: {doc.get('user_note')}")
-    if doc.get('why_saved'): parts.append(f"Why you saved it: {doc.get('why_saved')}")
-    content = doc.get('extracted_text') or doc.get('original_text')
-    if content: parts.append(f"Content: {content}")
-    context = "\n".join(parts)
-
+    import json
+    clean_doc = {
+        "item_type": doc.get('content_type', 'unknown'),
+        "title": doc.get('title'),
+        "category": doc.get('category'),
+        "source_url": doc.get('source_url'),
+        "keywords": doc.get('keywords', []),
+        "ai_summary": doc.get('summary'),
+        "user_original_note": doc.get('user_note'),
+        "assistant_rephrased_reason": doc.get('why_saved'),
+        "full_content_text": doc.get('extracted_text') or doc.get('original_text') or ''
+    }
+    context = json.dumps(clean_doc, indent=2)
     system = (
         "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
         "The user is viewing a specific saved item (content below) and is chatting with you about it. "
-        "CRITICAL RULES:\n"
-        "- Answer in natural, helpful prose or light markdown.\n"
-        "- Do NOT answer as JSON, tables of schema field names, or key-value dumps of the memory structure.\n"
-        "- Use the memory only as source material to explain/summarize. Write like a person explaining.\n"
-        "- Be friendly and helpful. General/chitchat questions can be answered naturally.\n\n"
+        "RULES: "
+        "1. If the user asks a general question, says hello, asks how you are, or wants to chat casually, respond naturally and warmly just like a human friend! Do NOT mention the saved item or say 'I don't have a memory for this'. "
+        "2. If the user asks a question about the item, answer it using the content below. "
+        "3. If the item lacks the info, politely let them know, but feel free to offer general knowledge or brainstorm with them if helpful.\n\n"
         "SAVED ITEM CONTENT:\n" + context
     )
     return StreamingResponse(
@@ -1166,42 +1164,36 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     if not q:
         return {"answer": "Ask me anything about what you've saved, or just say hi!", "results": []}
     
-    q_lower = q.lower()
-    is_follow_up = any(fw in q_lower for fw in ["explain it", "explain this", "explain that", "why did i save", "tell me more", "elaborate", "same one", "what about it", "what did it say"])
-
-    if is_follow_up and payload.context_item_ids:
-        docs = await db.items.find({"id": {"$in": payload.context_item_ids}, "library_id": lib, "status": "ready"}).to_list(None)
-        results = docs
-        by_id = {d["id"]: d for d in docs}
-    else:
-        results, by_id = await retrieve(q, lib, limit=8)
+    results, by_id = await retrieve(q, lib, limit=8)
     
+    import json
     ctx_parts = []
     if results:
-        for i, r in enumerate(results, 1):
-            parts = [f"Memory {i}"]
-            if r.get('title'): parts.append(f"Title: {r.get('title')}")
-            if r.get('content_type'): parts.append(f"Type: {r.get('content_type')}")
-            if r.get('category'): parts.append(f"Category: {r.get('category')}")
-            if r.get('source_url'): parts.append(f"URL: {r.get('source_url')}")
-            if r.get('summary'): parts.append(f"Summary: {r.get('summary')}")
-            if r.get('user_note'): parts.append(f"Your note: {r.get('user_note')}")
-            if r.get('why_saved'): parts.append(f"Why you saved it: {r.get('why_saved')}")
-            content = r.get('extracted_text') or r.get('original_text')
-            if content: parts.append(f"Content: {content}")
-            ctx_parts.append("\n".join(parts))
-        memory_context = "SAVED MEMORIES:\n\n" + "\n\n---\n\n".join(ctx_parts)
+        for r in results:
+            clean_doc = {
+                "item_type": r.get('content_type', 'unknown'),
+                "title": r.get('title'),
+                "category": r.get('category'),
+                "source_url": r.get('source_url'),
+                "keywords": r.get('keywords', []),
+                "ai_summary": r.get('summary'),
+                "user_original_note": r.get('user_note'),
+                "assistant_rephrased_reason": r.get('why_saved'),
+                "full_content_text": r.get('extracted_text') or r.get('original_text') or ''
+            }
+            ctx_parts.append(json.dumps(clean_doc, indent=2))
+        memory_context = "SAVED MEMORIES (JSON format):\n[\n" + ",\n".join(ctx_parts) + "\n]"
     else:
-        memory_context = "SAVED MEMORIES:\n(Empty - no relevant memories found)"
+        memory_context = "SAVED MEMORIES:\n[] (Empty - no relevant memories found)"
 
     system = (
         "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
         "CRITICAL RULES:\n"
-        "- Answer in natural, helpful prose or light markdown.\n"
-        "- Do NOT answer as JSON, tables of schema field names, or key-value dumps of the memory structure.\n"
-        "- Use the memories only as source material to explain/summarize. Write like a person explaining.\n"
-        "- If the user asks about their saves and memories are empty, say you couldn't find it - do not invent saves.\n"
-        "- Be friendly and helpful. General/chitchat questions can be answered naturally.\n\n"
+        "- Be friendly and helpful.\n"
+        "- If the user is asking about THEIR saved items or notes, use ONLY the SAVED MEMORIES below. "
+        "If none match or the memories are empty, say you couldn't find it — do NOT invent or hallucinate saves.\n"
+        "- If they're asking general questions, how-to, or chitchat, answer normally without needing memories.\n"
+        "- If the user asks for both, do both: answer the memory part from data, the rest normally.\n\n"
         + memory_context
     )
     

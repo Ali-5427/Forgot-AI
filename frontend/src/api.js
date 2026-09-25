@@ -129,7 +129,7 @@ export const api = {
     return { answer };
   },
   search: (query) => axios.post(`${API}/search`, { query }).then((r) => r.data),
-  chat: (query, history = [], context_item_ids = []) => axios.post(`${API}/chat`, { query, history, context_item_ids }).then((r) => r.data),
+  chat: (query, history = []) => axios.post(`${API}/chat`, { query, history }).then((r) => r.data),
   check: (payload) => axios.post(`${API}/items/check`, payload).then((r) => r.data),
   checkFile: async (file) => api.check({ content_type: "image", hash: await sha256Hex(file) }),
 };
