@@ -129,7 +129,14 @@ export default function SearchPage() {
                     <Sparkles className="h-3.5 w-3.5 text-indigo-500" /> From your memory
                   </p>
                   <div className="text-[15px] text-neutral-700 leading-relaxed font-serif prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        a: ({node, ...props}) => <a className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />
+                      }}
+                    >
+                      {answer}
+                    </ReactMarkdown>
                   </div>
                 </div>
               </div>

@@ -119,6 +119,8 @@ export default function PopupApp() {
     const q = retryQuery || chatQuery.trim();
     if (!q || chatting) return;
     
+    const historyToSend = messages.map(m => ({ role: m.role, content: m.content }));
+
     if (!retryQuery) {
       setChatQuery("");
       setMessages((prev) => [...prev, { role: "user", content: q }]);
@@ -131,7 +133,7 @@ export default function PopupApp() {
     try {
       const res = await fetchStream("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ query: q, stream: true }),
+        body: JSON.stringify({ query: q, stream: true, history: historyToSend }),
         signal: controller.signal
       });
 
@@ -320,7 +322,14 @@ export default function PopupApp() {
                     }`}>
                       {msg.role === 'ai' ? (
                         <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              a: ({node, ...props}) => <a className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />
+                            }}
+                          >
+                            {msg.content}
+                          </ReactMarkdown>
                         </div>
                       ) : (
                         msg.content

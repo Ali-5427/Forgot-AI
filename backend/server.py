@@ -240,6 +240,7 @@ class SearchIn(BaseModel):
 class ChatIn(BaseModel):
     query: str
     stream: bool = False
+    history: List[dict] = Field(default_factory=list)
 
 
 class PinIn(BaseModel):
@@ -248,6 +249,7 @@ class PinIn(BaseModel):
 
 class AskIn(BaseModel):
     question: str
+    history: List[dict] = Field(default_factory=list)
 
 
 class CheckIn(BaseModel):
@@ -428,17 +430,18 @@ async def llm_text(system: str, prompt: str, image_b64: Optional[str] = None) ->
         return "{}"
 
 
-async def llm_stream(system: str, prompt: str, image_b64: Optional[str] = None):
+async def llm_stream(system: str, prompt: str, image_b64: Optional[str] = None, history: List[dict] = None):
+    messages = [{"role": "system", "content": system}]
+    if history:
+        messages.extend(history)
     user_msg = {"role": "user", "content": prompt}
     if image_b64:
         user_msg["images"] = [image_b64]
+    messages.append(user_msg)
 
     payload = {
         "model": AI_MODEL[1],
-        "messages": [
-            {"role": "system", "content": system},
-            user_msg,
-        ],
+        "messages": messages,
         "stream": True,
     }
 
@@ -1134,7 +1137,7 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
         "SAVED ITEM CONTENT:\n" + context
     )
     return StreamingResponse(
-        llm_stream(system, payload.question), 
+        llm_stream(system, payload.question, history=payload.history), 
         media_type="application/octet-stream",
         headers={
             "X-Accel-Buffering": "no",
@@ -1196,7 +1199,7 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     
     async def _safe_llm_stream():
         try:
-            async for chunk in llm_stream(system, q):
+            async for chunk in llm_stream(system, q, history=payload.history):
                 yield chunk
         except Exception as e:
             logger.error(f"LLM stream failed: {e}")

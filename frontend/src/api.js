@@ -96,7 +96,7 @@ export const api = {
   deleteItem: (id) => axios.delete(`${API}/items/${id}`).then((r) => r.data),
   retryItem: (id) => axios.post(`${API}/items/${id}/retry`).then((r) => r.data),
   pinItem: (id, pinned) => axios.post(`${API}/items/${id}/pin`, { pinned }).then((r) => r.data),
-  ask: async (id, question, onChunk, signal) => {
+  ask: async (id, question, history = [], onChunk, signal) => {
     const t = getToken();
     const headers = {
       "Content-Type": "application/json",
@@ -107,7 +107,7 @@ export const api = {
     const res = await fetch(`${API}/items/${id}/ask`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, history }),
       signal,
     });
 
@@ -129,7 +129,7 @@ export const api = {
     return { answer };
   },
   search: (query) => axios.post(`${API}/search`, { query }).then((r) => r.data),
-  chat: (query) => axios.post(`${API}/chat`, { query }).then((r) => r.data),
+  chat: (query, history = []) => axios.post(`${API}/chat`, { query, history }).then((r) => r.data),
   check: (payload) => axios.post(`${API}/items/check`, payload).then((r) => r.data),
   checkFile: async (file) => api.check({ content_type: "image", hash: await sha256Hex(file) }),
 };

@@ -172,6 +172,9 @@ export const ItemDetailView = ({ itemId, onClose }) => {
     setQuestion("");
     setAsking(true);
     
+    // Create a copy of the history *before* adding the current question to send to the API
+    const historyToSend = chatHistory.map(m => ({ role: m.role, content: m.content }));
+    
     setChatHistory(prev => [
       ...prev, 
       { role: "user", content: query },
@@ -182,7 +185,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
     abortControllerRef.current = controller;
 
     try {
-      await api.ask(item.id, query, (chunk) => {
+      await api.ask(item.id, query, historyToSend, (chunk) => {
         setChatHistory(prev => {
           const newHistory = [...prev];
           const lastMsg = newHistory[newHistory.length - 1];
