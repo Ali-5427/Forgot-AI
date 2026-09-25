@@ -241,6 +241,7 @@ class ChatIn(BaseModel):
     query: str
     stream: bool = False
     history: List[dict] = Field(default_factory=list)
+    context_item_ids: List[str] = Field(default_factory=list)
 
 
 class PinIn(BaseModel):
@@ -250,6 +251,7 @@ class PinIn(BaseModel):
 class AskIn(BaseModel):
     question: str
     history: List[dict] = Field(default_factory=list)
+    context_item_ids: List[str] = Field(default_factory=list)
 
 
 class CheckIn(BaseModel):
@@ -387,20 +389,22 @@ async def groq_vision_scan(image_b64: str) -> str:
         logger.error(f"Groq Vision API failed: {e}")
         return "No text extracted due to processing error."
 
-async def llm_text(system: str, prompt: str, image_b64: Optional[str] = None) -> str:
+async def llm_text(system: str, prompt: str, image_b64: Optional[str] = None, history: List[dict] = None, json_format: bool = True) -> str:
+    messages = [{"role": "system", "content": system}]
+    if history:
+        messages.extend(history)
     user_msg = {"role": "user", "content": prompt}
     if image_b64:
         user_msg["images"] = [image_b64]
+    messages.append(user_msg)
 
     payload = {
         "model": AI_MODEL[1],
-        "messages": [
-            {"role": "system", "content": system},
-            user_msg,
-        ],
+        "messages": messages,
         "stream": False,
-        "format": "json",
     }
+    if json_format:
+        payload["format"] = "json"
 
     headers = {"Content-Type": "application/json"}
     if OLLAMA_API_KEY:
@@ -1133,7 +1137,8 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
         "RULES: "
         "1. If the user asks a general question, says hello, asks how you are, or wants to chat casually, respond naturally and warmly just like a human friend! Do NOT mention the saved item or say 'I don't have a memory for this'. "
         "2. If the user asks a question about the item, answer it using the content below. "
-        "3. If the item lacks the info, politely let them know, but feel free to offer general knowledge or brainstorm with them if helpful.\n\n"
+        "3. If the item lacks the info, politely let them know, but feel free to offer general knowledge or brainstorm with them if helpful.\n"
+        "4. The JSON block is REFERENCE DATA only for you. Always answer the user in natural helpful prose or light markdown. NEVER reply as JSON, schema field tables, or key-value dumps of the memory structure. Use memories only as source material to explain/summarize.\n\n"
         "SAVED ITEM CONTENT:\n" + context
     )
     return StreamingResponse(
@@ -1164,7 +1169,15 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     if not q:
         return {"answer": "Ask me anything about what you've saved, or just say hi!", "results": []}
     
-    results, by_id = await retrieve(q, lib, limit=8)
+    q_lower = q.lower()
+    follow_up_phrases = ["explain it", "explain this", "explain that", "could you explain", "why did i save", "tell me more", "elaborate", "same one", "what about it", "explain", "more about"]
+    is_follow_up = any(p in q_lower for p in follow_up_phrases)
+
+    if is_follow_up and payload.context_item_ids:
+        docs = await db.items.find({"id": {"$in": payload.context_item_ids}, "library_id": lib, "status": "ready"}).to_list(None)
+        results = [clean(d) for d in docs]
+    else:
+        results, by_id = await retrieve(q, lib, limit=8)
     
     import json
     ctx_parts = []
@@ -1189,10 +1202,13 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     system = (
         "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
         "CRITICAL RULES:\n"
-        "- Be friendly and helpful.\n"
+        "- The JSON block below is REFERENCE DATA only for you.\n"
+        "- Always answer the user in natural helpful prose or light markdown.\n"
+        "- NEVER reply as JSON, schema field tables, or key-value dumps of the memory structure.\n"
+        "- Use memories only as source material to explain/summarize.\n"
         "- If the user is asking about THEIR saved items or notes, use ONLY the SAVED MEMORIES below. "
         "If none match or the memories are empty, say you couldn't find it — do NOT invent or hallucinate saves.\n"
-        "- If they're asking general questions, how-to, or chitchat, answer normally without needing memories.\n"
+        "- If they're asking general questions, how-to, or chitchat, answer normally without needing memories. Friendly; chitchat/how-to OK without memories.\n"
         "- If the user asks for both, do both: answer the memory part from data, the rest normally.\n\n"
         + memory_context
     )
@@ -1206,20 +1222,24 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
             yield b" (Sorry, I'm having trouble connecting to my brain right now, but here are your search results!)"
 
     if payload.stream:
+        headers = {
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+        if results:
+            headers["X-Context-Ids"] = ",".join(str(r["id"]) for r in results)
+            
         return StreamingResponse(
             _safe_llm_stream(),
             media_type="application/octet-stream",
-            headers={
-                "X-Accel-Buffering": "no",
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive"
-            }
+            headers=headers
         )
         
     # Non-streaming with retry
     for attempt in range(2):
         try:
-            answer = await llm_text(system, q)
+            answer = await llm_text(system, q, history=payload.history, json_format=False)
             break
         except Exception as e:
             logger.error(f"LLM text failed (attempt {attempt+1}): {e}")
@@ -1263,6 +1283,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Context-Ids"],
 )
 
 

@@ -19,6 +19,8 @@ export default function SearchPage() {
   const [mode, setMode] = useState(params.get("mode") === "ask" ? "ask" : "search");
   const [q, setQ] = useState(params.get("q") || "");
   const [results, setResults] = useState([]);
+  const [contextIds, setContextIds] = useState([]);
+  const [history, setHistory] = useState([]);
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -31,9 +33,13 @@ export default function SearchPage() {
     setParams({ q: query, mode: m });
     try {
       if (m === "ask") {
-        const r = await api.chat(query);
+        const r = await api.chat(query, history, contextIds);
         setAnswer(r.answer || "");
         setResults(r.results || []);
+        if (r.results && r.results.length > 0) {
+          setContextIds(r.results.map(item => item.id));
+        }
+        setHistory(prev => [...prev, { role: "user", content: query }, { role: "assistant", content: r.answer || "" }]);
       } else {
         const r = await api.search(query);
         setResults(r.results || []);
@@ -41,7 +47,7 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }, [setParams]);
+  }, [setParams, history, contextIds]);
 
   useEffect(() => {
     const initial = params.get("q");
