@@ -201,6 +201,7 @@ class SavedItem(BaseModel):
     title: str = "Untitled"
     summary: str = ""
     why_saved: Optional[str] = None
+    user_note: Optional[str] = None
     keywords: List[str] = Field(default_factory=list)
     category: str = "Uncategorized"
     extracted_text: str = ""
@@ -498,7 +499,7 @@ def enrich_prompt(kind: str, body: str, user_note: Optional[str] = None) -> str:
         f"The user saved this {kind}. Analyze it and return JSON with keys: "
         '"title" (short, specific, max 8 words), '
         '"summary" (1-2 plain sentences explaining what it is and why it may be useful), '
-        '"why_saved" (1 short sentence starting with \'You likely saved this because...\' incorporating the USER NOTE if provided, or inferred from content if not), '
+        '"why_saved" (If the user provided a USER NOTE, simply fix its grammar and spelling so it reads naturally without changing the meaning or adding new information, do NOT use prefixes like \'You saved this because...\'. If NO note was provided, infer a 1 short natural sentence why they might have saved it), '
         '"keywords" (array of 4-8 lowercase topical keywords, include synonyms/related concepts, not just literal words), '
         '"category" (one short label like Ideas, AI Tools, Coding, Marketing, Productivity, Reference, Design, Finance, Personal), '
         '"extracted_text" (any readable text found in the content, or empty string), '
@@ -953,6 +954,7 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str =
     item = SavedItem(library_id=lib, content_type="text", original_text=payload.text,
                      source_url=payload.source_url, source_title=payload.source_title,
                      source_domain=domain_of(payload.source_url) if payload.source_url else None,
+                     user_note=payload.user_note,
                      dedup_key=text_hash(payload.text), title=payload.text.strip()[:60])
     values = item.model_dump()
     values["owner_user_id"] = lib
@@ -972,7 +974,8 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
         url = "https://" + url
     item = SavedItem(library_id=lib, content_type="url", source_url=url,
                      original_text=payload.context_text, source_title=payload.source_title,
-                     source_domain=domain_of(url), dedup_key=normalize_url(url), title=url[:60])
+                     source_domain=domain_of(url), dedup_key=normalize_url(url), title=url[:60],
+                     user_note=payload.user_note)
     values = item.model_dump()
     values["owner_user_id"] = lib
     await db.items.insert_one(values)
@@ -1005,6 +1008,7 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
     item = SavedItem(library_id=lib, content_type="image", image_path=stored_path,
                      source_url=source_url, source_title=source_title,
                      source_domain=domain_of(source_url) if source_url else None,
+                     user_note=user_note,
                      title="Image")
     values = item.model_dump()
     values["owner_user_id"] = lib
@@ -1109,6 +1113,8 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
         raise HTTPException(404, "Not found")
     context = (
         f"Title: {doc.get('title')}\nCategory: {doc.get('category')}\nSummary: {doc.get('summary')}\n"
+        f"User's Original Note: {doc.get('user_note') or 'None provided'}\n"
+        f"Why Saved: {doc.get('why_saved') or 'Unknown'}\n"
         f"Keywords: {', '.join(doc.get('keywords', []))}\n"
         f"Original text: {doc.get('original_text') or ''}\n"
         f"Extracted text: {doc.get('extracted_text') or ''}\n"
@@ -1156,7 +1162,13 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     ctx_parts = []
     if results:
         for r in results:
-            ctx_parts.append(f"Title: {r.get('title')}\nURL: {r.get('source_url')}\nSummary: {r.get('summary')}\nKeywords: {', '.join(r.get('keywords', []))}\nText: {r.get('extracted_text') or r.get('original_text') or ''}")
+            ctx_parts.append(
+                f"Title: {r.get('title')}\nURL: {r.get('source_url')}\n"
+                f"User Note: {r.get('user_note') or 'None'}\n"
+                f"Why Saved: {r.get('why_saved') or 'Unknown'}\n"
+                f"Summary: {r.get('summary')}\nKeywords: {', '.join(r.get('keywords', []))}\n"
+                f"Text: {r.get('extracted_text') or r.get('original_text') or ''}"
+            )
         memory_context = "SAVED MEMORIES:\n" + "\n\n---\n\n".join(ctx_parts)
     else:
         memory_context = "SAVED MEMORIES:\n(Empty - no relevant memories found)"
