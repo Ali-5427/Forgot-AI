@@ -499,7 +499,7 @@ def enrich_prompt(kind: str, body: str, user_note: Optional[str] = None) -> str:
         f"The user saved this {kind}. Analyze it and return JSON with keys: "
         '"title" (short, specific, max 8 words), '
         '"summary" (1-2 plain sentences explaining what it is and why it may be useful), '
-        '"why_saved" (If the user provided a USER NOTE, simply fix its grammar and spelling so it reads naturally without changing the meaning or adding new information, do NOT use prefixes like \'You saved this because...\'. If NO note was provided, infer a 1 short natural sentence why they might have saved it), '
+        '"why_saved" (If the user provided a USER NOTE, rewrite their note into the second-person (using \'You\'). Act like a helpful assistant reminding them why they saved it (e.g. \'You saved this to build XYZ\'). Keep it concise and natural, do not add extra summaries from the document, and do not use robotic prefixes. If NO note was provided, infer a 1 short natural sentence why they might have saved it), '
         '"keywords" (array of 4-8 lowercase topical keywords, include synonyms/related concepts, not just literal words), '
         '"category" (one short label like Ideas, AI Tools, Coding, Marketing, Productivity, Reference, Design, Finance, Personal), '
         '"extracted_text" (any readable text found in the content, or empty string), '
@@ -1111,15 +1111,19 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
     doc = await db.items.find_one({"id": item_id, "library_id": lib})
     if not doc:
         raise HTTPException(404, "Not found")
-    context = (
-        f"Title: {doc.get('title')}\nCategory: {doc.get('category')}\nSummary: {doc.get('summary')}\n"
-        f"User's Original Note: {doc.get('user_note') or 'None provided'}\n"
-        f"Why Saved: {doc.get('why_saved') or 'Unknown'}\n"
-        f"Keywords: {', '.join(doc.get('keywords', []))}\n"
-        f"Original text: {doc.get('original_text') or ''}\n"
-        f"Extracted text: {doc.get('extracted_text') or ''}\n"
-        f"Source URL: {doc.get('source_url') or 'none'}\n"
-    )
+    import json
+    clean_doc = {
+        "item_type": doc.get('content_type', 'unknown'),
+        "title": doc.get('title'),
+        "category": doc.get('category'),
+        "source_url": doc.get('source_url'),
+        "keywords": doc.get('keywords', []),
+        "ai_summary": doc.get('summary'),
+        "user_original_note": doc.get('user_note'),
+        "assistant_rephrased_reason": doc.get('why_saved'),
+        "full_content_text": doc.get('extracted_text') or doc.get('original_text') or ''
+    }
+    context = json.dumps(clean_doc, indent=2)
     system = (
         "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
         "The user is viewing a specific saved item (content below) and is chatting with you about it. "
@@ -1159,19 +1163,25 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     
     results, by_id = await retrieve(q, lib, limit=8)
     
+    import json
     ctx_parts = []
     if results:
         for r in results:
-            ctx_parts.append(
-                f"Title: {r.get('title')}\nURL: {r.get('source_url')}\n"
-                f"User Note: {r.get('user_note') or 'None'}\n"
-                f"Why Saved: {r.get('why_saved') or 'Unknown'}\n"
-                f"Summary: {r.get('summary')}\nKeywords: {', '.join(r.get('keywords', []))}\n"
-                f"Text: {r.get('extracted_text') or r.get('original_text') or ''}"
-            )
-        memory_context = "SAVED MEMORIES:\n" + "\n\n---\n\n".join(ctx_parts)
+            clean_doc = {
+                "item_type": r.get('content_type', 'unknown'),
+                "title": r.get('title'),
+                "category": r.get('category'),
+                "source_url": r.get('source_url'),
+                "keywords": r.get('keywords', []),
+                "ai_summary": r.get('summary'),
+                "user_original_note": r.get('user_note'),
+                "assistant_rephrased_reason": r.get('why_saved'),
+                "full_content_text": r.get('extracted_text') or r.get('original_text') or ''
+            }
+            ctx_parts.append(json.dumps(clean_doc, indent=2))
+        memory_context = "SAVED MEMORIES (JSON format):\n[\n" + ",\n".join(ctx_parts) + "\n]"
     else:
-        memory_context = "SAVED MEMORIES:\n(Empty - no relevant memories found)"
+        memory_context = "SAVED MEMORIES:\n[] (Empty - no relevant memories found)"
 
     system = (
         "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
