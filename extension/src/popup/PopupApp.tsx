@@ -32,7 +32,7 @@ export default function PopupApp() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const chatInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     getSession().then((s) => {
@@ -377,31 +377,24 @@ export default function PopupApp() {
 
       {/* Floating Glass Chat Input */}
       <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none z-10">
-        <form onSubmit={handleChat} className="relative group w-full pointer-events-auto shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-full border border-neutral-200/70 bg-white/80 backdrop-blur-xl focus-within:border-black focus-within:ring-1 focus-within:ring-black transition-all duration-200">
+        <form onSubmit={handleChat} className="relative group w-full pointer-events-auto shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-[24px] border border-neutral-200/70 bg-white/80 backdrop-blur-xl focus-within:border-black focus-within:ring-1 focus-within:ring-black transition-all duration-200">
           {/* Plus Button inside left edge */}
           <button
             type="button"
             onClick={() => setIsSaveModalOpen(true)}
-            className="absolute left-1.5 top-1/2 -translate-y-1/2 p-2.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100/50 transition-colors rounded-full"
+            className="absolute left-1.5 bottom-[5px] p-2.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100/50 transition-colors rounded-full"
             title="Save to Memory"
           >
             <Plus className="w-5 h-5" />
           </button>
 
-          <input
-            ref={chatInputRef}
-            type="text"
-            value={chatQuery}
-            onChange={(e) => setChatQuery(e.target.value)}
-            placeholder="Ask AI..."
-            className="w-full bg-transparent py-4 pl-14 pr-14 text-[14px] focus:outline-none placeholder:text-neutral-400"
-          />
+          <textarea ref={chatInputRef} rows={1} value={chatQuery} onChange={(e) => { setChatQuery(e.target.value); e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (chatQuery.trim()) handleChat(null); } }} placeholder="Ask AI..." className="w-full bg-transparent py-4 pl-14 pr-14 text-[14px] focus:outline-none placeholder:text-neutral-400 resize-none max-h-[120px]" style={{ overflowY: chatQuery.split("\n").length > 4 ? "auto" : "hidden" }} />
           
           {chatting ? (
             <button
               type="button"
               onClick={stopStream}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2.5 bg-neutral-900 text-white rounded-full hover:bg-neutral-800 transition-colors shadow-sm"
+              className="absolute right-1.5 bottom-[5px] p-2.5 bg-neutral-900 text-white rounded-full hover:bg-neutral-800 transition-colors shadow-sm"
             >
               <Square className="w-4 h-4 fill-current" />
             </button>
@@ -409,7 +402,7 @@ export default function PopupApp() {
             <button
               type="submit"
               disabled={!chatQuery.trim()}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2.5 bg-neutral-900 text-white rounded-full disabled:opacity-50 hover:bg-neutral-800 transition-colors shadow-sm"
+              className="absolute right-1.5 bottom-[5px] p-2.5 bg-neutral-900 text-white rounded-full disabled:opacity-50 hover:bg-neutral-800 transition-colors shadow-sm"
             >
               <Send className="w-4 h-4" />
             </button>
@@ -419,3 +412,5 @@ export default function PopupApp() {
     </div>
   );
 }
+
+
