@@ -335,9 +335,11 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           
           {item.content_type === "text" && (
             <div className="relative group text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-5 md:p-6 shadow-sm font-serif max-h-[70vh] overflow-auto">
-              <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="absolute top-3 right-3 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-900 bg-white/80 backdrop-blur-sm border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm rounded-lg" title="Copy">
-                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-              </Button>
+              <div className="sticky top-0 float-right mb-2 ml-4 z-10 h-0 overflow-visible pointer-events-none">
+                <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="pointer-events-auto -mt-3 -mr-3 h-8 w-8 p-0 text-neutral-500 hover:text-neutral-900 bg-white/90 backdrop-blur-md border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm rounded-lg" title="Copy">
+                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
               {item.original_text}
             </div>
           )}
@@ -350,7 +352,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
                 </div>
               )}
               {item.original_text && (
-                <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="absolute top-3 right-3 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-900 bg-white/80 backdrop-blur-sm border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm rounded-lg" title="Copy text">
+                <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="sticky top-3 float-right mt-3 mr-3 z-10 h-8 w-8 p-0 text-neutral-500 hover:text-neutral-900 bg-white/90 backdrop-blur-md border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm rounded-lg pointer-events-auto" title="Copy text">
                   {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                 </Button>
               )}
@@ -584,3 +586,4 @@ export const ItemDetailView = ({ itemId, onClose }) => {
     </div>
   );
 };
+
