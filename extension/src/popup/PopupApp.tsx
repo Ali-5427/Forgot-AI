@@ -51,8 +51,12 @@ export default function PopupApp() {
 
   useEffect(() => {
     if (chatInputRef.current) {
-      chatInputRef.current.style.height = 'auto';
-      chatInputRef.current.style.height = chatInputRef.current.scrollHeight + 'px';
+      const el = chatInputRef.current;
+      const MAX_CHAT_INPUT_PX = 160;
+      el.style.height = "0px";
+      const next = Math.min(el.scrollHeight, MAX_CHAT_INPUT_PX);
+      el.style.height = next + "px";
+      el.style.overflowY = el.scrollHeight > MAX_CHAT_INPUT_PX ? "auto" : "hidden";
     }
   }, [chatQuery]);
 
@@ -395,7 +399,7 @@ export default function PopupApp() {
             <Plus className="w-5 h-5" />
           </button>
 
-          <textarea ref={chatInputRef} rows={1} value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (chatQuery.trim()) handleChat(null); } }} placeholder="Ask AI..." className="w-full bg-transparent py-4 pl-14 pr-14 text-[14px] focus:outline-none placeholder:text-neutral-400 resize-none max-h-[120px] overflow-y-auto" />
+          <textarea ref={chatInputRef} rows={1} value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (chatQuery.trim()) handleChat(null); } }} placeholder="Ask AI..." className="w-full bg-transparent py-4 pl-14 pr-14 text-[14px] leading-5 focus:outline-none placeholder:text-neutral-400 resize-none" />
           
           {chatting ? (
             <button
