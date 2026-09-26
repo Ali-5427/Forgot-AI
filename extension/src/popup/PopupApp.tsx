@@ -395,7 +395,7 @@ export default function PopupApp() {
             <Plus className="w-5 h-5" />
           </button>
 
-          <textarea ref={chatInputRef} rows={1} value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (chatQuery.trim()) handleChat(null); } }} placeholder="Ask AI..." className="w-full bg-transparent py-4 pl-14 pr-14 text-[14px] focus:outline-none placeholder:text-neutral-400 resize-none max-h-[120px]" style={{ overflowY: chatQuery.split("\n").length > 4 ? "auto" : "hidden" }} />
+          <textarea ref={chatInputRef} rows={1} value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (chatQuery.trim()) handleChat(null); } }} placeholder="Ask AI..." className="w-full bg-transparent py-4 pl-14 pr-14 text-[14px] focus:outline-none placeholder:text-neutral-400 resize-none max-h-[120px] overflow-y-auto" />
           
           {chatting ? (
             <button
@@ -419,6 +419,7 @@ export default function PopupApp() {
     </div>
   );
 }
+
 
 
 
