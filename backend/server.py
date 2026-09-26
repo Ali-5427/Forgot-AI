@@ -1036,6 +1036,33 @@ async def related_items(item_id: str, lib: str = Depends(resolve_library)):
     target = await db.items.find_one({"id": item_id, "library_id": lib})
     if not target:
         raise HTTPException(404, "Not found")
+
+    # Try Vector Semantic Search first
+    embedding = target.get("embedding")
+    if embedding and isinstance(embedding, list):
+        try:
+            query_text = (target.get("title", "") + " " + target.get("summary", "")).strip()
+            res = supabase.rpc("hybrid_search_items", {
+                "query_embedding": embedding,
+                "query_text": query_text,
+                "time_filter": "all",
+                "match_count": 5,
+                "p_library_id": lib
+            }).execute()
+            
+            if res.data:
+                matches = []
+                for row in res.data:
+                    if row["id"] != item_id:
+                        matches.append(clean(row))
+                    if len(matches) == 4:
+                        break
+                if matches:
+                    return matches
+        except Exception as e:
+            logger.error(f"Vector related items failed: {e}")
+
+    # Fallback to hardcoded keyword overlap if vector search fails or embedding is missing
     others = await db.items.find({"library_id": lib, "status": "ready", "id": {"$ne": item_id}}).to_list(300)
     tkw = set(k.lower() for k in (target.get("keywords") or []))
     tcat = target.get("category")
