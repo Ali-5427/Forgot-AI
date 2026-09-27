@@ -15,7 +15,8 @@ export const Layout = () => {
   const { openSave, detailOpen, detailId, setDetailOpen } = useStore();
   return (
     <div className="min-h-screen w-full bg-neutral-50 text-foreground">
-      <aside className="w-60 border-r border-border bg-white flex flex-col fixed inset-y-0 left-0 z-20">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-60 border-r border-border bg-white flex-col fixed inset-y-0 left-0 z-20">
         <div className="px-5 py-5 border-b border-border">
           <div className="flex items-center gap-2">
             <img src="/logo.jpg" alt="Forgot AI Logo" className="h-7 w-7 rounded-md object-cover" />
@@ -54,13 +55,48 @@ export const Layout = () => {
         </div>
       </aside>
 
-      <main className="ml-60 min-h-screen relative bg-white">
+      {/* Main Content Area */}
+      <main className="ml-0 md:ml-60 min-h-screen relative bg-white pb-20 md:pb-0">
         {detailOpen && detailId ? (
           <ItemDetailView itemId={detailId} onClose={() => setDetailOpen(false)} />
         ) : (
           <Outlet />
         )}
       </main>
+
+      {/* Mobile Floating Action Button */}
+      {!detailOpen && (
+        <Button 
+          onClick={openSave} 
+          className="md:hidden fixed bottom-20 right-5 rounded-full w-14 h-14 shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-0 z-40 bg-neutral-900 hover:bg-neutral-800 transition-all"
+          data-testid="mobile-save-fab"
+        >
+          <Plus className="h-6 w-6 text-white" />
+        </Button>
+      )}
+
+      {/* Mobile Bottom Navigation */}
+      <nav 
+        className="md:hidden fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-border flex justify-around items-center px-1 pb-3 pt-2 z-50"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
+        {nav.map(({ to, label, Icon, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            onClick={() => setDetailOpen(false)}
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center w-16 gap-1 transition-colors ${
+                isActive && !detailOpen ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-900"
+              }`
+            }
+          >
+            <Icon className="h-6 w-6" />
+            <span className="text-[10px] font-medium">{label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 };
