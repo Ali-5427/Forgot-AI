@@ -371,7 +371,7 @@ export default function PopupApp() {
                     <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                       <PenTool className="w-4 h-4" />
                     </div>
-                    <span className="text-[13px] font-medium text-neutral-800">Jot a Note</span>
+                    <span className="text-[13px] font-medium text-neutral-800">Save Note</span>
                   </button>
                 </div>
 
@@ -498,6 +498,7 @@ export default function PopupApp() {
     </div>
   );
 }
+
 
 
 
