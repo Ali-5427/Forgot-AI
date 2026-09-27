@@ -33,6 +33,7 @@ export default function PopupApp() {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  const [inputHeight, setInputHeight] = useState(52);
 
   useEffect(() => {
     getSession().then((s) => {
@@ -52,16 +53,22 @@ export default function PopupApp() {
   useEffect(() => {
     if (chatInputRef.current) {
       const el = chatInputRef.current;
+      const MAX_CHAT_INPUT_PX = 160;
+      const MIN_HEIGHT = 52;
+
       if (!chatQuery) {
-        el.style.height = "auto";
+        el.style.height = MIN_HEIGHT + "px";
         el.style.overflowY = "hidden";
+        setInputHeight(MIN_HEIGHT);
         return;
       }
-      const MAX_CHAT_INPUT_PX = 160;
+      
       el.style.height = "0px";
-      const next = Math.min(el.scrollHeight, MAX_CHAT_INPUT_PX);
+      let next = Math.min(el.scrollHeight, MAX_CHAT_INPUT_PX);
+      next = Math.max(next, MIN_HEIGHT);
       el.style.height = next + "px";
       el.style.overflowY = el.scrollHeight > MAX_CHAT_INPUT_PX ? "auto" : "hidden";
+      setInputHeight(next);
     }
   }, [chatQuery]);
 
@@ -393,7 +400,7 @@ export default function PopupApp() {
 
       {/* Floating Glass Chat Input */}
       <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none z-10">
-        <form onSubmit={handleChat} className="relative group w-full pointer-events-auto shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-[24px] border border-neutral-200/70 bg-white/80 backdrop-blur-xl focus-within:border-black focus-within:ring-1 focus-within:ring-black transition-all duration-200">
+        <form onSubmit={handleChat} className={`relative group w-full pointer-events-auto shadow-[0_8px_30px_rgb(0,0,0,0.12)] ${inputHeight > 56 ? 'rounded-[24px]' : 'rounded-full'} border border-neutral-200/70 bg-white/80 backdrop-blur-xl focus-within:border-black focus-within:ring-1 focus-within:ring-black transition-all duration-200`}>
           {/* Plus Button inside left edge */}
           <button
             type="button"
