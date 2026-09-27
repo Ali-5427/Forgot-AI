@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon, Copy, Check, RotateCcw, Edit2, Square, Settings } from "lucide-react";
+import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon, Copy, Check, RotateCcw, Edit2, Square, Settings, Link, PenTool, Sparkles, MessageSquare } from "lucide-react";
 import { api, request, fetchStream } from "../lib/api";
 import { CONFIG } from "../lib/config";
 import { clearSession, getSession, onSessionChange } from "../lib/storage";
@@ -330,9 +330,73 @@ export default function PopupApp() {
         {/* Chat Thread */}
         <div className="space-y-4">
           {messages.length === 0 ? (
-            <div className="text-center py-10 text-sm text-neutral-400 bg-white rounded-2xl border border-dashed border-neutral-200">
-              No messages yet.<br/> Ask me about what you've saved!
-            </div>
+                          <div className="flex flex-col items-center justify-center pt-8 pb-4 w-full">
+                {/* Header */}
+                <div className="flex flex-col items-center mb-8">
+                  <div className="w-10 h-10 bg-neutral-100 rounded-2xl flex items-center justify-center mb-3 text-neutral-900 shadow-sm border border-neutral-200/50">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-neutral-800 font-semibold text-[15px]">What's on your mind?</h3>
+                  <p className="text-neutral-500 text-[13px] mt-1">Save a memory or ask about your past saves.</p>
+                </div>
+
+                {/* Primary Actions Grid */}
+                <div className="grid grid-cols-2 gap-3 w-full mb-8">
+                  <button
+                    onClick={() => {
+                      if (window.chrome && chrome.tabs) {
+                        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                          const activeTab = tabs[0];
+                          if (activeTab && activeTab.url) {
+                            setSaveText(activeTab.url);
+                            setIsSaveModalOpen(true);
+                          }
+                        });
+                      }
+                    }}
+                    className="flex flex-col items-center justify-center p-4 bg-white border border-neutral-200/60 rounded-2xl hover:border-neutral-300 hover:shadow-md transition-all group"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      <Link className="w-4 h-4" />
+                    </div>
+                    <span className="text-[13px] font-medium text-neutral-800">Save Current Tab</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setSaveText("");
+                      setIsSaveModalOpen(true);
+                    }}
+                    className="flex flex-col items-center justify-center p-4 bg-white border border-neutral-200/60 rounded-2xl hover:border-neutral-300 hover:shadow-md transition-all group"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      <PenTool className="w-4 h-4" />
+                    </div>
+                    <span className="text-[13px] font-medium text-neutral-800">Jot a Note</span>
+                  </button>
+                </div>
+
+                {/* Suggestion Chips */}
+                <div className="w-full flex flex-col items-center">
+                  <div className="flex items-center gap-3 w-full mb-4">
+                    <div className="h-px bg-neutral-200 flex-1"></div>
+                    <span className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider">Or ask your memory</span>
+                    <div className="h-px bg-neutral-200 flex-1"></div>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {["What did I save today?", "Summarize my recent links", "Show me my notes on AI"].map((chip) => (
+                      <button
+                        key={chip}
+                        onClick={() => handleChat(null, chip)}
+                        className="px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-full text-[12px] font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors flex items-center gap-1.5 shadow-sm"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 opacity-60" />
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
           ) : (
             <div className="space-y-6">
               {messages.map((msg, i) => (
@@ -435,6 +499,9 @@ export default function PopupApp() {
     </div>
   );
 }
+
+
+
 
 
 
