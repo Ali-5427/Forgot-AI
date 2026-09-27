@@ -145,10 +145,9 @@ export default function PopupApp() {
     
     const historyToSend = messages.map(m => ({ role: m.role, content: m.content }));
 
-    if (!retryQuery) {
-      setChatQuery("");
-      setMessages((prev) => [...prev, { role: "user", content: q }]);
-    }
+    setChatQuery("");
+    setMessages((prev) => [...prev, { role: "user", content: q }]);
+    
     setChatting(true);
     
     const controller = new AbortController();
@@ -499,6 +498,8 @@ export default function PopupApp() {
     </div>
   );
 }
+
+
 
 
 
