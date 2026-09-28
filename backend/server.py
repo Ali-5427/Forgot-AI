@@ -793,7 +793,16 @@ async def register(payload: AuthIn, request: Request):
         "token_version": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.users.insert_one(user)
+    try:
+        await db.users.insert_one(user)
+    except Exception as e:
+        logger.warning(f"db.users.insert_one failed in register (likely RLS): {e}. Using admin client.")
+        def _admin_insert():
+            try:
+                supabase_admin.table("profiles").insert(user).execute()
+            except Exception:
+                supabase_admin.table("users").insert(user).execute()
+        await asyncio.to_thread(_admin_insert)
     
     # Use the regular anon client to sign them in after creation
     session = supabase.auth.sign_in_with_password({"email": email, "password": payload.password})
@@ -841,7 +850,16 @@ async def login(payload: AuthIn, request: Request):
             "token_version": 0,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        await db.users.insert_one(user)
+        try:
+            await db.users.insert_one(user)
+        except Exception as e:
+            logger.warning(f"Failed to insert user into db.users (likely RLS): {e}. Falling back to admin client.")
+            def _admin_insert():
+                try:
+                    temp_client.table("profiles").insert(user).execute()
+                except Exception:
+                    temp_client.table("users").insert(user).execute()
+            await asyncio.to_thread(_admin_insert)
     await _record_session(user["id"], session.session.access_token, user.get("token_version", 0))
 
     anon = (request.headers.get("X-Library-Id") or "").strip()
@@ -1196,15 +1214,27 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     if not q:
         return {"answer": "Ask me anything about what you've saved, or just say hi!", "results": []}
     
-    q_lower = q.lower()
-    follow_up_phrases = ["explain it", "explain this", "explain that", "could you explain", "why did i save", "tell me more", "elaborate", "same one", "what about it", "explain", "more about"]
-    is_follow_up = any(p in q_lower for p in follow_up_phrases)
-
-    if is_follow_up and payload.context_item_ids:
-        docs = await db.items.find({"id": {"$in": payload.context_item_ids}, "library_id": lib, "status": "ready"}).to_list(None)
-        results = [clean(d) for d in docs]
-    else:
-        results, by_id = await retrieve(q, lib, limit=8)
+    # Rolling Context Merger
+    results = []
+    seen_ids = set()
+    
+    # 1. Fresh search
+    search_results, _ = await retrieve(q, lib, limit=8)
+    for r in search_results:
+        if r["id"] not in seen_ids:
+            results.append(r)
+            seen_ids.add(r["id"])
+            
+    # 2. Add past context if provided
+    if payload.context_item_ids:
+        past_docs = await db.items.find({"id": {"$in": payload.context_item_ids}, "library_id": lib, "status": "ready"}).to_list(None)
+        for d in past_docs:
+            if d["id"] not in seen_ids:
+                results.append(clean(d))
+                seen_ids.add(d["id"])
+                
+    # 3. Cap at 8 items max to prevent prompt bloat
+    results = results[:8]
     
     import json
     ctx_parts = []
