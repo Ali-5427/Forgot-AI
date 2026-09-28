@@ -42,6 +42,7 @@ export default function ChatV2() {
       setMessages([]);
       setContextItems([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentConvId]);
 
   // Scroll to bottom when messages change
@@ -315,3 +316,4 @@ export default function ChatV2() {
     </div>
   );
 }
+
