@@ -84,12 +84,11 @@ create policy assets_owner_delete on storage.objects for delete to authenticated
 using (bucket_id = 'forgot-ai-assets' and (storage.foldername(name))[1] = auth.uid()::text);
 -- VECTOR SEARCH & HYBRID RPC
 create extension if not exists vector;
-alter table public.items add column if not exists embedding vector(1024);
-create index if not exists items_embedding_idx on public.items 
-using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+alter table public.items add column if not exists embedding vector(2048);
+
 
 create or replace function hybrid_search_items(
-  query_embedding vector(1024),
+  query_embedding vector(2048),
   query_text text,
   time_filter text,
   match_count int,
@@ -165,4 +164,50 @@ create table if not exists public.user_subscriptions (
 alter table public.user_subscriptions enable row level security;
 drop policy if exists user_subscriptions_self on public.user_subscriptions;
 create policy user_subscriptions_self on public.user_subscriptions for select using (user_id = auth.uid());
+
+
+-- FTS Column for items
+alter table public.items add column if not exists fts tsvector generated always as (
+  setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+  setweight(to_tsvector('english', coalesce(summary, '')), 'B') ||
+  setweight(to_tsvector('english', coalesce(keywords::text, '')), 'B') ||
+  setweight(to_tsvector('english', coalesce(searchable_text, '')), 'C') ||
+  setweight(to_tsvector('english', coalesce(extracted_text, '')), 'D')
+) stored;
+
+create index if not exists items_fts_idx on public.items using gin (fts);
+
+-- Conversations Table
+create table if not exists public.conversations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  title text,
+  summary text default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create index if not exists idx_conversations_user_id on public.conversations(user_id, updated_at desc);
+alter table public.conversations enable row level security;
+drop policy if exists conversations_owner on public.conversations;
+create policy conversations_owner on public.conversations for all using (auth.uid() = user_id);
+
+-- Messages Table
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  role text check (role in ('user', 'assistant')),
+  content text not null,
+  cited_item_ids uuid[] default '{}',
+  created_at timestamptz default now()
+);
+create index if not exists idx_messages_conversation_id on public.messages(conversation_id, created_at);
+alter table public.messages enable row level security;
+drop policy if exists messages_owner on public.messages;
+create policy messages_owner on public.messages for all using (
+  exists (
+    select 1 from public.conversations c
+    where c.id = messages.conversation_id and c.user_id = auth.uid()
+  )
+);
+
 

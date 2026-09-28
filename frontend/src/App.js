@@ -16,6 +16,7 @@ import AuthGate from "@/pages/AuthGate";
 import Home from "@/pages/Home";
 import AllSaved from "@/pages/AllSaved";
 import SearchPage from "@/pages/SearchPage";
+import ChatV2 from "@/pages/ChatV2";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
 
@@ -113,6 +114,7 @@ function AppContent() {
             <Route path="/" element={<Home />} />
             <Route path="/all" element={<AllSaved />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/chat" element={<ChatV2 />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Home />} />
           </Route>
@@ -157,3 +159,4 @@ function App() {
 }
 
 export default App;
+
