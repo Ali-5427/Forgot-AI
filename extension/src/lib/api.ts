@@ -96,6 +96,9 @@ export async function request<T>(
   }
 
   if (!res.ok) {
+    if (res.status === 401 && init.auth) {
+      await clearSession();
+    }
     let detail = res.statusText || `HTTP ${res.status}`;
     try {
       const j: any = await res.json();
@@ -152,6 +155,9 @@ export async function fetchStream(
   }
 
   if (!res.ok) {
+    if (res.status === 401) {
+      await clearSession();
+    }
     throw new Error(`HTTP ${res.status}`);
   }
   return res;
