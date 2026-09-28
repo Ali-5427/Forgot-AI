@@ -80,7 +80,7 @@ async function sha256Hex(file) {
 export const api = {
   // V2 Chat & Conversations
   getConversations: () => axios.get(`${API}/conversations`).then((r) => r.data),
-  getConversation: (id) => axios.get(`${API/conversations/${id}`).then((r) => r.data),
+  getConversation: (id) => axios.get(`${API}/conversations/${id}`).then((r) => r.data),
   createConversation: (title) => axios.post(`${API}/conversations`, { title }).then((r) => r.data),
   updateConversation: (id, title) => axios.patch(`${API}/conversations/${id}`, { title }).then((r) => r.data),
   deleteConversation: (id) => axios.delete(`${API}/conversations/${id}`).then((r) => r.data),
@@ -163,4 +163,5 @@ export function formatApiErrorDetail(detail) {
   if (detail && typeof detail.msg === "string") return detail.msg;
   return String(detail);
 }
+
 
