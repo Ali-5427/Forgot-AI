@@ -3,6 +3,7 @@ import { useEffect } from "react";
 
 import { Footer } from "./Footer";
 import { Button } from "@/components/ui/button";
+import { FeedbackWidget } from "./FeedbackWidget";
 
 function AppButton({ children, size = "default", onClick }) {
   return (
@@ -67,6 +68,7 @@ export function PublicLayout({ onOpenApp }) {
       </main>
 
       <Footer />
+      <FeedbackWidget />
     </div>
   );
 }
