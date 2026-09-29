@@ -1365,29 +1365,29 @@ class ConversationPatch(BaseModel):
 @api_router.get("/conversations")
 async def get_conversations(lib: str = Depends(resolve_library)):
     user_id = lib
-    res = await db.supabase.table("conversations").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
+    res = db.supabase.table("conversations").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
     return res.data
 
 @api_router.post("/conversations")
 async def create_conversation(payload: ConversationCreate, lib: str = Depends(resolve_library)):
     user_id = lib
     title = payload.title or "New Chat"
-    res = await db.supabase.table("conversations").insert({"user_id": user_id, "title": title}).execute()
+    res = db.supabase.table("conversations").insert({"user_id": user_id, "title": title}).execute()
     return res.data[0]
 
 @api_router.get("/conversations/{conv_id}")
 async def get_conversation(conv_id: str, lib: str = Depends(resolve_library)):
     user_id = lib
-    res = await db.supabase.table("conversations").select("*").eq("id", conv_id).eq("user_id", user_id).execute()
+    res = db.supabase.table("conversations").select("*").eq("id", conv_id).eq("user_id", user_id).execute()
     if not res.data:
         raise HTTPException(404, "Conversation not found")
-    messages = await db.supabase.table("messages").select("*").eq("conversation_id", conv_id).order("created_at").execute()
+    messages = db.supabase.table("messages").select("*").eq("conversation_id", conv_id).order("created_at").execute()
     return {"conversation": res.data[0], "messages": messages.data}
 
 @api_router.patch("/conversations/{conv_id}")
 async def patch_conversation(conv_id: str, payload: ConversationPatch, lib: str = Depends(resolve_library)):
     user_id = lib
-    res = await db.supabase.table("conversations").update({"title": payload.title}).eq("id", conv_id).eq("user_id", user_id).execute()
+    res = db.supabase.table("conversations").update({"title": payload.title}).eq("id", conv_id).eq("user_id", user_id).execute()
     if not res.data:
         raise HTTPException(404)
     return res.data[0]
@@ -1395,7 +1395,7 @@ async def patch_conversation(conv_id: str, payload: ConversationPatch, lib: str 
 @api_router.delete("/conversations/{conv_id}")
 async def delete_conversation(conv_id: str, lib: str = Depends(resolve_library)):
     user_id = lib
-    await db.supabase.table("conversations").delete().eq("id", conv_id).eq("user_id", user_id).execute()
+    db.supabase.table("conversations").delete().eq("id", conv_id).eq("user_id", user_id).execute()
     return {"success": True}
 
 async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
@@ -1404,15 +1404,15 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
     query = payload.query.strip()
     
     if not conv_id:
-        c_res = await db.supabase.table("conversations").insert({"user_id": user_id, "title": query[:40]}).execute()
+        c_res = db.supabase.table("conversations").insert({"user_id": user_id, "title": query[:40]}).execute()
         conv_id = c_res.data[0]["id"]
         messages = []
         is_new = True
     else:
-        c_res = await db.supabase.table("conversations").select("id").eq("id", conv_id).eq("user_id", user_id).execute()
+        c_res = db.supabase.table("conversations").select("id").eq("id", conv_id).eq("user_id", user_id).execute()
         if not c_res.data:
             raise HTTPException(404, "Conversation not found")
-        m_res = await db.supabase.table("messages").select("*").eq("conversation_id", conv_id).order("created_at", desc=True).limit(12).execute()
+        m_res = db.supabase.table("messages").select("*").eq("conversation_id", conv_id).order("created_at", desc=True).limit(12).execute()
         messages = list(reversed(m_res.data))
         is_new = False
 
@@ -1439,7 +1439,7 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
         rpc_params = {"p_library": lib, "p_query": standalone_query, "p_embedding": None, "p_limit": 8}
         
     try:
-        search_res = await db.supabase.rpc("hybrid_search_items", rpc_params).execute()
+        search_res = db.supabase.rpc("hybrid_search_items", rpc_params).execute()
         top_ids = [r["id"] for r in search_res.data]
     except Exception as e:
         logger.error(f"Hybrid search failed: {e}")
@@ -1453,7 +1453,7 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
     
     context_items = []
     if final_ids:
-        items_res = await db.supabase.table("items").select("*").in_("id", final_ids).eq("library_id", lib).execute()
+        items_res = db.supabase.table("items").select("*").in_("id", final_ids).eq("library_id", lib).execute()
         context_items = items_res.data
 
     context_str = ""
@@ -1482,18 +1482,18 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
 async def chat_v2(payload: ChatV2In, lib: str = Depends(resolve_library)):
     conv_id, system_prompt, llm_history, final_ids, context_items, is_new = await _process_chat_v2_internal(payload, lib)
     
-    await db.supabase.table("messages").insert({"conversation_id": conv_id, "role": "user", "content": payload.query}).execute()
+    db.supabase.table("messages").insert({"conversation_id": conv_id, "role": "user", "content": payload.query}).execute()
     
     answer = await llm_chat(system_prompt, llm_history)
     
-    await db.supabase.table("messages").insert({
+    db.supabase.table("messages").insert({
         "conversation_id": conv_id,
         "role": "assistant",
         "content": answer,
         "cited_item_ids": final_ids
     }).execute()
     
-    await db.supabase.table("conversations").update({"updated_at": "now()"}).eq("id", conv_id).execute()
+    db.supabase.table("conversations").update({"updated_at": "now()"}).eq("id", conv_id).execute()
     
     return {
         "conversation_id": conv_id,
@@ -1506,7 +1506,7 @@ async def chat_v2(payload: ChatV2In, lib: str = Depends(resolve_library)):
 async def chat_v2_stream(payload: ChatV2In, lib: str = Depends(resolve_library)):
     conv_id, system_prompt, llm_history, final_ids, context_items, is_new = await _process_chat_v2_internal(payload, lib)
     
-    await db.supabase.table("messages").insert({"conversation_id": conv_id, "role": "user", "content": payload.query}).execute()
+    db.supabase.table("messages").insert({"conversation_id": conv_id, "role": "user", "content": payload.query}).execute()
     
     async def event_generator():
         answer_chunks = []
@@ -1520,14 +1520,14 @@ async def chat_v2_stream(payload: ChatV2In, lib: str = Depends(resolve_library))
             
         final_answer = "".join(answer_chunks)
         
-        await db.supabase.table("messages").insert({
+        db.supabase.table("messages").insert({
             "conversation_id": conv_id,
             "role": "assistant",
             "content": final_answer,
             "cited_item_ids": final_ids
         }).execute()
         
-        await db.supabase.table("conversations").update({"updated_at": "now()"}).eq("id", conv_id).execute()
+        db.supabase.table("conversations").update({"updated_at": "now()"}).eq("id", conv_id).execute()
         
         final_payload = {
             "type": "final",
@@ -1559,13 +1559,13 @@ async def submit_feedback(payload: FeedbackIn, request: Request, background_task
     # Save to Supabase DB (silent fail if error, so user isn't blocked)
     try:
         if user_id != "anonymous":
-            await db.supabase.table("feedback").insert({
+            db.supabase.table("feedback").insert({
                 "user_id": user_id,
                 "user_email": user_email,
                 "message": payload.message
             }).execute()
         else:
-            await db.supabase.table("feedback").insert({
+            db.supabase.table("feedback").insert({
                 "user_email": user_email,
                 "message": payload.message
             }).execute()
