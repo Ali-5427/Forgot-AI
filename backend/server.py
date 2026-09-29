@@ -1572,29 +1572,27 @@ async def submit_feedback(payload: FeedbackIn, request: Request, background_task
     except Exception as e:
         logger.error(f"Failed to save feedback to db: {e}")
 
-    # Send Email via Background Task
+    # Send Email via Background Task (Web3Forms bypassing Render SMTP blocks)
     def send_email_task():
-        sender = os.environ.get("EMAIL_SENDER")
-        pwd = os.environ.get("EMAIL_PASSWORD")
-        if not sender or not pwd:
-            logger.warning("EMAIL_SENDER or EMAIL_PASSWORD not set. Feedback email skipped.")
-            return
-
         try:
-            import smtplib, ssl
-            from email.message import EmailMessage
-
-            msg = EmailMessage()
-            msg.set_content(f"Feedback from: {user_email}\n\nMessage:\n{payload.message}")
-            msg['Subject'] = f"?? New Forgot AI Feedback from {user_email}"
-            msg['From'] = sender
-            msg['To'] = "founder@tesima-media.com"  # Send to founder inbox
-
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-                server.login(sender, pwd)
-                server.send_message(msg)
-            logger.info("Feedback email sent successfully.")
+            import requests
+            # Using Web3Forms public access key to send email over standard HTTPS (Port 443)
+            # This completely bypasses Render's block on SMTP ports.
+            access_key = "b0e79844-0463-4f1c-bc0e-c6ed8705a776"
+            
+            form_data = {
+                "access_key": access_key,
+                "subject": f"?? New Forgot AI Feedback from {user_email}",
+                "email": user_email,
+                "name": "Forgot AI App",
+                "message": payload.message
+            }
+            
+            response = requests.post("https://api.web3forms.com/submit", json=form_data, timeout=10)
+            if response.status_code == 200:
+                logger.info("Feedback email sent successfully via Web3Forms.")
+            else:
+                logger.error(f"Web3Forms error: {response.text}")
         except Exception as e:
             logger.error(f"Failed to send feedback email: {e}")
 
