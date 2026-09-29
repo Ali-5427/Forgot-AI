@@ -1587,7 +1587,7 @@ async def submit_feedback(payload: FeedbackIn, request: Request, background_task
             msg.set_content(f"Feedback from: {user_email}\n\nMessage:\n{payload.message}")
             msg['Subject'] = f"?? New Forgot AI Feedback from {user_email}"
             msg['From'] = sender
-            msg['To'] = sender  # Send to yourself
+            msg['To'] = "founder@tesima-media.com"  # Send to founder inbox
 
             context = ssl.create_default_context()
             with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
