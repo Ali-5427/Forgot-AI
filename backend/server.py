@@ -1337,6 +1337,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     expose_headers=["X-Context-Ids"],
 )
 
