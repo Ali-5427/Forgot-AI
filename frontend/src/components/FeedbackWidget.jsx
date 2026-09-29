@@ -48,10 +48,11 @@ export const FeedbackWidget = () => {
       {/* Floating Button */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 left-6 z-40 bg-white border border-neutral-200 shadow-[0_8px_30px_rgb(0,0,0,0.08)] p-3.5 rounded-full hover:shadow-lg transition-all hover:scale-105 group"
+        className="fixed bottom-24 left-5 md:bottom-6 md:left-auto md:right-6 z-[100] bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 p-3.5 md:px-5 md:py-3.5 rounded-full hover:bg-indigo-700 hover:shadow-xl transition-all hover:-translate-y-1 flex items-center gap-2 font-medium text-sm group"
         aria-label="Send Feedback"
       >
-        <MessageSquare className="h-5 w-5 text-neutral-600 group-hover:text-neutral-900 transition-colors" />
+        <MessageSquare className="h-5 w-5" />
+        <span className="hidden md:inline">Feedback</span>
       </button>
 
       {/* Modal Overlay */}
