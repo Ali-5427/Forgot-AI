@@ -1325,7 +1325,7 @@ async def root():
 
 
 # ---------------- App wiring ----------------
-app.include_router(api_router)
+# MOVED TO END
 
 default_origins = 'http://localhost:3000,https://forgot-ai.vercel.app'
 raw_origins = os.environ.get('CORS_ORIGINS', default_origins).split(',')
@@ -1600,3 +1600,7 @@ async def submit_feedback(payload: FeedbackIn, request: Request, background_task
     background_tasks.add_task(send_email_task)
 
     return {"success": True, "message": "Feedback received"}
+
+
+# Register all routes
+app.include_router(api_router)
