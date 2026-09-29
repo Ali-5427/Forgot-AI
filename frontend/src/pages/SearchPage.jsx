@@ -39,7 +39,7 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }, [setParams, history, contextIds]);
+  }, [setParams]);
 
   useEffect(() => {
     const initial = params.get("q");
