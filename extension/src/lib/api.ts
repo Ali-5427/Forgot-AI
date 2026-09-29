@@ -172,6 +172,7 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  getConversation: (id: string) => request<any>(`/api/conversations/${id}`),
   login: (email: string, password: string) =>
     request<AuthPayload>("/api/auth/login", {
       method: "POST",

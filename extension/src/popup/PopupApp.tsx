@@ -18,7 +18,29 @@ export default function PopupApp() {
   const [chatQuery, setChatQuery] = useState("");
   const [chatting, setChatting] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [convId, setConvId] = useState<string | null>(null);
   const [contextIds, setContextIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    chrome.storage.local.get(["extension_conv_id"], async (res) => {
+      if (res.extension_conv_id) {
+        try {
+          const data = await api.getConversation(res.extension_conv_id);
+          if (data && data.messages) {
+             setConvId(res.extension_conv_id);
+             setMessages(data.messages.map((m: any) => ({
+               role: m.role,
+               content: m.content
+             })));
+          }
+        } catch (e) {
+          // Conversation might be deleted or missing
+          chrome.storage.local.remove("extension_conv_id");
+        }
+      }
+    });
+  }, []);
+
   
   // Save Modal State
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -288,7 +310,8 @@ export default function PopupApp() {
           Forgot AI
         </div>
         
-        {/* Settings Menu */}
+        <button onClick={startNewChat} className="p-2 mr-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors" title="New Chat"><Plus className="w-4 h-4" /></button>
+          {/* Settings Menu */}
         <div className="relative">
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)} 

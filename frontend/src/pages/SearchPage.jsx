@@ -16,7 +16,7 @@ const EXAMPLES = {
 export default function SearchPage() {
   const { openItem, togglePin } = useStore();
   const [params, setParams] = useSearchParams();
-  const [mode, setMode] = useState(params.get("mode") === "ask" ? "ask" : "search");
+  const [mode, setMode] = useState("search");
   const [q, setQ] = useState(params.get("q") || "");
   const [results, setResults] = useState([]);
   const [contextIds, setContextIds] = useState([]);
@@ -32,15 +32,7 @@ export default function SearchPage() {
     setAnswer("");
     setParams({ q: query, mode: m });
     try {
-      if (m === "ask") {
-        const r = await api.chat(query, history, contextIds);
-        setAnswer(r.answer || "");
-        setResults(r.results || []);
-        if (r.results && r.results.length > 0) {
-          setContextIds(r.results.map(item => item.id));
-        }
-        setHistory(prev => [...prev, { role: "user", content: query }, { role: "assistant", content: r.answer || "" }]);
-      } else {
+      if (false) {} else {
         const r = await api.search(query);
         setResults(r.results || []);
       }
@@ -75,16 +67,7 @@ export default function SearchPage() {
         </p>
       </div>
 
-      <div className="flex justify-center mb-8">
-        <div className="inline-flex bg-neutral-100/80 rounded-full p-1 border border-neutral-200/50">
-          <button className={`px-5 py-2 text-sm rounded-full transition-all font-medium ${mode === "search" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`} onClick={() => switchMode("search")} data-testid="mode-search">
-            <SearchIcon className="h-4 w-4 inline mr-2" /> Search
-          </button>
-          <button className={`px-5 py-2 text-sm rounded-full transition-all font-medium ${mode === "ask" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`} onClick={() => switchMode("ask")} data-testid="mode-ask">
-            <Sparkles className="h-4 w-4 inline mr-2 text-amber-500" /> Ask
-          </button>
-        </div>
-      </div>
+      
 
       <form onSubmit={(e) => { e.preventDefault(); run(q, mode); }} className="relative mb-12 max-w-3xl mx-auto group">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />

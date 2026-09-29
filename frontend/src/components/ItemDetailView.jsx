@@ -173,7 +173,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
     setAsking(true);
     
     // Create a copy of the history *before* adding the current question to send to the API
-    const historyToSend = chatHistory.map(m => ({ role: m.role, content: m.content }));
+    const historyToSend = chatHistory.map(m => ({ role: m.role === "ai" ? "assistant" : m.role, content: m.content }));
     
     setChatHistory(prev => [
       ...prev, 
