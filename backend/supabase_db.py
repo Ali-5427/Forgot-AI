@@ -126,6 +126,7 @@ class SupabaseFind:
 
 class SupabaseDatabase:
     def __init__(self, client: Client):
+        self.supabase = client
         self.users = SupabaseCollection(client, "profiles")
         self.items = SupabaseCollection(client, "items")
         self.login_attempts = SupabaseCollection(client, "login_attempts")
