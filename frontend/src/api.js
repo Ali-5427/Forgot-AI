@@ -84,7 +84,23 @@ export const api = {
   createConversation: (title) => axios.post(`${API}/conversations`, { title }).then((r) => r.data),
   updateConversation: (id, title) => axios.patch(`${API}/conversations/${id}`, { title }).then((r) => r.data),
   deleteConversation: (id) => axios.delete(`${API}/conversations/${id}`).then((r) => r.data),
-  submitFeedback: (message) => axios.post(`${API}/feedback`, { message }).then((r) => r.data),
+  submitFeedback: async (message) => {
+    // 1. Save to Supabase (backend)
+    await axios.post(`${API}/feedback`, { message });
+    // 2. Send Email via Web3Forms (client-side)
+    await fetch("https://api.web3forms.com/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({
+        access_key: "b0e79844-0463-4f1c-bc0e-c6ed8705a776",
+        subject: "?? New Forgot AI Feedback",
+        name: "Forgot AI App",
+        email: "founder@tesima-media.com", // Fallback email if user is guest
+        message: message
+      })
+    });
+    return { success: true };
+  },
   chatV2Stream: async (conversation_id, query, signal) => {
     const t = getToken();
     const headers = {

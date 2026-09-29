@@ -1572,31 +1572,7 @@ async def submit_feedback(payload: FeedbackIn, request: Request, background_task
     except Exception as e:
         logger.error(f"Failed to save feedback to db: {e}")
 
-    # Send Email via Background Task (Web3Forms bypassing Render SMTP blocks)
-    def send_email_task():
-        try:
-            import requests
-            # Using Web3Forms public access key to send email over standard HTTPS (Port 443)
-            # This completely bypasses Render's block on SMTP ports.
-            access_key = "b0e79844-0463-4f1c-bc0e-c6ed8705a776"
-            
-            form_data = {
-                "access_key": access_key,
-                "subject": f"?? New Forgot AI Feedback from {user_email}",
-                "email": user_email,
-                "name": "Forgot AI App",
-                "message": payload.message
-            }
-            
-            response = requests.post("https://api.web3forms.com/submit", json=form_data, timeout=10)
-            if response.status_code == 200:
-                logger.info("Feedback email sent successfully via Web3Forms.")
-            else:
-                logger.error(f"Web3Forms error: {response.text}")
-        except Exception as e:
-            logger.error(f"Failed to send feedback email: {e}")
 
-    background_tasks.add_task(send_email_task)
 
     return {"success": True, "message": "Feedback received"}
 
