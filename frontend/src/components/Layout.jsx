@@ -3,6 +3,7 @@ import { Home, Layers, Search, Settings, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
 import { ItemDetailView } from "./ItemDetailView";
+import { FeedbackWidget } from "./FeedbackWidget";
 
 const nav = [
   { to: "/", label: "Home", Icon: Home, end: true },
@@ -97,6 +98,8 @@ export const Layout = () => {
           </NavLink>
         ))}
       </nav>
+
+      <FeedbackWidget />
     </div>
   );
 };

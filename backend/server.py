@@ -1538,3 +1538,65 @@ async def chat_v2_stream(payload: ChatV2In, lib: str = Depends(resolve_library))
         
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
+
+class FeedbackIn(BaseModel):
+    message: str
+
+@api_router.post("/feedback")
+async def submit_feedback(payload: FeedbackIn, request: Request, background_tasks: BackgroundTasks):
+    # Determine user info
+    try:
+        user = await get_current_user(request)
+        user_id = user["id"]
+        user_email = user.get("email", "anonymous")
+    except Exception:
+        # Fallback to library id if not fully authed, or anonymous
+        token = _bearer(request)
+        user_id = token if token else "anonymous"
+        user_email = "anonymous"
+
+    # Save to Supabase DB (silent fail if error, so user isn't blocked)
+    try:
+        if user_id != "anonymous":
+            await db.supabase.table("feedback").insert({
+                "user_id": user_id,
+                "user_email": user_email,
+                "message": payload.message
+            }).execute()
+        else:
+            await db.supabase.table("feedback").insert({
+                "user_email": user_email,
+                "message": payload.message
+            }).execute()
+    except Exception as e:
+        logger.error(f"Failed to save feedback to db: {e}")
+
+    # Send Email via Background Task
+    def send_email_task():
+        sender = os.environ.get("EMAIL_SENDER")
+        pwd = os.environ.get("EMAIL_PASSWORD")
+        if not sender or not pwd:
+            logger.warning("EMAIL_SENDER or EMAIL_PASSWORD not set. Feedback email skipped.")
+            return
+
+        try:
+            import smtplib, ssl
+            from email.message import EmailMessage
+
+            msg = EmailMessage()
+            msg.set_content(f"Feedback from: {user_email}\n\nMessage:\n{payload.message}")
+            msg['Subject'] = f"?? New Forgot AI Feedback from {user_email}"
+            msg['From'] = sender
+            msg['To'] = sender  # Send to yourself
+
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+                server.login(sender, pwd)
+                server.send_message(msg)
+            logger.info("Feedback email sent successfully.")
+        except Exception as e:
+            logger.error(f"Failed to send feedback email: {e}")
+
+    background_tasks.add_task(send_email_task)
+
+    return {"success": True, "message": "Feedback received"}

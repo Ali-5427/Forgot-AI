@@ -84,6 +84,7 @@ export const api = {
   createConversation: (title) => axios.post(`${API}/conversations`, { title }).then((r) => r.data),
   updateConversation: (id, title) => axios.patch(`${API}/conversations/${id}`, { title }).then((r) => r.data),
   deleteConversation: (id) => axios.delete(`${API}/conversations/${id}`).then((r) => r.data),
+  submitFeedback: (message) => axios.post(`${API}/feedback`, { message }).then((r) => r.data),
   chatV2Stream: async (conversation_id, query, signal) => {
     const t = getToken();
     const headers = {

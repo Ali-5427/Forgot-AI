@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ItemCard } from "@/components/ItemCard";
 import { useItems } from "@/lib/useItems";
 import { useStore } from "@/store";
+import { FeedbackPrompt } from "@/components/FeedbackPrompt";
 
 export default function Home() {
   const { openSave, openItem, togglePin } = useStore();
@@ -21,6 +22,7 @@ export default function Home() {
 
   return (
     <div className="max-w-5xl mx-auto px-8 py-14">
+      <FeedbackPrompt />
       <div className="mb-2 flex items-center justify-between">
         <div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">Forgot AI</h1>
