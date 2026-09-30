@@ -33,6 +33,49 @@ export const ItemDetailView = ({ itemId, onClose }) => {
 
   const [copiedIdx, setCopiedIdx] = useState(null);
 
+  const [rightWidth, setRightWidth] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const containerRef = useRef(null);
+
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDragging || !containerRef.current) return;
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const newLeftWidthPx = e.clientX - containerRect.left;
+      const newRightWidthPct = 100 - ((newLeftWidthPx / containerRect.width) * 100);
+      if (newRightWidthPct >= 20 && newRightWidthPct <= 80) {
+        setRightWidth(newRightWidthPct);
+      }
+    };
+
+    const handleMouseUp = () => setIsDragging(false);
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isDragging]);
+
   const abortControllerRef = useRef(null);
   const chatInputRef = useRef(null);
 
@@ -223,6 +266,16 @@ export const ItemDetailView = ({ itemId, onClose }) => {
 
           <div className="flex items-center gap-1">
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="h-8 px-3 gap-2 mr-2 text-neutral-600 bg-white"
+              title={isCollapsed ? "Open AI Chat" : "Close AI Chat"}
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline font-medium">{isCollapsed ? "Show Chat" : "Hide Chat"}</span>
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               onClick={() => {
@@ -317,10 +370,17 @@ export const ItemDetailView = ({ itemId, onClose }) => {
       </div>
 
       {/* 2-Column Split Content */}
-      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+      <div 
+        className="flex flex-col md:flex-row flex-1 overflow-hidden" 
+        ref={containerRef}
+        style={{ 
+          '--left-w': isCollapsed ? '100%' : `${100 - rightWidth}%`, 
+          '--right-w': isCollapsed ? '0%' : `${rightWidth}%` 
+        }}
+      >
         
         {/* LEFT COLUMN: Original Content */}
-        <div className="md:w-1/2 flex flex-col overflow-y-auto border-r border-neutral-100 bg-neutral-50/50 p-4 md:p-6">
+        <div className={`w-full md:w-[var(--left-w)] shrink-0 flex flex-col overflow-y-auto bg-neutral-50/50 p-4 md:p-6 ${!isDragging ? 'transition-all duration-300 ease-in-out' : ''}`}>
           <h3 className="text-[11px] uppercase tracking-widest font-bold text-neutral-400 mb-4 flex items-center gap-3 shrink-0">
             <span className="h-px w-6 bg-neutral-200"></span>
             Original Source
@@ -334,7 +394,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           )}
           
           {item.content_type === "text" && (
-            <div className="relative group text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-5 md:p-6 shadow-sm font-serif max-h-[70vh] overflow-auto">
+            <div className="relative group text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-5 md:p-6 shadow-sm font-serif ">
               <div className="sticky top-0 float-right mb-2 ml-4 z-10 h-0 overflow-visible pointer-events-none">
                 <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="pointer-events-auto -mt-3 -mr-3 h-8 w-8 p-0 text-neutral-500 hover:text-neutral-900 bg-white/90 backdrop-blur-md border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm rounded-lg" title="Copy">
                   {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
@@ -345,7 +405,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           )}
           
           {item.content_type === "url" && (
-            <div className="bg-white border border-neutral-200/60 rounded-2xl shadow-sm flex flex-col group relative max-h-[70vh] overflow-auto">
+            <div className="bg-white border border-neutral-200/60 rounded-2xl shadow-sm flex flex-col group relative ">
               {item.image_path && (
                 <div className="w-full h-48 bg-neutral-100 border-b border-neutral-200/60 overflow-hidden shrink-0">
                   <img src={item.image_path} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />
@@ -378,8 +438,18 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           )}
         </div>
 
+        {/* DRAG HANDLE */}
+        {!isCollapsed && (
+          <div 
+            className="hidden md:flex w-1.5 hover:w-2 bg-neutral-200/50 hover:bg-indigo-400 cursor-col-resize shrink-0 z-10 items-center justify-center transition-colors"
+            onMouseDown={handleMouseDown}
+          >
+            <div className="w-0.5 h-8 bg-neutral-400/50 rounded-full" />
+          </div>
+        )}
+
         {/* RIGHT COLUMN: AI Analysis & Chat */}
-        <div className="md:w-1/2 flex flex-col overflow-hidden bg-white">
+        <div className={`w-full md:w-[var(--right-w)] shrink-0 flex flex-col overflow-hidden bg-white border-l border-neutral-200/50 ${isCollapsed ? 'hidden md:flex opacity-0 pointer-events-none' : 'opacity-100'} ${!isDragging ? 'transition-all duration-300 ease-in-out' : ''}`}>
           
           <div className="flex-1 overflow-y-auto p-8 space-y-10">
             {/* AI Summary Section (Only show if not editing, or always show editor) */}
