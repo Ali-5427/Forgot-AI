@@ -265,16 +265,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           </Button>
 
           <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="h-8 px-3 gap-2 mr-2 text-neutral-600 bg-white"
-              title={isCollapsed ? "Open AI Chat" : "Close AI Chat"}
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline font-medium">{isCollapsed ? "Show Chat" : "Hide Chat"}</span>
-            </Button>
+            
             <Button
               variant="ghost"
               size="sm"
