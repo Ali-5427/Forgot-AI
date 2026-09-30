@@ -85,17 +85,19 @@ export const api = {
   updateConversation: (id, title) => axios.patch(`${API}/conversations/${id}`, { title }).then((r) => r.data),
   deleteConversation: (id) => axios.delete(`${API}/conversations/${id}`).then((r) => r.data),
   submitFeedback: async (message) => {
-    // 1. Save to Supabase (backend)
-    await axios.post(`${API}/feedback`, { message });
+    // 1. Save to Supabase (backend) and get the user's real email
+    const res = await axios.post(`${API}/feedback`, { message });
+    const userEmail = res.data.user_email || "anonymous";
+
     // 2. Send Email via Web3Forms (client-side)
     await fetch("https://api.web3forms.com/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify({
         access_key: "b0e79844-0463-4f1c-bc0e-c6ed8705a776",
-        subject: "?? New Forgot AI Feedback",
-        name: "Forgot AI App",
-        email: "founder@tesima-media.com", // Fallback email if user is guest
+        subject: `?? New Forgot AI Feedback from ${userEmail}`,
+        name: userEmail === "anonymous" ? "Guest User" : "Forgot AI User",
+        email: userEmail === "anonymous" ? "guest@forgot-ai.com" : userEmail,
         message: message
       })
     });

@@ -1574,7 +1574,7 @@ async def submit_feedback(payload: FeedbackIn, request: Request, background_task
 
 
 
-    return {"success": True, "message": "Feedback received"}
+    return {"success": True, "message": "Feedback received", "user_email": user_email}
 
 
 # Register all routes
