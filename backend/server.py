@@ -797,24 +797,14 @@ async def register(payload: AuthIn, request: Request):
     if len(payload.password) < 8:
         raise HTTPException(400, "Password must be at least 8 characters")
     try:
-        # --- THE FIX: Create a dedicated Admin Client ---
-        supabase_url = os.environ.get("SUPABASE_URL")
-        service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-        
-        if not service_key:
-            raise HTTPException(500, "Server is missing SUPABASE_SERVICE_ROLE_KEY!")
-            
-        supabase_admin = make_supabase_client(supabase_url, service_key)
-        
-        # Use supabase_admin instead of supabase here!
-        created = supabase_admin.auth.admin.create_user({
+        created = supabase.auth.sign_up({
             "email": email,
             "password": payload.password,
-            "email_confirm": True,
-            "user_metadata": {"name": email.split("@")[0]},
+            "options": {
+                "data": {"name": email.split("@")[0]}
+            }
         })
         auth_user = created.user
-        # ------------------------------------------------
 
     except Exception as e:
         if "already" in str(e).lower() or "duplicate" in str(e).lower():
@@ -831,13 +821,7 @@ async def register(payload: AuthIn, request: Request):
     try:
         await db.users.insert_one(user)
     except Exception as e:
-        logger.warning(f"db.users.insert_one failed in register (likely RLS): {e}. Using admin client.")
-        def _admin_insert():
-            try:
-                supabase_admin.table("profiles").insert(user).execute()
-            except Exception:
-                supabase_admin.table("users").insert(user).execute()
-        await asyncio.to_thread(_admin_insert)
+        logger.warning(f"db.users.insert_one failed in register: {e}")
     
     # Use the regular anon client to sign them in after creation
     session = supabase.auth.sign_in_with_password({"email": email, "password": payload.password})
@@ -864,8 +848,7 @@ async def login(payload: AuthIn, request: Request):
         if locked_until and locked_until > datetime.now(timezone.utc):
             raise HTTPException(429, "Too many attempts. Try again in a few minutes.")
     try:
-        temp_client = make_supabase_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
-        session = temp_client.auth.sign_in_with_password({"email": email, "password": payload.password})
+        session = supabase.auth.sign_in_with_password({"email": email, "password": payload.password})
         auth_user = session.user
     except Exception:
         count = (att.get("count", 0) if att else 0) + 1
@@ -888,13 +871,7 @@ async def login(payload: AuthIn, request: Request):
         try:
             await db.users.insert_one(user)
         except Exception as e:
-            logger.warning(f"Failed to insert user into db.users (likely RLS): {e}. Falling back to admin client.")
-            def _admin_insert():
-                try:
-                    temp_client.table("profiles").insert(user).execute()
-                except Exception:
-                    temp_client.table("profiles").insert(user).execute()
-            await asyncio.to_thread(_admin_insert)
+            logger.warning(f"Failed to insert user into db.users: {e}")
     await _record_session(user["id"], session.session.access_token, user.get("token_version", 0))
 
     anon = (request.headers.get("X-Library-Id") or "").strip()
@@ -910,8 +887,7 @@ async def login(payload: AuthIn, request: Request):
 @api_router.post("/auth/refresh")
 async def refresh_session(payload: RefreshIn):
     try:
-        temp_client = make_supabase_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
-        session = temp_client.auth.refresh_session(payload.refresh_token)
+        session = supabase.auth.refresh_session(payload.refresh_token)
         auth_user = session.user
     except Exception:
         raise HTTPException(401, "Invalid or expired refresh token")
