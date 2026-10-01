@@ -10,7 +10,7 @@ import ipaddress
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
-from typing import List, Optional, Annotated
+from typing import List, Optional, Annotated, Literal
 from collections import defaultdict
 import asyncio
 import aiohttp
@@ -22,6 +22,13 @@ from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
 from supabase_db import SupabaseDatabase, create_supabase_client
 from supabase import create_client as make_supabase_client
+from billing import (
+    CheckoutIn,
+    SupabaseBillingStore,
+    billing_public_fields,
+    create_checkout_url,
+    process_dodo_webhook,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -275,8 +282,36 @@ class ImportIn(BaseModel):
 
 
 # ---------------- Auth dependencies ----------------
-def public_user(u: dict) -> dict:
-    return {"id": u["id"], "email": u["email"], "name": u.get("name", ""), "created_at": u.get("created_at")}
+_billing_store = None
+
+
+def get_billing_store():
+    global _billing_store
+    if _billing_store is None:
+        _billing_store = SupabaseBillingStore(db.supabase)
+    return _billing_store
+
+
+def public_user(u: dict, billing: Optional[dict] = None) -> dict:
+    summary = billing_summary(billing)
+    return {
+        "id": u["id"],
+        "email": u["email"],
+        "name": u.get("name", ""),
+        "created_at": u.get("created_at"),
+        "plan_type": summary["plan_type"],
+        "status": summary["status"],
+        "current_period_end": summary["current_period_end"],
+    }
+
+
+async def public_user_with_billing(u: dict) -> dict:
+    try:
+        row = await asyncio.to_thread(get_billing_store().get_subscription, u["id"])
+    except Exception as e:
+        logger.warning("Failed to load billing state: %s", e)
+        row = None
+    return public_user(u, row)
 
 
 def _bearer(request: Request) -> Optional[str]:
@@ -813,7 +848,7 @@ async def register(payload: AuthIn, request: Request):
     return {
         "token": session.session.access_token,
         "refresh_token": session.session.refresh_token,
-        "user": public_user(user),
+        "user": await public_user_with_billing(user),
         "imported": imported,
     }
 
@@ -858,7 +893,7 @@ async def login(payload: AuthIn, request: Request):
                 try:
                     temp_client.table("profiles").insert(user).execute()
                 except Exception:
-                    temp_client.table("users").insert(user).execute()
+                    temp_client.table("profiles").insert(user).execute()
             await asyncio.to_thread(_admin_insert)
     await _record_session(user["id"], session.session.access_token, user.get("token_version", 0))
 
@@ -867,7 +902,7 @@ async def login(payload: AuthIn, request: Request):
     return {
         "token": session.session.access_token,
         "refresh_token": session.session.refresh_token,
-        "user": public_user(user),
+        "user": await public_user_with_billing(user),
         "importable_count": count,
     }
 
@@ -887,13 +922,13 @@ async def refresh_session(payload: RefreshIn):
     return {
         "token": session.session.access_token,
         "refresh_token": session.session.refresh_token,
-        "user": public_user(user),
+        "user": await public_user_with_billing(user),
     }
 
 
 @api_router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
-    return public_user(user)
+    return await public_user_with_billing(user)
 
 
 @api_router.post("/auth/logout")
@@ -914,7 +949,7 @@ async def export_data(user: dict = Depends(get_current_user)):
     # Remove embeddings from export to keep file size small
     for item in items:
         item.pop("embedding", None)
-    return {"user": public_user(user), "items": items}
+    return {"user": await public_user_with_billing(user), "items": items}
 
 @api_router.delete("/account")
 async def delete_account(request: Request, user: dict = Depends(get_current_user)):
@@ -1575,6 +1610,49 @@ async def submit_feedback(payload: FeedbackIn, request: Request, background_task
 
 
     return {"success": True, "message": "Feedback received", "user_email": user_email}
+
+
+@api_router.post("/billing/checkout")
+async def billing_checkout(payload: CheckoutIn, user: dict = Depends(get_current_user)):
+    try:
+        checkout_url = await asyncio.to_thread(create_checkout_url, user, payload.plan)
+    except ValueError:
+        raise HTTPException(400, "Invalid plan")
+    except RuntimeError as e:
+        logger.exception("Billing checkout is not configured")
+        raise HTTPException(503, "Billing is not configured") from e
+    except Exception as e:
+        logger.exception("Failed to create Dodo checkout session")
+        raise HTTPException(502, "Unable to start checkout") from e
+    return {"checkout_url": checkout_url}
+
+
+@api_router.post("/webhooks/dodo")
+async def dodo_webhook(request: Request):
+    raw = await request.body()
+    headers = {
+        "webhook-id": request.headers.get("webhook-id", ""),
+        "webhook-signature": request.headers.get("webhook-signature", ""),
+        "webhook-timestamp": request.headers.get("webhook-timestamp", ""),
+    }
+    try:
+        unwrapped = await asyncio.to_thread(unwrap_webhook, raw, headers)
+    except Exception:
+        raise HTTPException(401, "Invalid signature")
+    event_type, data = event_from_unwrapped(unwrapped)
+    webhook_id = headers["webhook-id"]
+    try:
+        await asyncio.to_thread(
+            process_verified_webhook,
+            get_billing_store(),
+            webhook_id,
+            event_type,
+            data,
+        )
+    except Exception:
+        logger.exception("Failed to process Dodo webhook %s", event_type)
+        raise HTTPException(500, "Webhook processing failed")
+    return {"received": True}
 
 
 # Register all routes

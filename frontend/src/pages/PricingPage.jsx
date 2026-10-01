@@ -36,7 +36,7 @@ export default function PricingPage() {
   const FAQS = [
     {
       q: "Can I try Forgot AI before paying?",
-      a: "Yes. New users can start with a 7-day free trial. After the trial, you can continue with Pro or choose Founding Lifetime access."
+      a: "Yes. Pro includes a 7-day free trial. A payment method is required to start the trial, but you are not charged until it ends. After the trial, Pro continues at $5/month unless you cancel, or you can choose Founding Lifetime access."
     },
     {
       q: "How much is Pro?",
@@ -48,11 +48,11 @@ export default function PricingPage() {
     },
     {
       q: "Can I cancel Pro?",
-      a: "Yes. Pro can be cancelled anytime through your account settings once billing is connected."
+      a: "Yes. You can cancel Pro to stop future charges. In-app cancellation from Settings is not available yet."
     },
     {
       q: "What happens after my trial ends?",
-      a: "Your trial ends after 7 days. You can then continue with the paid Pro subscription if you have an active subscription, or choose another available paid option."
+      a: "After 7 days, Pro continues automatically at $5/month unless you cancel. You can also choose Founding Lifetime for a one-time $49 payment."
     },
     {
       q: "Will the price change?",
@@ -70,10 +70,10 @@ export default function PricingPage() {
             Forgot AI is simple to use, and simple to pay for.
           </h1>
           <p className="text-lg text-ink-muted max-w-2xl mx-auto">
-            Start free for 7 days. Keep using Forgot AI for $5/month, or get Founding Lifetime access for $49 once.
+            Start a 7-day free trial of Pro for $5/month, or get Founding Lifetime access for $49 once. A payment method is required to start the trial.
           </p>
           <div className="mt-8 inline-block bg-cream rounded-full px-4 py-2 text-sm font-medium border border-line">
-            Enjoy a full 7-day free trial. No credit card required to start.
+            7-day free trial. A payment method is required. You will not be charged until the trial ends.
           </div>
         </Reveal>
       </section>
@@ -90,7 +90,7 @@ export default function PricingPage() {
                   <span className="text-4xl font-bold">$5</span>
                   <span className="text-ink-muted">/month</span>
                 </div>
-                <p className="text-sm font-medium text-ink-muted">7-day free trial</p>
+                <p className="text-sm font-medium text-ink-muted">7-day free trial. Payment method required.</p>
               </div>
               <Button 
                 onClick={() => handleCheckout(STRIPE_PRO_MONTHLY_PRICE_ID)}
@@ -108,7 +108,7 @@ export default function PricingPage() {
                 ))}
               </div>
               <p className="text-xs text-ink-muted text-center mt-auto">
-                7 days free. Then $5/month. Cancel anytime.
+                7 days free, then $5/month unless cancelled. A payment method is required to start.
               </p>
             </div>
           </Reveal>

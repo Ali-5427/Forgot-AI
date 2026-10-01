@@ -131,6 +131,12 @@ OLLAMA_API_KEY=your_ollama_key_here
 OLLAMA_BASE_URL=https://ollama.com/api/generate
 CORS_ORIGINS=http://localhost:3000
 STORAGE_BUCKET=forgot-ai-assets
+DODO_PAYMENTS_API_KEY=your_dodo_test_api_key
+DODO_PAYMENTS_WEBHOOK_KEY=your_dodo_webhook_signing_secret
+DODO_PAYMENTS_ENVIRONMENT=test_mode
+DODO_PRODUCT_PRO=pdt_0NolIEGrKG8a3MsswcefH
+DODO_PRODUCT_LIFETIME=pdt_0NolIEHwY2k9URmRzEddS
+DODO_PAYMENTS_RETURN_URL=http://localhost:3000/checkout/success
 ```
 
 Start the API:

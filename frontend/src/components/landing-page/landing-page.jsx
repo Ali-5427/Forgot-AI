@@ -65,7 +65,7 @@ const FAQ = [
   },
   {
     q: "Is it free to try?",
-    a: "Yes. Open the app and start with whatever you already have.",
+    a: "Yes. Pro includes a 7-day free trial. A payment method is required to start the trial, and you will not be charged until it ends. After that, Pro is $5/month unless you cancel.",
   },
   {
     q: "How is this different from bookmarks?",
