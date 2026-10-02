@@ -53,6 +53,17 @@ export const ItemCard = ({ item, onClick, onPin }) => {
           <span className="text-xs text-muted-foreground">{timeAgo(item.created_at)}</span>
         </div>
 
+                {item.group_name && (
+          <span 
+            className="inline-block px-2 py-0.5 mb-2 w-max text-[11px] font-bold rounded-md"
+            style={{ 
+              backgroundColor: `${item.group_color}20`,
+              color: item.group_color 
+            }}
+          >
+            {item.group_name}
+          </span>
+        )}
         <h3 className="text-sm font-semibold leading-snug line-clamp-2 text-foreground pr-6">{item.title}</h3>
 
         {item.status === "processing" ? (

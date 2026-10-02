@@ -124,6 +124,11 @@ export const api = {
   me: () => axios.get(`${API}/auth/me`).then((r) => r.data),
   logout: () => axios.post(`${API}/auth/logout`).then((r) => r.data),
   importLibrary: (library_id) => axios.post(`${API}/auth/import`, { library_id }).then((r) => r.data),
+    // Groups
+  getGroups: () => axios.get(`${API}/groups`).then((r) => r.data),
+  createGroup: (name, color) => axios.post(`${API}/groups`, { name, color }).then((r) => r.data),
+  updateGroup: (id, payload) => axios.patch(`${API}/groups/${id}`, payload).then((r) => r.data),
+  deleteGroup: (id) => axios.delete(`${API}/groups/${id}`).then((r) => r.data),
   // items
   listItems: () => axios.get(`${API}/items`).then((r) => r.data),
   getItem: (id) => axios.get(`${API}/items/${id}`).then((r) => r.data),
