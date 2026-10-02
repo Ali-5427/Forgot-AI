@@ -14,8 +14,17 @@ export const StoreProvider = ({ children }) => {
   
   // Global items cache
   const [items, setItems] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const timer = useRef(null);
+
+  const loadGroups = useCallback(async () => {
+    if (!user) return;
+    try {
+      const g = await api.getGroups();
+      setGroups(g);
+    } catch (e) {}
+  }, [user]);
 
   const loadItems = useCallback(async () => {
     if (!user) return;
@@ -36,6 +45,7 @@ export const StoreProvider = ({ children }) => {
     let ws = null;
 
     if (user) {
+      loadGroups();
       loadItems();
       
       // Connect to Live Sync WebSocket

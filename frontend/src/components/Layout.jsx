@@ -15,22 +15,17 @@ const nav = [
 ];
 
 export const Layout = () => {
-  const { openSave, detailOpen, detailId, setDetailOpen } = useStore();
+  const { openSave, detailOpen, detailId, setDetailOpen, groups, reloadGroups } = useStore();
   
-  const [groups, setGroups] = useState([]);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupColor, setNewGroupColor] = useState("#3b82f6");
 
-  useEffect(() => {
-    api.getGroups().then(setGroups).catch(console.error);
-  }, []);
-
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) return;
     try {
-      const created = await api.createGroup(newGroupName.trim(), newGroupColor);
-      setGroups([created, ...groups]);
+      await api.createGroup(newGroupName.trim(), newGroupColor);
+      await reloadGroups();
       setIsCreatingGroup(false);
       setNewGroupName("");
     } catch (e) {

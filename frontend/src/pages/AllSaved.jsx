@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Layers, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ItemCard } from "@/components/ItemCard";
@@ -14,7 +15,9 @@ const TYPES = [
 ];
 
 export default function AllSaved() {
-  const { openSave, openItem, togglePin } = useStore();
+  const [searchParams] = useSearchParams();
+  const activeGroupId = searchParams.get("group");
+  const { openSave, openItem, togglePin, groups } = useStore();
   const { items, loading } = useItems();
   const [type, setType] = useState("all");
   const [recent, setRecent] = useState(false);
@@ -32,6 +35,7 @@ export default function AllSaved() {
   const filtered = useMemo(() => {
     const now = Date.now();
     let list = items.filter((i) => {
+      if (activeGroupId && i.group_id !== activeGroupId) return false;
       if (type !== "all" && i.content_type !== type) return false;
       if (recent && now - new Date(i.created_at).getTime() > WEEK_MS) return false;
       if (category !== "all" && i.category !== category) return false;
