@@ -310,7 +310,7 @@ def public_user(u: dict, billing: Optional[dict] = None) -> dict:
 
 async def public_user_with_billing(u: dict) -> dict:
     try:
-        row = await asyncio.to_thread(get_billing_store().get_subscription, u["id"])
+        row = await get_billing_store().get_subscription(u["id"])
     except Exception as e:
         logger.warning("Failed to load billing state: %s", e)
         row = None
