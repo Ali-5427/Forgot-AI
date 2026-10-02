@@ -198,6 +198,14 @@ def text_hash(t: str) -> str:
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
+class GroupCreate(BaseModel):
+    name: str
+    color: Optional[str] = "#808080"
+
+class GroupUpdate(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
+
 class SavedItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -219,6 +227,9 @@ class SavedItem(BaseModel):
     dedup_key: Optional[str] = None
     status: str = "processing"
     pinned: bool = False
+    group_id: Optional[str] = None
+    group_name: Optional[str] = None
+    group_color: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -227,6 +238,8 @@ class TextSaveIn(BaseModel):
     source_url: Optional[str] = None
     source_title: Optional[str] = None
     user_note: Optional[str] = None
+    group_id: Optional[str] = None
+    new_group_name: Optional[str] = None
 
 
 class UrlSaveIn(BaseModel):
@@ -234,12 +247,18 @@ class UrlSaveIn(BaseModel):
     context_text: Optional[str] = None
     source_title: Optional[str] = None
     user_note: Optional[str] = None
+    group_id: Optional[str] = None
+    new_group_name: Optional[str] = None
 
 
 class ItemUpdate(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
     category: Optional[str] = None
+    user_note: Optional[str] = None
+    group_id: Optional[str] = None
+    group_name: Optional[str] = None
+    group_color: Optional[str] = None
     keywords: Optional[List[str]] = None
 
 
@@ -962,6 +981,81 @@ async def do_import(payload: ImportIn, request: Request, user: dict = Depends(ge
     return {"imported": imported}
 
 
+
+async def _handle_new_group(payload, lib, user_id):
+    group_id = getattr(payload, 'group_id', None)
+    new_group_name = getattr(payload, 'new_group_name', None)
+    
+    if new_group_name:
+        group_id = str(uuid.uuid4())
+        group_color = getattr(payload, 'new_group_color', '#808080')
+        db.supabase.table("groups").insert({
+            "id": group_id,
+            "library_id": lib,
+            "user_id": user_id,
+            "name": new_group_name,
+            "color": group_color
+        }).execute()
+        return group_id, new_group_name, group_color
+        
+    if group_id:
+        res = db.supabase.table("groups").select("*").eq("id", group_id).execute()
+        if res.data:
+            return group_id, res.data[0]["name"], res.data[0]["color"]
+            
+    return None, None, None
+
+@api_router.get("/groups")
+async def get_groups(lib: str = Depends(resolve_library)):
+    res = db.supabase.table("groups").select("*").eq("library_id", lib).order("created_at", desc=True).execute()
+    return res.data or []
+
+@api_router.post("/groups")
+async def create_group(payload: GroupCreate, request: Request, lib: str = Depends(resolve_library)):
+    user_id = lib  # Simplified fallback
+    try:
+        user = await get_current_user(request)
+        user_id = user["id"]
+    except Exception:
+        pass
+    
+    group_id = str(uuid.uuid4())
+    res = db.supabase.table("groups").insert({
+        "id": group_id,
+        "library_id": lib,
+        "user_id": user_id,
+        "name": payload.name,
+        "color": payload.color
+    }).execute()
+    return res.data[0]
+
+@api_router.patch("/groups/{group_id}")
+async def update_group(group_id: str, payload: GroupUpdate, lib: str = Depends(resolve_library)):
+    updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not updates:
+        return {"ok": True}
+    res = db.supabase.table("groups").update(updates).eq("id", group_id).eq("library_id", lib).execute()
+    
+    # Sync group name/color across items
+    if "name" in updates or "color" in updates:
+        item_updates = {}
+        if "name" in updates: item_updates["group_name"] = updates["name"]
+        if "color" in updates: item_updates["group_color"] = updates["color"]
+        await db.items.update_many({"group_id": group_id, "library_id": lib}, {"$set": item_updates})
+        
+    return res.data[0] if res.data else None
+
+@api_router.delete("/groups/{group_id}")
+async def delete_group(group_id: str, lib: str = Depends(resolve_library)):
+    # Items' group_id will be set to NULL due to ON DELETE SET NULL, 
+    # but for mongo we need to manually update them.
+    await db.items.update_many(
+        {"group_id": group_id, "library_id": lib}, 
+        {"$set": {"group_id": None, "group_name": None, "group_color": None}}
+    )
+    db.supabase.table("groups").delete().eq("id", group_id).eq("library_id", lib).execute()
+    return {"ok": True}
+
 # ---------------- Item routes ----------------
 @api_router.get("/")
 async def api_root():
@@ -990,10 +1084,12 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str =
     limiter.check(lib, 60, 60)
     if not payload.text.strip():
         raise HTTPException(400, "Text is empty")
+    group_id, group_name, group_color = await _handle_new_group(payload, lib, lib)
     item = SavedItem(library_id=lib, content_type="text", original_text=payload.text,
                      source_url=payload.source_url, source_title=payload.source_title,
                      source_domain=domain_of(payload.source_url) if payload.source_url else None,
                      user_note=payload.user_note,
+                     group_id=group_id, group_name=group_name, group_color=group_color,
                      dedup_key=text_hash(payload.text), title=payload.text.strip()[:60])
     values = item.model_dump()
     values["owner_user_id"] = lib
@@ -1011,10 +1107,12 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
         raise HTTPException(400, "URL is empty")
     if not url.startswith("http"):
         url = "https://" + url
+    group_id, group_name, group_color = await _handle_new_group(payload, lib, lib)
     item = SavedItem(library_id=lib, content_type="url", source_url=url,
                      original_text=payload.context_text, source_title=payload.source_title,
                      source_domain=domain_of(url), dedup_key=normalize_url(url), title=url[:60],
-                     user_note=payload.user_note)
+                     user_note=payload.user_note,
+                     group_id=group_id, group_name=group_name, group_color=group_color)
     values = item.model_dump()
     values["owner_user_id"] = lib
     await db.items.insert_one(values)
@@ -1044,10 +1142,20 @@ async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
         logger.error(f"Upload failed: {e}")
         raise HTTPException(500, "Upload failed")
 
+    
+    # For images, we can pack it into an object that resembles payload
+    class _ImgPayload:
+        pass
+    p = _ImgPayload()
+    p.group_id = None # could be pulled from form if needed later
+    p.new_group_name = None
+    group_id, group_name, group_color = await _handle_new_group(p, lib, lib)
+    
     item = SavedItem(library_id=lib, content_type="image", image_path=stored_path,
                      source_url=source_url, source_title=source_title,
                      source_domain=domain_of(source_url) if source_url else None,
                      user_note=user_note,
+                     group_id=group_id, group_name=group_name, group_color=group_color,
                      title="Image")
     values = item.model_dump()
     values["owner_user_id"] = lib
