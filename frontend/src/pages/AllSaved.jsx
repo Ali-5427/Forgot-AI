@@ -47,7 +47,7 @@ export default function AllSaved() {
       return sort === "newest" ? db - da : da - db;
     });
     return list;
-  }, [items, type, recent, category, sort]);
+  }, [items, type, recent, category, sort, activeGroupId]);
 
   const chip = (active) =>
     `text-xs rounded-full px-3 py-1.5 border transition-colors ${

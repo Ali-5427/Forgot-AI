@@ -89,7 +89,7 @@ export const StoreProvider = ({ children }) => {
       clearTimeout(timer.current);
       if (ws) ws.close();
     };
-  }, [user, loadItems]);
+  }, [user, loadItems, loadGroups]);
 
   const openSave = () => setSaveOpen(true);
   const openItem = (item) => {
