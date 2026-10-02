@@ -21,7 +21,7 @@ export const ItemCard = ({ item, onClick, onPin }) => {
       // Let's pass them all.
       let updatePayload = { group_id: null, group_name: null, group_color: null };
       if (groupId) {
-        const g = groups.find(x => x.id === groupId);
+        const g = (groups || []).find(x => x.id === groupId);
         if (g) updatePayload = { group_id: g.id, group_name: g.name, group_color: g.color };
       }
       
@@ -80,7 +80,7 @@ export const ItemCard = ({ item, onClick, onPin }) => {
             >
               No Group (Unorganized)
             </button>
-            {groups.map(g => (
+            {groups?.map(g => (
               <button 
                 key={g.id}
                 onClick={(e) => handleMove(e, g.id)}

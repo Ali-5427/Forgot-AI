@@ -75,8 +75,8 @@ export const Layout = () => {
             <button onClick={() => setIsCreatingGroup(true)} className="hover:text-neutral-900" title="Create Group"><Plus className="h-3.5 w-3.5" /></button>
           </div>
           <nav className="flex flex-col gap-0.5 max-h-[30vh] overflow-y-auto">
-            {groups.length === 0 && <div className="text-xs text-neutral-400 px-2 py-1">No groups yet</div>}
-            {groups.map(g => (
+            {groups?.length === 0 && <div className="text-xs text-neutral-400 px-2 py-1">No groups yet</div>}
+            {groups?.map(g => (
               <NavLink
                 key={g.id}
                 to={`/all?group=${g.id}`}

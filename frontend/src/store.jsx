@@ -125,6 +125,7 @@ export const StoreProvider = ({ children }) => {
   return (
     <StoreContext.Provider
       value={{
+        groups, reloadGroups: loadGroups,
         saveOpen, setSaveOpen,
         detailId, detailOpen, setDetailOpen,
         items, loading, reloadItems: loadItems,
