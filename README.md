@@ -131,6 +131,8 @@ OLLAMA_API_KEY=your_ollama_key_here
 OLLAMA_BASE_URL=https://ollama.com/api/generate
 CORS_ORIGINS=http://localhost:3000
 STORAGE_BUCKET=forgot-ai-assets
+
+# Dodo Payments (test mode only)
 DODO_PAYMENTS_API_KEY=your_dodo_test_api_key
 DODO_PAYMENTS_WEBHOOK_KEY=your_dodo_webhook_signing_secret
 DODO_PAYMENTS_ENVIRONMENT=test_mode
@@ -138,6 +140,28 @@ DODO_PRODUCT_PRO=pdt_0NolIEGrKG8a3MsswcefH
 DODO_PRODUCT_LIFETIME=pdt_0NolIEHwY2k9URmRzEddS
 DODO_PAYMENTS_RETURN_URL=http://localhost:3000/checkout/success
 ```
+
+**Important:** For production deployment, update `DODO_PAYMENTS_RETURN_URL` to your deployed frontend URL (e.g., `https://your-app.vercel.app/checkout/success`).
+
+### Billing Setup
+
+To enable paid plans with Dodo Payments:
+
+1. **Apply the billing migration** to your Supabase project:
+   ```bash
+   # In the Supabase SQL editor, run the contents of:
+   backend/migrations/004_billing.sql
+   ```
+   This migration is additive and safe to re-run if already applied.
+
+2. **Configure the webhook** in the Dodo Payments dashboard:
+   - Webhook URL: `https://your-backend-url.com/api/webhooks/dodo`
+   - For local development, use a tunneling service like ngrok to expose your local backend
+   - Events to subscribe to: `payment.succeeded`, `payment.failed`, `subscription.active`, `subscription.renewed`, `subscription.cancelled`, `subscription.on_hold`, `subscription.failed`, `subscription.expired`, `subscription.updated`
+
+3. **Set environment variables** on Render (or your deployment platform):
+   - All `DODO_*` variables from the .env file above
+   - Ensure `DODO_PAYMENTS_ENVIRONMENT=test_mode` for testing
 
 Start the API:
 

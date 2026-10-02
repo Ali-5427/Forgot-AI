@@ -1,20 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 import { Reveal } from "@/components/landing-page/reveal";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { api, getToken } from "@/api";
 
 export default function PricingPage() {
   const navigate = useNavigate();
-  const STRIPE_PRO_MONTHLY_PRICE_ID = 'price_placeholder_pro_monthly';
-  const STRIPE_LIFETIME_PRICE_ID = 'price_placeholder_lifetime';
+  const [loadingPlan, setLoadingPlan] = useState(null);
+  const [error, setError] = useState(null);
 
-  const handleCheckout = (priceId) => {
-    // Placeholder handler for Stripe Checkout
-    alert(`Stripe Checkout will be connected here.\nPrice ID: ${priceId}`);
-    // Simulate flow
-    // navigate('/checkout/success');
+  const handleCheckout = async (plan) => {
+    const token = getToken();
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    if (loadingPlan) return;
+    setLoadingPlan(plan);
+    setError(null);
+
+    try {
+      const response = await api.billingCheckout(plan);
+      if (response.checkout_url) {
+        window.location.href = response.checkout_url;
+      } else {
+        setError('Failed to start checkout. Please try again.');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      if (err.response?.status === 401) {
+        navigate('/login');
+      } else if (err.response?.status === 503) {
+        setError('Billing is not configured. Please contact support.');
+      } else {
+        setError('Unable to start checkout. Please try again.');
+      }
+    } finally {
+      setLoadingPlan(null);
+    }
   };
 
   const PRO_FEATURES = [
@@ -62,6 +88,15 @@ export default function PricingPage() {
 
   return (
     <div className="w-full pb-24 text-ink">
+      {/* Error Display */}
+      {error && (
+        <div className="max-w-4xl mx-auto px-5 pt-8">
+          <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 text-sm">
+            {error}
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="pt-24 pb-16 px-5 sm:px-8 max-w-4xl mx-auto text-center">
         <Reveal>
@@ -92,12 +127,13 @@ export default function PricingPage() {
                 </div>
                 <p className="text-sm font-medium text-ink-muted">7-day free trial. Payment method required.</p>
               </div>
-              <Button 
-                onClick={() => handleCheckout(STRIPE_PRO_MONTHLY_PRICE_ID)}
+              <Button
+                onClick={() => handleCheckout('pro')}
+                disabled={loadingPlan === 'pro'}
                 variant="outline"
                 className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper"
               >
-                Start 7-day free trial
+                {loadingPlan === 'pro' ? 'Starting trial...' : 'Start 7-day free trial'}
               </Button>
               <div className="space-y-4 flex-1 mb-8">
                 {PRO_FEATURES.map((feature, i) => (
@@ -128,12 +164,13 @@ export default function PricingPage() {
                 </div>
                 <p className="text-sm font-medium text-ink-muted">one-time</p>
               </div>
-              <Button 
-                onClick={() => handleCheckout(STRIPE_LIFETIME_PRICE_ID)}
+              <Button
+                onClick={() => handleCheckout('lifetime')}
+                disabled={loadingPlan === 'lifetime'}
                 variant="outline"
                 className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper text-ink"
               >
-                Get Lifetime Access
+                {loadingPlan === 'lifetime' ? 'Processing...' : 'Get Lifetime Access'}
               </Button>
               <div className="space-y-4 flex-1 mb-8">
                 {LIFETIME_FEATURES.map((feature, i) => (

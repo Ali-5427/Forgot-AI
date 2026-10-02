@@ -485,3 +485,35 @@ async def process_dodo_webhook(raw_body: bytes, headers: dict, store, client=Non
     except Exception:
         await store.complete_webhook(webhook_id, "failed")
         raise
+
+
+def billing_summary(billing_row: Optional[dict]) -> dict:
+    """Extract public billing fields from a subscription row."""
+    return billing_public_fields(billing_row)
+
+
+def event_from_unwrapped(unwrapped: Any) -> tuple[str, dict]:
+    """Extract event_type and data from an unwrapped webhook payload."""
+    event_type = event_type_of(unwrapped)
+    data = event_data_of(unwrapped)
+    return event_type, data
+
+
+def process_verified_webhook(store, webhook_id: str, event_type: str, data: dict) -> dict:
+    """Sync wrapper for webhook processing (called via asyncio.to_thread in server.py)."""
+    import asyncio
+    return asyncio.run(process_dodo_webhook_sync(store, webhook_id, event_type, data))
+
+
+async def process_dodo_webhook_sync(store, webhook_id: str, event_type: str, data: dict) -> dict:
+    """Async implementation of webhook processing for sync wrapper."""
+    claim = await store.claim_webhook(webhook_id, event_type)
+    if claim == "duplicate":
+        return {"received": True, "duplicate": True}
+    try:
+        result = await handle_verified_event(event_type, data, store)
+        await store.complete_webhook(webhook_id, "processed" if result != "ignored" else "ignored")
+        return {"received": True, "result": result}
+    except Exception:
+        await store.complete_webhook(webhook_id, "failed")
+        raise
