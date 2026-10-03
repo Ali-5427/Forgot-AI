@@ -32,6 +32,16 @@ interface AuthPayload {
   user: { id: string; email: string; [k: string]: any };
 }
 
+export async function getLibraryId(): Promise<string> {
+  const data = await chrome.storage.local.get("forgot_ai_library");
+  let id = data.forgot_ai_library;
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+    await chrome.storage.local.set({ forgot_ai_library: id });
+  }
+  return id;
+}
+
 export async function request<T>(
   path: string,
   init: RequestInit & { auth?: boolean } = {}
@@ -40,6 +50,7 @@ export async function request<T>(
   if (!(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
+  headers.set("X-Library-Id", await getLibraryId());
   if (init.auth) {
     const s = await getSession();
     if (s?.token) headers.set("Authorization", `Bearer ${s.token}`);
@@ -123,6 +134,7 @@ export async function fetchStream(
 ): Promise<Response> {
   const headers = new Headers(init.headers || {});
   headers.set("Content-Type", "application/json");
+  headers.set("X-Library-Id", await getLibraryId());
   const s = await getSession();
   if (s?.token) headers.set("Authorization", `Bearer ${s.token}`);
 
@@ -218,10 +230,13 @@ export const api = {
     };
   },
 
-  saveText: (data: { text: string; user_note?: string }) => 
+
+  getGroups: () => request<any[]>("/api/groups", { auth: true }),
+  saveText: (data: any) => 
     request<any>("/api/items/text", { method: "POST", body: JSON.stringify(data), auth: true }),
-  saveUrl: (data: { url: string; user_note?: string }) => 
+  saveUrl: (data: any) => 
     request<any>("/api/items/url", { method: "POST", body: JSON.stringify(data), auth: true }),
+
   saveImage: (fd: FormData) => 
     request<any>("/api/items/image", { method: "POST", body: fd, auth: true })
 };

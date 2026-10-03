@@ -100,6 +100,13 @@ export default function PopupApp() {
     }
   }, [chatQuery]);
 
+  const startNewChat = () => {
+    setMessages([]);
+    setChatQuery("");
+    setConvId(null);
+    chrome.storage.local.remove("extension_conv_id");
+  };
+
   const openAuth = () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("src/auth/index.html") });
   };
