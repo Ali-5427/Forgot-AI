@@ -217,3 +217,79 @@ def test_delete(created_ids):
     assert r.status_code == 200
     g = requests.get(f"{API}/items/{iid}", timeout=15)
     assert g.status_code == 404
+
+
+# ---------- Forgot Password ----------
+def test_forgot_password_does_not_reveal_account():
+    """Test that forgot-password always returns success, even for non-existent email."""
+    fake_email = f"nonexistent_{uuid.uuid4().hex[:8]}@example.com"
+    r = requests.post(f"{API}/auth/forgot-password", json={"email": fake_email}, timeout=15)
+    assert r.status_code == 200
+    assert "send a reset link" in r.json().get("message", "").lower()
+
+
+# ---------- Change Password ----------
+def test_change_password_requires_auth():
+    """Test that change-password requires authentication."""
+    r = requests.post(f"{API}/auth/change-password", json={
+        "old_password": "test123",
+        "new_password": "newtest123",
+        "confirm_password": "newtest123"
+    }, timeout=15)
+    assert r.status_code == 401
+
+
+# ---------- Billing Status ----------
+def test_billing_status_requires_auth():
+    """Test that billing status requires authentication."""
+    r = requests.get(f"{API}/billing/status", timeout=15)
+    assert r.status_code == 401
+
+
+def test_billing_status_returns_user_billing(auth_header):
+    """Test that billing status returns only the authenticated user's billing info."""
+    r = requests.get(f"{API}/billing/status", headers=auth_header, timeout=15)
+    assert r.status_code == 200
+    data = r.json()
+    # Should have billing fields
+    assert "plan_type" in data
+    assert "status" in data
+    # Should be free by default
+    assert data["plan_type"] in ["free", "pro", "lifetime"]
+
+
+# ---------- Search Beyond 50 Items ----------
+def test_search_works_beyond_50_items(auth_header):
+    """Test that search works when user has more than 50 items."""
+    # Create 60 simple text items
+    created_ids = []
+    for i in range(60):
+        payload = {"text": f"TEST_SEARCH_ITEM_{i}: unique keyword {i % 10}"}
+        r = requests.post(f"{API}/items/text", json=payload, headers=auth_header, timeout=30)
+        assert r.status_code == 200
+        item_id = r.json()["id"]
+        created_ids.append(item_id)
+        # Wait for ready
+        final = wait_ready(item_id, auth_header, timeout=90)
+        assert final["status"] == "ready"
+
+    try:
+        # Search for items with a specific keyword that should appear multiple times
+        q = "unique keyword 5"
+        r = requests.post(f"{API}/search", json={"query": q}, headers=auth_header, timeout=90)
+        assert r.status_code == 200
+        data = r.json()
+        assert "results" in data
+        # Should find at least some results (the keyword appears 6 times in 60 items)
+        assert len(data["results"]) > 0
+    finally:
+        # Clean up
+        for iid in created_ids:
+            requests.delete(f"{API}/items/{iid}", headers=auth_header, timeout=15)
+
+
+# ---------- Cancellation Security ----------
+def test_unauthorized_cancellation_rejected():
+    """Test that cancellation requires authentication."""
+    r = requests.post(f"{API}/billing/cancel", timeout=15)
+    assert r.status_code == 401

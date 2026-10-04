@@ -124,6 +124,9 @@ export const api = {
   me: () => axios.get(`${API}/auth/me`).then((r) => r.data),
   logout: () => axios.post(`${API}/auth/logout`).then((r) => r.data),
   importLibrary: (library_id) => axios.post(`${API}/auth/import`, { library_id }).then((r) => r.data),
+  forgotPassword: (email) => axios.post(`${API}/auth/forgot-password`, { email }).then((r) => r.data),
+  resetPassword: (password, confirm_password) => axios.post(`${API}/auth/reset-password`, { password, confirm_password }).then((r) => r.data),
+  changePassword: (old_password, new_password, confirm_password) => axios.post(`${API}/auth/change-password`, { old_password, new_password, confirm_password }).then((r) => r.data),
     // Groups
   getGroups: () => axios.get(`${API}/groups`).then((r) => r.data),
   createGroup: (name, color) => axios.post(`${API}/groups`, { name, color }).then((r) => r.data),
@@ -179,6 +182,8 @@ export const api = {
   checkFile: async (file) => api.check({ content_type: "image", hash: await sha256Hex(file) }),
   // billing
   billingCheckout: (plan) => axios.post(`${API}/billing/checkout`, { plan }).then((r) => r.data),
+  billingStatus: () => axios.get(`${API}/billing/status`).then((r) => r.data),
+  cancelSubscription: () => axios.post(`${API}/billing/cancel`).then((r) => r.data),
 };
 
 export function formatApiErrorDetail(detail) {

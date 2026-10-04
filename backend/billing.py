@@ -103,6 +103,42 @@ async def create_checkout_url(user: dict, plan: str, client=None) -> str:
     return checkout_url
 
 
+async def cancel_subscription(store, user_id: str) -> dict:
+    """Cancel a user's Pro subscription via Dodo."""
+    # Get user's subscription from database
+    row = await store.get_subscription(user_id)
+    if not row:
+        raise ValueError("No subscription found for user")
+
+    # Prevent canceling Lifetime subscriptions
+    if is_lifetime_row(row):
+        raise ValueError("Lifetime subscriptions cannot be canceled")
+
+    # Check if there's an active Pro subscription to cancel
+    dodo_subscription_id = row.get("dodo_subscription_id")
+    if not dodo_subscription_id:
+        raise ValueError("No active subscription to cancel")
+
+    # Cancel via Dodo API
+    dodo = get_dodo_client()
+    try:
+        await asyncio.to_thread(
+            dodo.subscriptions.cancel,
+            dodo_subscription_id
+        )
+    except Exception as e:
+        logger.error(f"Dodo cancellation failed for subscription {dodo_subscription_id}: {e}")
+        raise RuntimeError("Failed to cancel subscription with payment provider")
+
+    # Update database status to canceled
+    updated = await store.upsert_subscription(user_id, {
+        "status": "canceled",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    return updated
+
+
 def _as_dict(value: Any) -> dict:
     if value is None:
         return {}

@@ -27,6 +27,7 @@ from billing import (
     SupabaseBillingStore,
     billing_public_fields,
     billing_summary,
+    cancel_subscription,
     create_checkout_url,
     event_from_unwrapped,
     process_dodo_webhook,
@@ -297,6 +298,21 @@ class AuthIn(BaseModel):
 
 class RefreshIn(BaseModel):
     refresh_token: str
+
+
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    password: str
+    confirm_password: str
+
+
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str
+    confirm_password: str
 
 
 class ImportIn(BaseModel):
@@ -734,7 +750,7 @@ def rel_age(iso: str) -> str:
 
 
 async def retrieve(query: str, lib: str, limit: int = 30):
-    docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(50)
+    docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(200)
     
     if not docs:
         return [], {}
@@ -979,6 +995,84 @@ async def do_import(payload: ImportIn, request: Request, user: dict = Depends(ge
         return {"imported": 0}
     imported = await import_library(anon_hdr, user["id"])
     return {"imported": imported}
+
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(payload: ForgotPasswordIn):
+    """Request password reset email. Always returns success to avoid account enumeration."""
+    email = payload.email.lower().strip()
+    try:
+        supabase.auth.reset_password_for_email(
+            email,
+            options={"redirectTo": "https://forgot-ai.vercel.app/reset-password"}
+        )
+    except Exception as e:
+        # Log error but don't reveal to user
+        logger.warning(f"Password reset request failed for {email}: {e}")
+    # Always return success to avoid revealing account existence
+    return {"message": "If an account exists for this email, we'll send a reset link."}
+
+
+@api_router.post("/auth/reset-password")
+async def reset_password(payload: ResetPasswordIn, request: Request):
+    """Reset password using Supabase access token from URL params."""
+    if len(payload.password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
+    if payload.password != payload.confirm_password:
+        raise HTTPException(400, "Passwords do not match")
+
+    token = _bearer(request)
+    if not token:
+        raise HTTPException(401, "Invalid or expired reset link")
+
+    try:
+        # Verify token is valid by getting user
+        auth_user = supabase.auth.get_user(token).user
+        if not auth_user:
+            raise HTTPException(401, "Invalid or expired reset link")
+
+        # Update password
+        supabase.auth.update_user({"password": payload.password})
+
+        # Invalidate all sessions for security
+        await db.users.update_one({"id": str(auth_user.id)}, {"$inc": {"token_version": 1}})
+        await db.sessions.delete_many({"user_id": str(auth_user.id)})
+
+        return {"message": "Password updated successfully. Please sign in with your new password."}
+    except Exception as e:
+        logger.error(f"Password reset failed: {e}")
+        raise HTTPException(400, "Invalid or expired reset link")
+
+
+@api_router.post("/auth/change-password")
+async def change_password(payload: ChangePasswordIn, user: dict = Depends(get_current_user)):
+    """Change password for authenticated user."""
+    if len(payload.new_password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(400, "Passwords do not match")
+
+    try:
+        # Verify old password by attempting to sign in
+        supabase.auth.sign_in_with_password({
+            "email": user["email"],
+            "password": payload.old_password
+        })
+    except Exception:
+        raise HTTPException(400, "Current password is incorrect")
+
+    try:
+        # Update password
+        supabase.auth.update_user({"password": payload.new_password})
+
+        # Invalidate all sessions for security
+        await db.users.update_one({"id": user["id"]}, {"$inc": {"token_version": 1}})
+        await db.sessions.delete_many({"user_id": user["id"]})
+
+        return {"message": "Password updated successfully. Please sign in with your new password."}
+    except Exception as e:
+        logger.error(f"Password change failed: {e}")
+        raise HTTPException(400, "Failed to update password")
 
 
 
@@ -1712,6 +1806,33 @@ async def billing_checkout(payload: CheckoutIn, user: dict = Depends(get_current
         logger.exception("Failed to create Dodo checkout session")
         raise HTTPException(502, "Unable to start checkout") from e
     return {"checkout_url": checkout_url}
+
+
+@api_router.get("/billing/status")
+async def billing_status(user: dict = Depends(get_current_user)):
+    """Get the current user's billing status."""
+    try:
+        row = await get_billing_store().get_subscription(user["id"])
+    except Exception as e:
+        logger.warning("Failed to load billing state: %s", e)
+        row = None
+    return billing_public_fields(row)
+
+
+@api_router.post("/billing/cancel")
+async def cancel_subscription_endpoint(user: dict = Depends(get_current_user)):
+    """Cancel the user's Pro subscription."""
+    try:
+        updated = await cancel_subscription(get_billing_store(), user["id"])
+        return billing_public_fields(updated)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        logger.error(f"Subscription cancellation failed: {e}")
+        raise HTTPException(502, "Failed to cancel subscription. Please contact support.")
+    except Exception as e:
+        logger.error(f"Unexpected error during cancellation: {e}")
+        raise HTTPException(500, "An unexpected error occurred")
 
 
 @api_router.post("/webhooks/dodo")

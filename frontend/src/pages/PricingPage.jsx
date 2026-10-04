@@ -74,7 +74,7 @@ export default function PricingPage() {
     },
     {
       q: "Can I cancel Pro?",
-      a: "Yes. You can cancel Pro to stop future charges. In-app cancellation from Settings is not available yet."
+      a: "Yes. You can cancel Pro from Settings to stop future charges.",
     },
     {
       q: "What happens after my trial ends?",

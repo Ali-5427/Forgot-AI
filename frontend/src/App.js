@@ -31,6 +31,11 @@ import TermsPage from "@/pages/legal/TermsPage";
 import ContactPage from "@/pages/legal/ContactPage";
 import SecurityPage from "@/pages/legal/SecurityPage";
 import DataDeletionPage from "@/pages/legal/DataDeletionPage";
+import RefundPage from "@/pages/legal/RefundPage";
+
+// Auth Pages
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 
 function GlobalDialogs() {
   const { saveOpen, setSaveOpen, openItem, reloadItems } = useStore();
@@ -104,7 +109,10 @@ function AppContent() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/security" element={<SecurityPage />} />
           <Route path="/data-deletion" element={<DataDeletionPage />} />
-          
+          <Route path="/refund" element={<RefundPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+
           {!user && <Route path="*" element={<NotFound />} />}
         </Route>
 

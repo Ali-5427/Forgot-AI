@@ -35,6 +35,7 @@ export function Footer() {
               <li><Link to="/privacy" className="hover:text-ink transition-colors">Privacy Policy</Link></li>
               <li><Link to="/terms" className="hover:text-ink transition-colors">Terms of Service</Link></li>
               <li><Link to="/security" className="hover:text-ink transition-colors">Security</Link></li>
+              <li><Link to="/refund" className="hover:text-ink transition-colors">Refund Policy</Link></li>
             </ul>
           </div>
 

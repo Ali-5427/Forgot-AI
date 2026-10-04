@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +83,16 @@ export default function AuthGate() {
                 </button>
               </div>
             </div>
+            {mode === "login" && (
+              <div className="text-right">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-neutral-600 hover:text-neutral-900 font-medium"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            )}
             {error && (
               <p className="text-[13px] text-red-600 bg-red-50 border border-red-100 p-3 rounded-lg flex items-center gap-2" data-testid="auth-error">
                 {error}
