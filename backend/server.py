@@ -1004,7 +1004,7 @@ async def forgot_password(payload: ForgotPasswordIn):
     try:
         supabase.auth.reset_password_for_email(
             email,
-            options={"redirectTo": "https://forgot-ai.vercel.app/reset-password"}
+            options={"redirect_to": "https://forgot-ai.vercel.app/reset-password"}
         )
     except Exception as e:
         # Log error but don't reveal to user
