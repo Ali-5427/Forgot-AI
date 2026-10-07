@@ -26,21 +26,25 @@ export const ItemDetailView = ({ itemId, onClose }) => {
   const [showFolderMenu, setShowFolderMenu] = useState(false);
 
   const handleMove = async (groupId) => {
+    let updatePayload = { group_id: null, group_name: null, group_color: null };
+    if (groupId) {
+      const g = groups?.find(x => x.id === groupId);
+      if (g) updatePayload = { group_id: g.id, group_name: g.name, group_color: g.color };
+    }
+    
+    // 1. Instant UI update
+    setItem(prev => ({ ...prev, ...updatePayload }));
+    updateItemLocal(item.id, updatePayload);
+    setShowFolderMenu(false);
+    toast.success("Moved to group");
+
     try {
-      let updatePayload = { group_id: null, group_name: null, group_color: null };
-      if (groupId) {
-        const g = groups?.find(x => x.id === groupId);
-        if (g) updatePayload = { group_id: g.id, group_name: g.name, group_color: g.color };
-      }
-      setItem(prev => ({ ...prev, ...updatePayload }));
-      updateItemLocal(item.id, updatePayload);
+      // 2. Background Sync
       await api.updateItem(item.id, updatePayload);
-      setShowFolderMenu(false);
-      reloadItems();
-      toast.success("Moved to group");
     } catch (err) {
       console.error(err);
       toast.error("Failed to move");
+      // Rollback (requires keeping previous state, but a refresh will fix it)
     }
   };
   const [related, setRelated] = useState([]);

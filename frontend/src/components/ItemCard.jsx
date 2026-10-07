@@ -4,32 +4,35 @@ import { api, fileUrl } from "@/api";
 import { typeMeta, timeAgo } from "@/lib/format";
 import { Loader2, AlertTriangle, Pin, FolderPlus } from "lucide-react";
 import { useStore } from "@/store";
+import { toast } from "sonner";
 
 export const ItemCard = ({ item, onClick, onPin }) => {
   const { label, Icon } = typeMeta(item.content_type);
   const preview = item.summary || item.original_text || item.source_url || "";
   
-  const { groups, reloadItems } = useStore();
+  const { groups, updateItemLocal } = useStore();
   const [showFolderMenu, setShowFolderMenu] = useState(false);
   
   const handleMove = async (e, groupId) => {
     e.stopPropagation();
+    
+    let updatePayload = { group_id: null, group_name: null, group_color: null };
+    if (groupId) {
+      const g = (groups || []).find(x => x.id === groupId);
+      if (g) updatePayload = { group_id: g.id, group_name: g.name, group_color: g.color };
+    }
+    
+    // 1. Instant UI update
+    updateItemLocal(item.id, updatePayload);
+    setShowFolderMenu(false);
+    toast.success("Moved to group");
+
     try {
-      // Find the group to grab the name and color (or let backend handle it, but for instant UI we can just send group_id)
-      // Actually backend handles syncing name/color in PATCH /items if we only pass group_id?
-      // Wait, in server.py, update_item accepts group_id, group_name, group_color.
-      // Let's pass them all.
-      let updatePayload = { group_id: null, group_name: null, group_color: null };
-      if (groupId) {
-        const g = (groups || []).find(x => x.id === groupId);
-        if (g) updatePayload = { group_id: g.id, group_name: g.name, group_color: g.color };
-      }
-      
+      // 2. Background sync
       await api.updateItem(item.id, updatePayload);
-      setShowFolderMenu(false);
-      reloadItems();
     } catch (err) {
       console.error(err);
+      toast.error("Failed to move");
     }
   };
 
