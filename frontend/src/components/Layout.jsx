@@ -15,7 +15,7 @@ const nav = [
 ];
 
 export const Layout = () => {
-  const { openSave, detailOpen, detailId, setDetailOpen, groups, reloadGroups } = useStore();
+  const { openSave, detailOpen, detailId, setDetailOpen, groups, reloadGroups, addGroupLocal, updateGroupLocal, deleteGroupLocal } = useStore();
   
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
@@ -27,33 +27,58 @@ export const Layout = () => {
 
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) return;
+    const name = newGroupName.trim();
+    const color = newGroupColor;
+    
+    // 1. Instant UI update (create temp group)
+    setIsCreatingGroup(false);
+    setNewGroupName("");
+    const tempId = "temp-" + Date.now();
+    addGroupLocal({ id: tempId, name, color });
+
     try {
-      await api.createGroup(newGroupName.trim(), newGroupColor);
-      await reloadGroups();
-      setIsCreatingGroup(false);
-      setNewGroupName("");
+      // 2. Background Sync
+      await api.createGroup(name, color);
+      await reloadGroups(); // pull real ID from server
     } catch (e) {
+      deleteGroupLocal(tempId);
       console.error("Failed to create group", e);
     }
   };
 
   const handleUpdateGroup = async () => {
     if (!editGroupName.trim()) return;
+    const name = editGroupName.trim();
+    const color = editGroupColor;
+    const groupToUpdate = editingGroup;
+    
+    // 1. Instant UI update
+    setEditingGroup(null);
+    updateGroupLocal(groupToUpdate.id, { name, color });
+
     try {
-      await api.updateGroup(editingGroup.id, { name: editGroupName.trim(), color: editGroupColor });
-      await reloadGroups();
-      setEditingGroup(null);
+      // 2. Background Sync
+      await api.updateGroup(groupToUpdate.id, { name, color });
     } catch (e) {
+      // Rollback
+      updateGroupLocal(groupToUpdate.id, { name: groupToUpdate.name, color: groupToUpdate.color });
       console.error(e);
     }
   };
 
   const handleDeleteGroup = async () => {
+    const groupToDelete = editingGroup;
+    
+    // 1. Instant UI update
+    setEditingGroup(null);
+    deleteGroupLocal(groupToDelete.id);
+
     try {
-      await api.deleteGroup(editingGroup.id);
-      await reloadGroups();
-      setEditingGroup(null);
+      // 2. Background Sync
+      await api.deleteGroup(groupToDelete.id);
     } catch (e) {
+      // Rollback
+      addGroupLocal(groupToDelete);
       console.error(e);
     }
   };

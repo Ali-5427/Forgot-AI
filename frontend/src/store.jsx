@@ -106,6 +106,18 @@ export const StoreProvider = ({ children }) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
   };
 
+  const addGroupLocal = (group) => {
+    setGroups((prev) => [...prev, group]);
+  };
+
+  const updateGroupLocal = (id, updates) => {
+    setGroups((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+  };
+
+  const deleteGroupLocal = (id) => {
+    setGroups((prev) => prev.filter((g) => g.id !== id));
+  };
+
   const togglePin = async (item) => {
     const newPinned = !item.pinned;
     // 1. Optimistic Update
@@ -126,6 +138,7 @@ export const StoreProvider = ({ children }) => {
     <StoreContext.Provider
       value={{
         groups, reloadGroups: loadGroups,
+        addGroupLocal, updateGroupLocal, deleteGroupLocal,
         saveOpen, setSaveOpen,
         detailId, detailOpen, setDetailOpen,
         items, loading, reloadItems: loadItems,
