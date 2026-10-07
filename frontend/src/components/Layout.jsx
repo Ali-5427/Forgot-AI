@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Home, Layers, Search, Settings, Plus, RefreshCw, MessageSquare } from "lucide-react";
+import { Home, Layers, Search, Settings, Plus, RefreshCw, MessageSquare, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
 import { ItemDetailView } from "./ItemDetailView";
@@ -21,6 +21,10 @@ export const Layout = () => {
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupColor, setNewGroupColor] = useState("#3b82f6");
 
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editGroupColor, setEditGroupColor] = useState("");
+
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) return;
     try {
@@ -30,6 +34,27 @@ export const Layout = () => {
       setNewGroupName("");
     } catch (e) {
       console.error("Failed to create group", e);
+    }
+  };
+
+  const handleUpdateGroup = async () => {
+    if (!editGroupName.trim()) return;
+    try {
+      await api.updateGroup(editingGroup.id, { name: editGroupName.trim(), color: editGroupColor });
+      await reloadGroups();
+      setEditingGroup(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    try {
+      await api.deleteGroup(editingGroup.id);
+      await reloadGroups();
+      setEditingGroup(null);
+    } catch (e) {
+      console.error(e);
     }
   };
   return (
@@ -89,11 +114,25 @@ export const Layout = () => {
                 to={`/all?group=${g.id}`}
                 onClick={() => setDetailOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-colors text-neutral-600 hover:bg-neutral-100`
+                  `group flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors ${isActive ? "text-neutral-900 bg-neutral-100" : "text-neutral-600 hover:bg-neutral-100"}`
                 }
               >
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: g.color }}></span>
-                {g.name}
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }}></span>
+                  <span className="truncate">{g.name}</span>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setEditingGroup(g);
+                    setEditGroupName(g.name);
+                    setEditGroupColor(g.color);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-neutral-900 transition-all rounded"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
               </NavLink>
             ))}
           </nav>
@@ -158,7 +197,7 @@ export const Layout = () => {
 
       {/* Create Group Modal */}
       {isCreatingGroup && (
-        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center animate-in fade-in">
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center">
           <div className="bg-white rounded-2xl p-5 w-80 shadow-2xl">
             <h3 className="font-bold text-[15px] mb-4">Create New Group</h3>
             <input 
@@ -181,6 +220,39 @@ export const Layout = () => {
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setIsCreatingGroup(false)}>Cancel</Button>
               <Button onClick={handleCreateGroup}>Create</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Group Modal */}
+      {editingGroup && (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-5 w-80 shadow-2xl">
+            <h3 className="font-bold text-[15px] mb-4">Edit Group</h3>
+            <input 
+              type="text" 
+              placeholder="Group Name" 
+              value={editGroupName} 
+              onChange={e => setEditGroupName(e.target.value)} 
+              className="w-full border border-neutral-200 focus:border-neutral-800 outline-none rounded-xl p-3 mb-4 text-[13px]" 
+              autoFocus 
+            />
+            <div className="flex items-center justify-between mb-6 px-1">
+              <label className="text-[13px] font-medium text-neutral-600">Badge Color</label>
+              <input 
+                type="color" 
+                value={editGroupColor} 
+                onChange={e => setEditGroupColor(e.target.value)} 
+                className="w-8 h-8 rounded-md cursor-pointer border-0 p-0" 
+              />
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={handleDeleteGroup}>Delete</Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setEditingGroup(null)}>Cancel</Button>
+                <Button onClick={handleUpdateGroup}>Save</Button>
+              </div>
             </div>
           </div>
         </div>
