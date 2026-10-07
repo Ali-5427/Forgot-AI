@@ -45,21 +45,11 @@ export const FeedbackWidget = () => {
 
   return (
     <>
-      {/* Floating Button */}
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-24 left-5 md:bottom-6 md:left-auto md:right-6 z-[100] bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 p-3.5 md:px-5 md:py-3.5 rounded-full hover:bg-indigo-700 hover:shadow-xl transition-all hover:-translate-y-1 flex items-center gap-2 font-medium text-sm group"
-        aria-label="Send Feedback"
-      >
-        <MessageSquare className="h-5 w-5" />
-        <span className="hidden md:inline">Feedback</span>
-      </button>
-
       {/* Modal Overlay */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
           <div 
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-200"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center p-5 border-b border-neutral-100">

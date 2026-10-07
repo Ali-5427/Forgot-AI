@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Home, Layers, Search, Settings, Plus, RefreshCw } from "lucide-react";
+import { Home, Layers, Search, Settings, Plus, RefreshCw, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
 import { ItemDetailView } from "./ItemDetailView";
@@ -67,6 +67,13 @@ export const Layout = () => {
               <Icon className="h-4 w-4" /> {label}
             </NavLink>
           ))}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("open-feedback"))}
+            data-testid="nav-feedback"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-neutral-600 hover:bg-neutral-100 w-full text-left"
+          >
+            <MessageSquare className="h-4 w-4" /> Feedback
+          </button>
         </nav>
 
         <div className="mt-6 px-3">
@@ -138,6 +145,13 @@ export const Layout = () => {
             <span className="text-[10px] font-medium">{label}</span>
           </NavLink>
         ))}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("open-feedback"))}
+          className="flex flex-col items-center justify-center w-16 gap-1 transition-colors text-neutral-400 hover:text-neutral-900"
+        >
+          <MessageSquare className="h-6 w-6" />
+          <span className="text-[10px] font-medium">Feedback</span>
+        </button>
       </nav>
 
       <FeedbackWidget />
