@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 interface ChatMessage {
-  role: "user" | "ai";
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -191,8 +191,6 @@ export default function PopupApp() {
     const q = retryQuery || chatQuery.trim();
     if (!q || chatting) return;
     
-    const historyToSend = messages.map(m => ({ role: m.role, content: m.content }));
-
     setChatQuery("");
     setMessages((prev) => [...prev, { role: "user", content: q }]);
     
@@ -202,41 +200,73 @@ export default function PopupApp() {
     abortControllerRef.current = controller;
 
     try {
-      const res = await fetchStream("/api/chat", {
+      const res = await fetchStream("/api/chat/v2/stream", {
         method: "POST",
-        body: JSON.stringify({ query: q, stream: true, history: historyToSend, context_item_ids: contextIds }),
+        body: JSON.stringify({ query: q, conversation_id: convId || undefined }),
         signal: controller.signal
       });
 
       if (!res.body) throw new Error("No response body");
-      const idsHeader = res.headers.get("X-Context-Ids");
-      if (idsHeader) setContextIds(idsHeader.split(",").filter(Boolean));
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
       
       let answerText = "";
-      setMessages((prev) => [...prev, { role: "ai", content: "" }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
       
+      let buffer = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        answerText += chunk;
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { role: "ai", content: answerText };
-          return updated;
-        });
+        buffer += decoder.decode(value, { stream: true });
+        
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || "";
+        
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === "token") {
+                answerText += data.text;
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { role: "assistant", content: answerText };
+                  return updated;
+                });
+              } else if (data.type === "final") {
+                if (data.conversation_id) {
+                  setConvId(data.conversation_id);
+                  chrome.storage.local.set({ extension_conv_id: data.conversation_id });
+                }
+              } else if (data.type === "error") {
+                answerText += "\n\n*(Error: " + (data.text || "Stream error") + ")*";
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { role: "assistant", content: answerText };
+                  return updated;
+                });
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
       }
     } catch (e: any) {
       if (e.name === 'AbortError') return;
+      let errorMessage = "Sorry, I couldn't process that right now.";
+      if (e.message && e.message.includes("401")) {
+        errorMessage = "Session expired. Please sign in again.";
+      } else if (e.message && (e.message.includes("500") || e.message.includes("502") || e.message.includes("503") || e.message.includes("Failed to fetch"))) {
+        errorMessage = "The server is currently busy. Please try again in a moment.";
+      }
       setMessages((prev) => {
         const updated = [...prev];
-        if (updated[updated.length - 1]?.role === "ai" && updated[updated.length - 1].content) {
-          updated[updated.length - 1].content += "\n\n*(Error: Connection lost)*";
+        if (updated[updated.length - 1]?.role === "assistant" && !updated[updated.length - 1].content) {
+          updated[updated.length - 1].content = errorMessage;
         } else if (updated[updated.length - 1]?.role === "user") {
-          updated.push({ role: "ai", content: "Sorry, I couldn't process that right now." });
+          updated.push({ role: "assistant", content: errorMessage });
         }
         return updated;
       });
@@ -484,7 +514,7 @@ export default function PopupApp() {
               {messages.map((msg, i) => (
                 <div key={i} className={`group flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
-                    {msg.role === 'ai' && (
+                    {msg.role === 'assistant' && (
                        <div className="w-7 h-7 mr-3 mt-0.5 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
                          <Brain className="w-3.5 h-3.5 text-white" />
                        </div>
@@ -492,7 +522,7 @@ export default function PopupApp() {
                     <div className={`text-[14px] leading-relaxed ${
                       msg.role === 'user' ? 'max-w-[85%] bg-neutral-900 text-white rounded-3xl rounded-br-md px-4 py-3 shadow-sm' : 'max-w-[90%] text-neutral-800'
                     }`}>
-                      {msg.role === 'ai' ? (
+                      {msg.role === 'assistant' ? (
                         <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
                           <ReactMarkdown 
                             remarkPlugins={[remarkGfm]}
@@ -514,7 +544,7 @@ export default function PopupApp() {
                     <button type="button" onClick={() => handleCopy(msg.content, i)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Copy">
                       {copiedIdx === i ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
-                    {msg.role === 'ai' && !chatting && i === messages.length - 1 && (
+                    {msg.role === 'assistant' && !chatting && i === messages.length - 1 && (
                       <button type="button" onClick={() => handleRetry(i)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Retry">
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
@@ -527,7 +557,7 @@ export default function PopupApp() {
                   </div>
                 </div>
               ))}
-              {chatting && messages[messages.length - 1]?.role !== 'ai' && (
+              {chatting && messages[messages.length - 1]?.role !== 'assistant' && (
                 <div className="flex justify-start items-center">
                    <div className="w-7 h-7 mr-3 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
                      <Brain className="w-3.5 h-3.5 text-white" />
