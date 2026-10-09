@@ -53,29 +53,29 @@ export const ItemCard = ({ item, onClick, onPin }) => {
             onPin(item);
           }}
           title={item.pinned ? "Unpin" : "Pin to top"}
-          className={`absolute right-2 top-2 z-10 h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
+          className={`absolute right-2 top-2 z-10 h-9 w-9 md:h-7 md:w-7 rounded-md flex items-center justify-center transition-colors ${
             item.pinned
               ? "bg-neutral-900 text-white"
-              : "bg-white/80 text-neutral-500 opacity-0 group-hover:opacity-100 hover:bg-neutral-100 border border-border"
+              : "bg-white/80 text-neutral-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-neutral-100 border border-border md:border-transparent md:hover:border-border"
           }`}
         >
-          <Pin className={`h-3.5 w-3.5 ${item.pinned ? "fill-white" : ""}`} />
+          <Pin className={`h-4 w-4 md:h-3.5 md:w-3.5 ${item.pinned ? "fill-white" : ""}`} />
         </button>
       )}
-      <div className="absolute right-10 top-2 z-20">
+      <div className="absolute right-12 md:right-10 top-2 z-20">
         <button
           onClick={(e) => {
             e.stopPropagation();
             setShowFolderMenu(!showFolderMenu);
           }}
           title="Move to Group"
-          className="h-7 w-7 rounded-md flex items-center justify-center transition-colors bg-white/80 text-neutral-500 opacity-0 group-hover:opacity-100 hover:bg-neutral-100 border border-border"
+          className="h-9 w-9 md:h-7 md:w-7 rounded-md flex items-center justify-center transition-colors bg-white/80 text-neutral-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-neutral-100 border border-border md:border-transparent md:hover:border-border"
         >
-          <FolderPlus className="h-3.5 w-3.5" />
+          <FolderPlus className="h-4 w-4 md:h-3.5 md:w-3.5" />
         </button>
         
         {showFolderMenu && (
-          <div className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-xl border border-border py-1 z-30 flex flex-col max-h-64 overflow-y-auto">
+          <div className="absolute right-0 top-10 md:top-8 w-48 bg-white rounded-lg shadow-xl border border-border py-1 z-30 flex flex-col max-h-64 overflow-y-auto overscroll-contain">
             <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Move to...</div>
             <button 
               onClick={(e) => handleMove(e, null)}

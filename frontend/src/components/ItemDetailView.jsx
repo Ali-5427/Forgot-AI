@@ -419,7 +419,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
 
       {/* 2-Column Split Content */}
       <div 
-        className="flex flex-col md:flex-row flex-1 overflow-hidden" 
+        className="flex flex-col md:flex-row flex-1 overflow-y-auto md:overflow-hidden overscroll-contain" 
         ref={containerRef}
         style={{ 
           '--left-w': isCollapsed ? '100%' : `${100 - rightWidth}%`, 
@@ -428,7 +428,7 @@ export const ItemDetailView = ({ itemId, onClose }) => {
       >
         
         {/* LEFT COLUMN: Original Content */}
-        <div className={`w-full md:w-[var(--left-w)] shrink-0 flex flex-col overflow-y-auto bg-neutral-50/50 p-4 md:p-6 ${!isDragging ? 'transition-all duration-300 ease-in-out' : ''}`}>
+        <div className={`w-full md:w-[var(--left-w)] shrink-0 flex flex-col overflow-visible md:overflow-y-auto bg-neutral-50/50 p-4 md:p-6 ${!isDragging ? 'transition-all duration-300 ease-in-out' : ''}`}>
           <h3 className="text-[11px] uppercase tracking-widest font-bold text-neutral-400 mb-4 flex items-center gap-3 shrink-0">
             <span className="h-px w-6 bg-neutral-200"></span>
             Original Source
@@ -444,8 +444,8 @@ export const ItemDetailView = ({ itemId, onClose }) => {
           {item.content_type === "text" && (
             <div className="relative group text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-700 bg-white border border-neutral-200/60 rounded-2xl p-5 md:p-6 shadow-sm font-serif ">
               <div className="sticky top-0 float-right mb-2 ml-4 z-10 h-0 overflow-visible pointer-events-none">
-                <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="pointer-events-auto -mt-3 -mr-3 h-8 w-8 p-0 text-neutral-500 hover:text-neutral-900 bg-white/90 backdrop-blur-md border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm rounded-lg" title="Copy">
-                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="pointer-events-auto -mt-3 -mr-3 h-10 w-10 md:h-8 md:w-8 p-0 text-neutral-500 hover:text-neutral-900 bg-white/90 backdrop-blur-md border border-neutral-200/50 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-sm rounded-lg" title="Copy">
+                  {copied ? <Check className="h-5 w-5 md:h-4 md:w-4 text-green-600" /> : <Copy className="h-5 w-5 md:h-4 md:w-4" />}
                 </Button>
               </div>
               {item.original_text}
@@ -460,8 +460,8 @@ export const ItemDetailView = ({ itemId, onClose }) => {
                 </div>
               )}
               {item.original_text && (
-                <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="sticky top-3 float-right mt-3 mr-3 z-10 h-8 w-8 p-0 text-neutral-500 hover:text-neutral-900 bg-white/90 backdrop-blur-md border border-neutral-200/50 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm rounded-lg pointer-events-auto" title="Copy text">
-                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                <Button variant="ghost" size="sm" onClick={() => handleCopy(item.original_text)} className="sticky top-3 float-right mt-3 mr-3 z-10 h-10 w-10 md:h-8 md:w-8 p-0 text-neutral-500 hover:text-neutral-900 bg-white/90 backdrop-blur-md border border-neutral-200/50 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-sm rounded-lg pointer-events-auto" title="Copy text">
+                  {copied ? <Check className="h-5 w-5 md:h-4 md:w-4 text-green-600" /> : <Copy className="h-5 w-5 md:h-4 md:w-4" />}
                 </Button>
               )}
               <div className="p-6 space-y-4">
@@ -497,9 +497,9 @@ export const ItemDetailView = ({ itemId, onClose }) => {
         )}
 
         {/* RIGHT COLUMN: AI Analysis & Chat */}
-        <div className={`w-full md:w-[var(--right-w)] shrink-0 flex flex-col overflow-hidden bg-white border-l border-neutral-200/50 ${isCollapsed ? 'hidden md:flex opacity-0 pointer-events-none' : 'opacity-100'} ${!isDragging ? 'transition-all duration-300 ease-in-out' : ''}`}>
+        <div className={`w-full md:w-[var(--right-w)] shrink-0 flex flex-col overflow-visible md:overflow-hidden bg-white border-t md:border-t-0 md:border-l border-neutral-200/50 ${isCollapsed ? 'hidden md:flex opacity-0 pointer-events-none' : 'opacity-100'} ${!isDragging ? 'transition-all duration-300 ease-in-out' : ''}`}>
           
-          <div className="flex-1 overflow-y-auto p-8 space-y-10">
+          <div className="flex-1 overflow-visible md:overflow-y-auto p-4 md:p-8 space-y-10">
             {/* AI Summary Section (Only show if not editing, or always show editor) */}
             <section className="space-y-4">
               <h3 className="text-[11px] uppercase tracking-widest font-bold text-neutral-400 flex items-center gap-3">
