@@ -88,66 +88,48 @@ alter table public.items add column if not exists embedding vector(2048);
 
 
 create or replace function hybrid_search_items(
-  query_embedding vector(2048),
-  query_text text,
-  time_filter text,
-  match_count int,
-  p_library_id text
+  p_library text,
+  p_query text,
+  p_embedding vector(2048),
+  p_limit int default 8
 )
-returns setof public.items
+returns table (id uuid, score float)
 language plpgsql
-as $body
-declare
-  time_cutoff timestamptz;
+as $$
 begin
-  if time_filter = 'yesterday' then
-    time_cutoff := date_trunc('day', now()) - interval '1 day';
-  elsif time_filter = 'today' then
-    time_cutoff := date_trunc('day', now());
-  elsif time_filter = 'week' then
-    time_cutoff := now() - interval '7 days';
-  else
-    time_cutoff := '1970-01-01'::timestamptz;
-  end if;
-
   return query
-  with vector_matches as (
-    select
-      items.id,
-      1 - (items.embedding <=> query_embedding) as vector_score
+  with full_text as (
+    select items.id, ts_rank(items.fts, websearch_to_tsquery('english', p_query)) as text_score
     from items
-    where items.library_id = p_library_id
+    where items.library_id = p_library
       and items.status = 'ready'
-      and items.embedding is not null
-      and items.created_at >= time_cutoff
+      and (p_query = '' or p_query is null or items.fts @@ websearch_to_tsquery('english', p_query))
   ),
-  keyword_matches as (
-    select
-      items.id,
-      1.0 as kw_score
+  semantic as (
+    select items.id, 1 - (items.embedding <=> p_embedding) as vector_score
     from items
-    where items.library_id = p_library_id
+    where items.library_id = p_library
       and items.status = 'ready'
-      and items.created_at >= time_cutoff
-      and (
-        items.title ilike '%' || query_text || '%'
-        or items.summary ilike '%' || query_text || '%'
-        or items.extracted_text ilike '%' || query_text || '%'
-        or items.searchable_text ilike '%' || query_text || '%'
-      )
+      and p_embedding is not null
+  ),
+  ranked_text as (
+    select full_text.id, row_number() over (order by full_text.text_score desc) as rnk
+    from full_text
+    where full_text.text_score > 0
+  ),
+  ranked_semantic as (
+    select semantic.id, row_number() over (order by semantic.vector_score desc) as rnk
+    from semantic
   )
-  select i.*
-  from items i
-  left join vector_matches vm on vm.id = i.id
-  left join keyword_matches km on km.id = i.id
-  where i.library_id = p_library_id
-    and i.status = 'ready'
-    and i.created_at >= time_cutoff
-    and (vm.id is not null or km.id is not null)
-  order by coalesce(vm.vector_score, 0) + coalesce(km.kw_score, 0) desc
-  limit match_count;
+  select
+    coalesce(rt.id, rs.id) as id,
+    coalesce(1.0 / (60 + rt.rnk), 0.0) + coalesce(1.0 / (60 + rs.rnk), 0.0) as score
+  from ranked_text rt
+  full outer join ranked_semantic rs on rt.id = rs.id
+  order by score desc
+  limit p_limit;
 end;
-$body;
+$$;
 
 
 -- BILLING / SUBSCRIPTIONS (Stripe-named columns kept unused; Dodo is the provider)
