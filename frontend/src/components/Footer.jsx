@@ -1,4 +1,4 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 
 export function Footer() {
@@ -49,7 +49,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-12 pt-8 border-t border-line flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-ink-muted">
-          <p>Â© {new Date().getFullYear()} Forgot AI. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Forgot AI. All rights reserved.</p>
         </div>
       </div>
     </footer>
