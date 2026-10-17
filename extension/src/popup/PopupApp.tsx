@@ -11,6 +11,23 @@ interface ChatMessage {
   content: string;
 }
 
+function formatUrlDisplay(rawText: string, href?: string): string {
+  try {
+    const target = href || rawText;
+    const urlObj = new URL(target.startsWith("http") ? target : `https://${target}`);
+    const host = urlObj.hostname.replace(/^www\./, "");
+    const pathname = urlObj.pathname.replace(/\/$/, "");
+    if (!pathname || pathname === "") return host;
+    const pathSegments = pathname.split("/").filter(Boolean);
+    if (pathSegments.length === 0) return host;
+    const lastSegment = decodeURIComponent(pathSegments[pathSegments.length - 1]);
+    const shortSegment = lastSegment.length > 20 ? lastSegment.slice(0, 17) + "…" : lastSegment;
+    return `${host}/…/${shortSegment}`;
+  } catch {
+    return rawText.length > 30 ? rawText.slice(0, 27) + "…" : rawText;
+  }
+}
+
 export default function PopupApp() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
@@ -434,7 +451,7 @@ export default function PopupApp() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-8 pb-32" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-8 pb-32" ref={scrollRef}>
         {/* Chat Thread */}
         <div className="space-y-4">
           {messages.length === 0 ? (
@@ -519,15 +536,48 @@ export default function PopupApp() {
                          <Brain className="w-3.5 h-3.5 text-white" />
                        </div>
                     )}
-                    <div className={`text-[14px] leading-relaxed ${
+                    <div className={`text-[14px] leading-relaxed break-words [overflow-wrap:anywhere] ${
                       msg.role === 'user' ? 'max-w-[85%] bg-neutral-900 text-white rounded-3xl rounded-br-md px-4 py-3 shadow-sm' : 'max-w-[90%] text-neutral-800'
                     }`}>
                       {msg.role === 'assistant' ? (
-                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
+                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold break-words [overflow-wrap:anywhere]">
                           <ReactMarkdown 
                             remarkPlugins={[remarkGfm]}
                             components={{
-                              a: ({node, ...props}) => <a className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />
+                              a: ({node, href, children, ...props}) => {
+                                const childStr = typeof children === "string" ? children : Array.isArray(children) ? children.map(c => String(c)).join("") : "";
+                                const isUrlText = childStr.startsWith("http://") || childStr.startsWith("https://") || childStr.startsWith("www.") || (href && childStr === href);
+
+                                if (isUrlText) {
+                                  const displayLabel = formatUrlDisplay(childStr, href);
+                                  return (
+                                    <a
+                                      href={href}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title={href || childStr}
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 rounded-lg bg-blue-50/80 hover:bg-blue-100 text-blue-700 border border-blue-200/60 text-[12px] font-medium transition-colors max-w-full group/link align-middle no-underline"
+                                      {...props}
+                                    >
+                                      <ExternalLink className="w-3 h-3 shrink-0 text-blue-500 group-hover/link:text-blue-700 transition-colors" />
+                                      <span className="truncate">{displayLabel}</span>
+                                    </a>
+                                  );
+                                }
+
+                                return (
+                                  <a
+                                    href={href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={href}
+                                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium break-words [overflow-wrap:anywhere]"
+                                    {...props}
+                                  >
+                                    {children}
+                                  </a>
+                                );
+                              }
                             }}
                           >
                             {msg.content}
