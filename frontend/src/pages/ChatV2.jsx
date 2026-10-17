@@ -1,26 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { MessageSquare, Plus, Loader2, Sparkles, Sidebar, FileText, Link as LinkIcon, Image as ImageIcon, Trash2, ExternalLink } from "lucide-react";
+import { MessageSquare, Plus, Loader2, Sparkles, Sidebar, FileText, Link as LinkIcon, Image as ImageIcon, Trash2 } from "lucide-react";
 import { api } from "@/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
-function formatUrlDisplay(rawText, href) {
-  try {
-    const target = href || rawText;
-    const urlObj = new URL(target.startsWith("http") ? target : `https://${target}`);
-    const host = urlObj.hostname.replace(/^www\./, "");
-    const pathname = urlObj.pathname.replace(/\/$/, "");
-    if (!pathname || pathname === "") return host;
-    const pathSegments = pathname.split("/").filter(Boolean);
-    if (pathSegments.length === 0) return host;
-    const lastSegment = decodeURIComponent(pathSegments[pathSegments.length - 1]);
-    const shortSegment = lastSegment.length > 20 ? lastSegment.slice(0, 17) + "…" : lastSegment;
-    return `${host}/…/${shortSegment}`;
-  } catch {
-    return rawText.length > 30 ? rawText.slice(0, 27) + "…" : rawText;
-  }
-}
 
 export default function ChatV2() {
   const navigate = useNavigate();
@@ -269,7 +252,7 @@ export default function ChatV2() {
                   </div>
                 )}
                 
-                <div className={`px-5 py-3.5 rounded-2xl max-w-[90%] text-[15px] leading-relaxed break-words [overflow-wrap:anywhere] ${
+                <div className={`px-5 py-3.5 rounded-2xl max-w-[90%] text-[15px] leading-relaxed ${
                   m.role === 'user' 
                     ? 'bg-neutral-100 text-neutral-900 rounded-tr-sm' 
                     : 'bg-white border border-neutral-100 shadow-sm rounded-tl-sm prose prose-sm max-w-none'
@@ -280,40 +263,7 @@ export default function ChatV2() {
                     <ReactMarkdown 
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        a: ({node, href, children, ...props}) => {
-                          const childStr = typeof children === "string" ? children : Array.isArray(children) ? children.map(c => String(c)).join("") : "";
-                          const isUrlText = childStr.startsWith("http://") || childStr.startsWith("https://") || childStr.startsWith("www.") || (href && childStr === href);
-
-                          if (isUrlText) {
-                            const displayLabel = formatUrlDisplay(childStr, href);
-                            return (
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={href || childStr}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 text-[12px] font-medium transition-colors max-w-full align-middle no-underline group/link"
-                                {...props}
-                              >
-                                <ExternalLink className="w-3 h-3 shrink-0 text-indigo-500 group-hover/link:text-indigo-700 transition-colors" />
-                                <span className="truncate">{displayLabel}</span>
-                              </a>
-                            );
-                          }
-
-                          return (
-                            <a
-                              href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title={href}
-                              className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium break-words [overflow-wrap:anywhere]"
-                              {...props}
-                            >
-                              {children}
-                            </a>
-                          );
-                        }
+                        a: ({node, ...props}) => <a className="text-indigo-600 hover:underline font-medium" target="_blank" rel="noopener noreferrer" {...props} />
                       }}
                     >
                       {m.content}
