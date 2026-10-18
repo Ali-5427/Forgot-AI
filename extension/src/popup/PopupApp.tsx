@@ -263,11 +263,6 @@ export default function PopupApp() {
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   
-  const [groups, setGroups] = useState<any[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
-  const [newGroupName, setNewGroupName] = useState<string>("");
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-  
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -281,7 +276,6 @@ export default function PopupApp() {
       setEmail(s?.user?.email || null);
       setLoading(false);
     });
-    api.getGroups().then(setGroups).catch(console.error);
     const off = onSessionChange((s) => setEmail(s?.user?.email || null));
     return off;
   }, []);
@@ -349,18 +343,11 @@ export default function PopupApp() {
     setSaving(true);
     try {
       const basePayload: any = { user_note: userNote };
-      if (isCreatingGroup && newGroupName.trim()) {
-        basePayload.new_group_name = newGroupName.trim();
-      } else if (!isCreatingGroup && selectedGroupId) {
-        basePayload.group_id = selectedGroupId;
-      }
 
       if (file) {
         const fd = new FormData();
         fd.append("file", file);
         if (userNote) fd.append("user_note", userNote);
-        if (basePayload.new_group_name) fd.append("new_group_name", basePayload.new_group_name);
-        if (basePayload.group_id) fd.append("group_id", basePayload.group_id);
         await api.saveImage(fd);
       } else if (saveText.trim().startsWith("http")) {
         await api.saveUrl({ url: saveText.trim(), ...basePayload });
@@ -371,11 +358,7 @@ export default function PopupApp() {
       setSaveText("");
       setUserNote("");
       setFile(null);
-      setNewGroupName("");
-      setIsCreatingGroup(false);
       setIsSaveModalOpen(false);
-      // Refresh groups list
-      api.getGroups().then(setGroups).catch(console.error);
     } catch (e) {
       console.error("Save failed", e);
     } finally {
@@ -583,36 +566,6 @@ export default function PopupApp() {
                   placeholder="Why are you saving this? (Optional)"
                   className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-3 px-4 text-[13px] focus:outline-none focus:border-neutral-300 focus:bg-white transition-all placeholder:text-neutral-400"
                 />
-                
-                <select 
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl py-3 px-4 text-[13px] focus:outline-none focus:border-neutral-300 focus:bg-white transition-all text-neutral-600"
-                  value={isCreatingGroup ? "CREATE_NEW" : selectedGroupId}
-                  onChange={(e) => {
-                    if (e.target.value === "CREATE_NEW") {
-                      setIsCreatingGroup(true);
-                      setSelectedGroupId("");
-                    } else {
-                      setIsCreatingGroup(false);
-                      setSelectedGroupId(e.target.value);
-                    }
-                  }}
-                >
-                  <option value="">No Group (Unorganized)</option>
-                  <option value="CREATE_NEW">+ Create New Group...</option>
-                  {groups.map(g => (
-                    <option key={g.id} value={g.id}>{g.name}</option>
-                  ))}
-                </select>
-
-                {isCreatingGroup && (
-                  <input
-                    type="text"
-                    placeholder="Name your new group..."
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    className="w-full bg-neutral-50 border border-blue-200 rounded-xl py-3 px-4 text-[13px] focus:outline-none focus:bg-white transition-all"
-                  />
-                )}
               </div>
             </div>
             
