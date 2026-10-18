@@ -136,31 +136,30 @@ async def llm_chat_stream(system: str, messages: List[Dict[str, str]]) -> AsyncG
             async with client.stream("POST", url, headers=headers, json=payload) as resp:
                 resp.raise_for_status()
                 inside_think = False
-                async for chunk in resp.aiter_text():
-                    for line in chunk.splitlines():
-                        if line.startswith("data: "):
-                            data_str = line[6:].strip()
-                            if data_str == "[DONE]":
-                                break
-                            try:
-                                data = json.loads(data_str)
-                                delta = data["choices"][0]["delta"]
-                                content = delta.get("content", "")
-                                if not content:
-                                    continue
-                                if "<think>" in content:
-                                    inside_think = True
-                                    content = content.split("<think>", 1)[0]
-                                if inside_think:
-                                    if "</think>" in content:
-                                        inside_think = False
-                                        content = content.split("</think>", 1)[1]
-                                    else:
-                                        continue
-                                if content:
-                                    yield content
-                            except json.JSONDecodeError:
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            delta = data["choices"][0]["delta"]
+                            content = delta.get("content", "")
+                            if not content:
                                 continue
+                            if "<think>" in content:
+                                inside_think = True
+                                content = content.split("<think>", 1)[0]
+                            if inside_think:
+                                if "</think>" in content:
+                                    inside_think = False
+                                    content = content.split("</think>", 1)[1]
+                                else:
+                                    continue
+                            if content:
+                                yield content
+                        except json.JSONDecodeError:
+                            continue
     except Exception as e:
         logger.error(f"Stream error: {str(e)}")
         yield "\n\n(Connection interrupted)"
