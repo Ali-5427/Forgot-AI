@@ -582,17 +582,26 @@ export default function PopupApp() {
         </div>
       )}
 
-      {/* Slide-out Navigation Drawer (Apollo SaaS Style) */}
-      {isMenuOpen && (
-        <div className="absolute inset-0 z-50 flex">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-neutral-900/40 backdrop-blur-xs transition-opacity duration-200" 
-            onClick={() => setIsMenuOpen(false)} 
-          />
+      {/* Slide-out Navigation Drawer (Smooth Sliding Animation) */}
+      <div 
+        className={`fixed inset-0 z-50 flex transition-all duration-300 ${
+          isMenuOpen ? "pointer-events-auto" : "pointer-events-none"
+        }`}
+      >
+        {/* Backdrop */}
+        <div 
+          className={`fixed inset-0 bg-neutral-900/40 backdrop-blur-xs transition-opacity duration-300 ease-in-out ${
+            isMenuOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setIsMenuOpen(false)} 
+        />
 
-          {/* Drawer Panel */}
-          <div className="relative w-[85%] bg-white h-full shadow-2xl flex flex-col justify-between z-10 animate-in slide-in-from-left duration-200 border-r border-neutral-200">
+        {/* Drawer Panel */}
+        <div 
+          className={`relative w-[85%] bg-white h-full shadow-2xl flex flex-col justify-between z-10 border-r border-neutral-200 transform transition-transform duration-300 ease-in-out ${
+            isMenuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
             {/* Top & Navigation Section */}
             <div className="flex-1 overflow-y-auto">
               {/* Drawer Header */}
@@ -702,7 +711,6 @@ export default function PopupApp() {
             </div>
           </div>
         </div>
-      )}
 
       {/* Header */}
       <div className="flex-none px-3.5 py-3 border-b border-neutral-200 bg-white flex items-center justify-between shadow-xs z-10 relative">
