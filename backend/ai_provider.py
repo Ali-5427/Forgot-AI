@@ -7,11 +7,21 @@ from typing import List, Dict, Any, AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
-# Config from Env (Fallback to what might exist)
+# Config from Env
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
+GROQ_BASE_URL = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
+GROQ_CHAT_MODEL = os.environ.get("GROQ_CHAT_MODEL", "openai/gpt-oss-120b")
+
 NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY") or os.environ.get("OLLAMA_API_KEY", "").strip()
 NVIDIA_BASE_URL = os.environ.get("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1").rstrip("/")
 NVIDIA_CHAT_MODEL = os.environ.get("NVIDIA_CHAT_MODEL", "meta/llama-3.2-11b-vision-instruct")
 NVIDIA_EMBED_MODEL = os.environ.get("NVIDIA_EMBED_MODEL", "nvidia/nemotron-3-embed-1b")
+
+def get_chat_config():
+    """Return (base_url, api_key, model) prioritizing Groq for ultra-fast chat."""
+    if GROQ_API_KEY:
+        return GROQ_BASE_URL, GROQ_API_KEY, GROQ_CHAT_MODEL
+    return NVIDIA_BASE_URL, NVIDIA_API_KEY, NVIDIA_CHAT_MODEL
 
 async def get_httpx_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=120.0)
@@ -68,21 +78,22 @@ async def embed_texts(texts: List[str], input_type: str = "passage") -> List[Lis
 
 async def llm_chat(system: str, messages: List[Dict[str, str]]) -> str:
     """Standard non-streaming chat with history."""
-    if not NVIDIA_API_KEY:
+    base_url, api_key, model = get_chat_config()
+    if not api_key:
         return "AI is not configured."
         
     headers = {
-        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
-    url = f"{NVIDIA_BASE_URL}/chat/completions"
+    url = f"{base_url}/chat/completions"
     
     payload_messages = [{"role": "system", "content": system}]
     payload_messages.extend(messages)
     
     payload = {
-        "model": NVIDIA_CHAT_MODEL,
+        "model": model,
         "messages": payload_messages,
         "stream": False
     }
@@ -111,22 +122,23 @@ async def llm_chat(system: str, messages: List[Dict[str, str]]) -> str:
 
 async def llm_chat_stream(system: str, messages: List[Dict[str, str]]) -> AsyncGenerator[str, None]:
     """Streaming chat returning text deltas."""
-    if not NVIDIA_API_KEY:
+    base_url, api_key, model = get_chat_config()
+    if not api_key:
         yield "AI is not configured."
         return
         
     headers = {
-        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
-    url = f"{NVIDIA_BASE_URL}/chat/completions"
+    url = f"{base_url}/chat/completions"
     
     payload_messages = [{"role": "system", "content": system}]
     payload_messages.extend(messages)
     
     payload = {
-        "model": NVIDIA_CHAT_MODEL,
+        "model": model,
         "messages": payload_messages,
         "stream": True
     }
