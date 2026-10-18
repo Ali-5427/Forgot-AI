@@ -502,20 +502,20 @@ export default function PopupApp() {
   };
 
   if (loading) {
-    return <div className="p-4 text-sm text-textMuted flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/> Loading...</div>;
+    return <div className="p-4 text-sm text-neutral-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/> Loading...</div>;
   }
 
   if (!email) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-bg p-6 space-y-6 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6 space-y-6 text-center">
         <div className="w-12 h-12 bg-neutral-900 rounded-xl flex items-center justify-center">
           <Brain className="w-6 h-6 text-white" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-xl font-bold text-textPrimary">Forgot AI</h2>
-          <p className="text-sm text-textSecondary">Sign in to start saving your memory.</p>
+          <h2 className="text-xl font-bold text-neutral-900">Forgot AI</h2>
+          <p className="text-sm text-neutral-500">Sign in to start saving your memory.</p>
         </div>
-        <button onClick={openAuth} className="w-full bg-textPrimary text-bg font-semibold text-sm rounded-lg py-3 px-4">
+        <button onClick={openAuth} className="w-full bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-sm rounded-lg py-3 px-4 transition-colors">
           Sign in
         </button>
       </div>
