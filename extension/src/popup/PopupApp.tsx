@@ -428,6 +428,27 @@ export default function PopupApp() {
       let answerText = "";
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
       
+      let animationFrameId: number | null = null;
+      const flushUpdate = () => {
+        setMessages((prev) => {
+          if (!prev.length) return prev;
+          const updated = [...prev];
+          const lastIdx = updated.length - 1;
+          if (updated[lastIdx].role === "assistant" && updated[lastIdx].content !== answerText) {
+            updated[lastIdx] = { ...updated[lastIdx], content: answerText };
+            return updated;
+          }
+          return prev;
+        });
+        animationFrameId = null;
+      };
+
+      const scheduleFlush = () => {
+        if (animationFrameId === null) {
+          animationFrameId = requestAnimationFrame(flushUpdate);
+        }
+      };
+
       let buffer = "";
       while (true) {
         const { done, value } = await reader.read();
@@ -443,11 +464,7 @@ export default function PopupApp() {
               const data = JSON.parse(line.slice(6));
               if (data.type === "token") {
                 answerText += data.text;
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = { role: "assistant", content: answerText };
-                  return updated;
-                });
+                scheduleFlush();
               } else if (data.type === "final") {
                 if (data.conversation_id) {
                   setConvId(data.conversation_id);
@@ -455,11 +472,7 @@ export default function PopupApp() {
                 }
               } else if (data.type === "error") {
                 answerText += "\n\n*(Error: " + (data.text || "Stream error") + ")*";
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = { role: "assistant", content: answerText };
-                  return updated;
-                });
+                scheduleFlush();
               }
             } catch (e) {
               // Ignore parse errors
@@ -467,6 +480,12 @@ export default function PopupApp() {
           }
         }
       }
+
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      flushUpdate();
     } catch (e: any) {
       if (e.name === 'AbortError') return;
       let errorMessage = "Sorry, I couldn't process that right now.";
