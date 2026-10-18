@@ -1611,37 +1611,79 @@ async def delete_conversation(conv_id: str, lib: str = Depends(resolve_library))
     db.supabase.table("conversations").delete().eq("id", conv_id).eq("user_id", user_id).execute()
     return {"success": True}
 
-def detect_chat_intent(query: str, has_history: bool, last_cited_ids: list) -> str:
-    q = query.strip().lower()
-    clean_q = re.sub(r'[^\w\s]', '', q).strip()
+def deduplicate_items(items: list) -> list:
+    """Normalize and deduplicate items by URL and title so duplicates never appear."""
+    seen_urls = set()
+    seen_titles = set()
+    unique = []
+    for it in items:
+        raw_url = (it.get("source_url") or it.get("url") or "").strip().rstrip("/")
+        norm_url = re.sub(r'^https?://(www\.)?', '', raw_url.lower()) if raw_url else ""
+        title = (it.get("title") or "").strip().lower()
 
-    chitchat_exact = {
-        "hi", "hello", "hey", "yo", "sup", "greetings", "good morning", "good afternoon", "good evening",
-        "bye", "goodbye", "cya", "see ya", "good night", "gn",
-        "thanks", "thank you", "thx", "thanks bro", "thank you bro", "ty", "cheers",
-        "ok", "okay", "k", "cool", "great", "nice", "awesome", "got it", "understood",
-        "how are you", "who are you", "what can you do", "help"
+        if norm_url and norm_url in seen_urls:
+            continue
+        if title and len(title) > 3 and title in seen_titles:
+            continue
+
+        if norm_url:
+            seen_urls.add(norm_url)
+        if title:
+            seen_titles.add(title)
+        unique.append(it)
+    return unique
+
+
+def classify_agent_action(query: str, has_history: bool) -> str:
+    """
+    Intelligently determines the agentic action for a user query:
+      - 'chitchat': Greetings, gratitude, closings, conversational pleasantries.
+      - 'followup': Follow-up questions about items/topics already discussed in active chat.
+      - 'recency': Explicit requests for recent saves, today's saves, latest notes.
+      - 'search': Search queries looking for specific topics or keywords in library.
+    """
+    q = query.strip().lower()
+    clean_q = re.sub(r'[^\w\s]', ' ', q)
+    clean_q = re.sub(r'\s+', ' ', clean_q).strip()
+
+    # 1. Chitchat / Gratitude / Closing / Social
+    chitchat_tokens = {
+        "hi", "hello", "hey", "yo", "sup", "greetings",
+        "thanks", "thank", "thx", "thnks", "thnx", "ty", "cheers",
+        "ok", "okay", "k", "cool", "great", "nice", "awesome", "perfect",
+        "got", "it", "understood", "alright", "sure", "sounds", "good",
+        "bye", "goodbye", "cya", "gn", "night", "morning", "afternoon", "evening",
+        "bro", "man", "mate", "dude", "welcome"
     }
-    if clean_q in chitchat_exact:
+    words = clean_q.split()
+    if words and all(w in chitchat_tokens for w in words):
         return "chitchat"
 
-    if any(clean_q.startswith(prefix) for prefix in ["thanks ", "thank you ", "bye ", "goodbye ", "hi ", "hello ", "hey "]):
-        if not any(w in clean_q for w in ["note", "notes", "save", "saved", "search", "find", "link", "image", "what did"]):
+    if any(clean_q.startswith(p) for p in ["thanks", "thank you", "thx", "thnks", "thnx", "ty", "ok thanks", "ok thnks", "okay thanks", "cool thanks", "great thanks"]):
+        if not any(w in words for w in ["search", "find", "where", "what", "which", "how", "show", "open", "explain"]):
             return "chitchat"
 
-    if has_history and last_cited_ids:
-        followup_triggers = [
-            "explain it", "explain that", "tell me more", "more details", "expand on that",
-            "the first one", "the second one", "the third one", "the last one",
-            "1st one", "2nd one", "3rd one", "first note", "second note", "third note",
-            "summarize it", "what about that", "why did i save that", "what does it say",
-            "show me its link", "show its link", "give me the link", "what is the link", "link", "url",
-            "open it", "what link", "where is it from"
-        ]
-        if any(trigger in clean_q for trigger in followup_triggers):
+    if clean_q in {"how are you", "who are you", "what can you do", "help"}:
+        return "chitchat"
+
+    # 2. Followup (only if conversation has history)
+    if has_history:
+        # Ordinal reference: 1st, 2nd, 3rd, 4th, 5th, etc.
+        if re.search(r'\b(\d+(st|nd|rd|th)|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last)\b', clean_q):
+            return "followup"
+        # Relative pronoun / follow-up phrases
+        if re.search(r'\b(explain|explian|summarize|details?|expand|tell me more|what does it say|why did i save|show (me )?(its|the) link|give (me )?(its|the) link|open it|where is it from)\b', clean_q):
+            return "followup"
+        if re.search(r'\b(the other one|that one|this one|about that|about it)\b', clean_q):
             return "followup"
 
-    return "memory"
+    # 3. Recency queries
+    if re.search(r'\b(today|yesterday|recent|recently|lately|newest|latest|what did i save|saved today|recent saves|what have i saved|my saves|my saved)\b', clean_q):
+        return "recency"
+
+    # 4. Search query
+    return "search"
+
 
 async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
     user_id = lib
@@ -1661,36 +1703,110 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
         messages = list(reversed(m_res.data))
         is_new = False
 
-    cited_ids = []
-    if messages and messages[-1]["role"] == "assistant":
-        cited_ids = messages[-1].get("cited_item_ids") or []
+    # Collect all cited item IDs across the entire conversation history (Session Memory Pool)
+    session_cited_ids = []
+    for m in messages:
+        if m.get("role") == "assistant" and m.get("cited_item_ids"):
+            for cid in m["cited_item_ids"]:
+                if cid and cid not in session_cited_ids:
+                    session_cited_ids.append(cid)
 
-    intent = detect_chat_intent(query, bool(messages), cited_ids)
-    logger.info(f"V2 Chat: {conv_id} | Intent: {intent} | Query: {query[:40]}")
+    action = classify_agent_action(query, bool(messages))
+    logger.info(f"V2 Agent Action: {action} | Conv: {conv_id} | Session IDs: {len(session_cited_ids)} | Query: {query[:40]}")
 
     final_ids = []
     context_items = []
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d (%A)")
 
-    if intent == "chitchat":
+    if action == "chitchat":
+        final_ids = session_cited_ids[:8]
+        context_items = []
         system_prompt = (
-            "You are Forgot AI, a helpful and friendly personal memory assistant. "
-            "The user is engaging in casual conversation, greetings, pleasantries, or closings. "
-            "Respond naturally, warmly, and concisely. "
-            "Do NOT mention saved items or memories unless the user explicitly asks about them."
+            "You are Forgot AI, a warm, helpful, and concise personal memory assistant.\n"
+            "The user is engaging in casual conversation, pleasantries, greetings, or expressing gratitude.\n"
+            "Respond naturally, warmly, and concisely (e.g. 'You're welcome! Let me know if you need anything else!').\n"
+            "Do NOT search for new notes, do NOT bring up unprompted notes, and do NOT apologize or claim you made an error."
         )
-    elif intent == "followup":
-        final_ids = cited_ids[:8]
-        if final_ids:
-            try:
-                items_res = db.supabase.table("items").select("*").in_("id", final_ids).eq("library_id", lib).execute()
-                context_items = items_res.data or []
-            except Exception as e:
-                logger.error(f"Failed to fetch previous cited items for followup: {e}")
-                context_items = []
-        if not context_items:
-            intent = "memory"
 
-    if intent == "memory":
+    elif action == "followup":
+        # Pull all previously cited items from session pool
+        if session_cited_ids:
+            try:
+                items_res = db.supabase.table("items").select("*").in_("id", session_cited_ids).eq("library_id", lib).execute()
+                context_items = deduplicate_items(items_res.data or [])
+            except Exception as e:
+                logger.error(f"Failed to fetch session items for followup: {e}")
+                context_items = []
+        
+        # Fallback to recent items if session had no cited IDs
+        if not context_items:
+            try:
+                fallback_res = db.supabase.table("items").select("*").eq("library_id", lib).eq("status", "ready").order("created_at", desc=True).limit(6).execute()
+                context_items = deduplicate_items(fallback_res.data or [])
+            except Exception as e:
+                logger.error(f"Fallback fetch for followup failed: {e}")
+                context_items = []
+
+        final_ids = list(dict.fromkeys([it["id"] for it in context_items] + session_cited_ids))[:10]
+        
+        context_str = ""
+        for idx, item in enumerate(context_items):
+            safe_text = (item.get('searchable_text', '') + ' ' + item.get('extracted_text', ''))[:1000]
+            url = item.get('source_url') or item.get('url') or ''
+            url_line = f"URL: {url}\n" if url else ""
+            created_at = item.get('created_at') or ''
+            date_line = f"SavedDate: {created_at[:10]}\n" if created_at else ""
+            type_line = f"Type: {item.get('content_type', 'note')}\n"
+            title = item.get('title') or 'Untitled'
+            summary = item.get('summary') or ''
+            context_str += f'<memory index="{idx+1}">\nTitle: {title}\n{type_line}{url_line}{date_line}Summary: {summary}\nText: {safe_text}\n</memory>\n\n'
+
+        system_prompt = (
+            f"You are Forgot AI, an intelligent personal memory assistant. Today's date is {today_str}.\n"
+            "The user is asking a follow-up question about an item or topic already discussed in this conversation.\n"
+            "Use the conversation history and the saved memories below to answer the user directly and helpfully.\n"
+            "- If the user asks about 'the 4th one', 'the 5th one', 'the second link', etc., identify that exact item from your previous message in the chat history.\n"
+            "- Provide the exact clickable markdown link [Title](URL) if requested.\n"
+            "- NEVER claim an item does not exist or that you made a mistake if it was already mentioned or appears in the chat history.\n"
+            "- Do NOT output raw database IDs. Refer to items by their title or clean clickable link.\n\n"
+            f"Previously discussed memories:\n{context_str}"
+        )
+
+    elif action == "recency":
+        try:
+            rec_res = db.supabase.table("items").select("*").eq("library_id", lib).eq("status", "ready").order("created_at", desc=True).limit(10).execute()
+            raw_items = rec_res.data or []
+            context_items = deduplicate_items(raw_items)[:6]
+        except Exception as e:
+            logger.error(f"Failed to fetch recent items: {e}")
+            context_items = []
+
+        final_ids = list(dict.fromkeys([it["id"] for it in context_items] + session_cited_ids))[:10]
+
+        context_str = ""
+        for idx, item in enumerate(context_items):
+            safe_text = (item.get('searchable_text', '') + ' ' + item.get('extracted_text', ''))[:1000]
+            url = item.get('source_url') or item.get('url') or ''
+            url_line = f"URL: {url}\n" if url else ""
+            created_at = item.get('created_at') or ''
+            date_line = f"SavedDate: {created_at[:10]}\n" if created_at else ""
+            type_line = f"Type: {item.get('content_type', 'note')}\n"
+            title = item.get('title') or 'Untitled'
+            summary = item.get('summary') or ''
+            context_str += f'<memory index="{idx+1}">\nTitle: {title}\n{type_line}{url_line}{date_line}Summary: {summary}\nText: {safe_text}\n</memory>\n\n'
+
+        system_prompt = (
+            f"You are Forgot AI, an intelligent personal memory assistant. Today's date is {today_str}.\n"
+            "You have access to the user's recently saved items in the <memory> blocks below.\n"
+            "- List the user's recently saved items clearly as a clean numbered list (1., 2., 3., etc.).\n"
+            "- For each item, provide the exact clickable markdown link [Title](URL).\n"
+            "- If asked about 'today' or 'yesterday', check the SavedDate of each memory against today's date ({today_str[:10]}).\n"
+            "- Do NOT output raw database IDs. Refer to memories by their title or clean clickable link.\n"
+            "- Answer directly, concisely, and helpfully.\n\n"
+            f"Recent Memories:\n{context_str}"
+        )
+
+    else:  # action == "search"
         standalone_query = query
         if messages:
             hist_text = "\n".join([f"{m['role']}: {m['content']}" for m in messages[-4:]])
@@ -1700,7 +1816,7 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
             except Exception as e:
                 logger.error(f"Query rewrite failed: {e}")
                 standalone_query = query
-                
+
         try:
             embeddings = await embed_texts([standalone_query], input_type="query")
             q_emb = embeddings[0]
@@ -1709,7 +1825,6 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
             q_emb = None
 
         rpc_params = {"p_library": lib, "p_query": standalone_query, "p_embedding": q_emb, "p_limit": 8}
-            
         top_ids = []
         try:
             search_res = db.supabase.rpc("hybrid_search_items", rpc_params).execute()
@@ -1719,30 +1834,18 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
             logger.error(f"Hybrid search failed: {e}")
             top_ids = []
 
-        # Recency queries (e.g. 'today', 'recent') or fallback if search returned no IDs: retrieve recent ready items
-        is_recency_query = any(w in standalone_query.lower() for w in ["today", "recent", "lately", "newest", "latest", "what did i save", "saved today"])
-        if is_recency_query or not top_ids:
+        if top_ids:
             try:
-                fallback_res = db.supabase.table("items").select("id").eq("library_id", lib).eq("status", "ready").order("created_at", desc=True).limit(6).execute()
-                if fallback_res.data:
-                    recent_ids = [r["id"] for r in fallback_res.data]
-                    top_ids = list(dict.fromkeys((recent_ids if is_recency_query else []) + top_ids + recent_ids))[:8]
-                    logger.info(f"Using recent items for memory search: {len(top_ids)} items")
+                items_res = db.supabase.table("items").select("*").in_("id", top_ids).eq("library_id", lib).execute()
+                context_items = deduplicate_items(items_res.data or [])[:6]
             except Exception as e:
-                logger.error(f"Fallback search failed: {e}")
-            
-        final_ids = list(dict.fromkeys(top_ids + cited_ids))[:8]
-        if final_ids:
-            try:
-                items_res = db.supabase.table("items").select("*").in_("id", final_ids).eq("library_id", lib).execute()
-                context_items = items_res.data or []
-            except Exception as e:
-                logger.error(f"Failed to fetch context items: {e}")
+                logger.error(f"Failed to fetch search items: {e}")
                 context_items = []
+        else:
+            context_items = []
 
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d (%A)")
+        final_ids = list(dict.fromkeys([it["id"] for it in context_items] + session_cited_ids))[:10]
 
-    if intent in ("memory", "followup"):
         if context_items:
             context_str = ""
             for idx, item in enumerate(context_items):
@@ -1754,29 +1857,28 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
                 type_line = f"Type: {item.get('content_type', 'note')}\n"
                 title = item.get('title') or 'Untitled'
                 summary = item.get('summary') or ''
-                context_str += f'<memory id="{item["id"]}">\nTitle: {title}\n{type_line}{url_line}{date_line}Summary: {summary}\nText: {safe_text}\n</memory>\n\n'
-                
+                context_str += f'<memory index="{idx+1}">\nTitle: {title}\n{type_line}{url_line}{date_line}Summary: {summary}\nText: {safe_text}\n</memory>\n\n'
+
             system_prompt = (
                 f"You are Forgot AI, an intelligent personal memory assistant. Today's date is {today_str}.\n"
-                "You have access to the user's saved items in the <memory> blocks below.\n"
-                "- When the user asks for links, sources, or URLs, provide the exact clickable markdown link (e.g. [Title](URL)).\n"
-                "- If asked about recent saves or dates (like 'today' or 'yesterday'), check the SavedDate of each memory against today's date.\n"
-                "- Do NOT output raw database IDs like [uuid]. Refer to memories by their title or clean clickable link.\n"
-                "- Answer the user's question directly, concisely, and helpfully using information from their memories.\n"
-                "- If the user asks a conversational or general question, answer helpfully while prioritizing their memories.\n\n"
-                f"Memories:\n{context_str}"
+                "You have access to the user's saved items matching their search in the <memory> blocks below.\n"
+                "- Provide the exact clickable markdown link (e.g. [Title](URL)) for relevant results.\n"
+                "- Answer the user's question directly and concisely using information from their memories.\n"
+                "- Do NOT output raw database IDs like [uuid]. Refer to memories by their title or clean clickable link.\n\n"
+                f"Search Results:\n{context_str}"
             )
         else:
             system_prompt = (
                 f"You are Forgot AI, a personal memory assistant. Today's date is {today_str}.\n"
-                "The user is asking about their saved items, but no matching notes or links were found in their saved library for this query.\n"
-                "Politely and concisely tell the user you couldn't find any saved notes or links matching their request, and offer helpful next steps. Do NOT hallucinate fake memories."
+                f"The user searched for '{query}', but no saved notes or links matching that topic were found in their library.\n"
+                "Politely and concisely let the user know you couldn't find any saved notes matching that specific search, and suggest they try another keyword or save something new.\n"
+                "IMPORTANT: Do NOT apologize for previous messages or claim previous items didn't exist."
             )
 
     llm_history = [{"role": m["role"], "content": m["content"]} for m in messages]
     llm_history.append({"role": "user", "content": query})
     
-    logger.info(f"V2 Chat: {conv_id} | User: {user_id[-6:]} | Retrieved: {len(final_ids)} items")
+    logger.info(f"V2 Chat: {conv_id} | User: {user_id[-6:]} | Action: {action} | Context Items: {len(context_items)}")
 
     return conv_id, system_prompt, llm_history, final_ids, context_items, is_new
 
