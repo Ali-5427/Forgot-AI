@@ -639,7 +639,7 @@ export default function PopupApp() {
           />
 
           {/* Drawer Panel */}
-          <div className="relative w-[280px] max-w-[85%] bg-white h-full shadow-2xl flex flex-col justify-between z-10 animate-in slide-in-from-left duration-200 border-r border-neutral-200">
+          <div className="relative w-[85%] bg-white h-full shadow-2xl flex flex-col justify-between z-10 animate-in slide-in-from-left duration-200 border-r border-neutral-200">
             {/* Top & Navigation Section */}
             <div className="flex-1 overflow-y-auto">
               {/* Drawer Header */}
