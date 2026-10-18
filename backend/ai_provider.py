@@ -135,6 +135,7 @@ async def llm_chat_stream(system: str, messages: List[Dict[str, str]]) -> AsyncG
         async with await get_httpx_client() as client:
             async with client.stream("POST", url, headers=headers, json=payload) as resp:
                 resp.raise_for_status()
+                inside_think = False
                 async for chunk in resp.aiter_text():
                     for line in chunk.splitlines():
                         if line.startswith("data: "):
@@ -144,8 +145,20 @@ async def llm_chat_stream(system: str, messages: List[Dict[str, str]]) -> AsyncG
                             try:
                                 data = json.loads(data_str)
                                 delta = data["choices"][0]["delta"]
-                                if "content" in delta:
-                                    yield strip_reasoning(delta["content"])
+                                content = delta.get("content", "")
+                                if not content:
+                                    continue
+                                if "<think>" in content:
+                                    inside_think = True
+                                    content = content.split("<think>", 1)[0]
+                                if inside_think:
+                                    if "</think>" in content:
+                                        inside_think = False
+                                        content = content.split("</think>", 1)[1]
+                                    else:
+                                        continue
+                                if content:
+                                    yield content
                             except json.JSONDecodeError:
                                 continue
     except Exception as e:
