@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon, Copy, Check, RotateCcw, Edit2, Square, Settings, Link, PenTool, Sparkles, MessageSquare, Calendar, Link2 } from "lucide-react";
+import { Brain, Send, Plus, Loader2, ExternalLink, LogOut, X, Image as ImageIcon, Copy, Check, RotateCcw, Edit2, Square, Settings, Link, PenTool, Sparkles, MessageSquare, Calendar, Link2, Menu, SquarePen, PanelLeftClose, Folder, HelpCircle, MessageSquareQuote } from "lucide-react";
 import { api, request, fetchStream } from "../lib/api";
 import { CONFIG } from "../lib/config";
 import { clearSession, getSession, onSessionChange } from "../lib/storage";
@@ -327,6 +327,15 @@ export default function PopupApp() {
   const openApp = () => {
     chrome.tabs.create({ url: CONFIG.APP_URL });
   };
+  const openSettings = () => {
+    chrome.tabs.create({ url: `${CONFIG.APP_URL}/settings` });
+  };
+  const openGuide = () => {
+    chrome.tabs.create({ url: `${CONFIG.APP_URL}/#faq` });
+  };
+  const openFeedback = () => {
+    chrome.tabs.create({ url: `${CONFIG.APP_URL}/contact` });
+  };
   const logout = async () => {
     await api.logout();
     await clearSession();
@@ -620,51 +629,153 @@ export default function PopupApp() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex-none p-4 border-b border-neutral-200 bg-white flex items-center justify-between shadow-sm z-10 relative">
-        <div className="flex items-center gap-2 font-bold text-[15px] tracking-tight">
-          <div className="w-7 h-7 bg-neutral-900 rounded-md flex items-center justify-center shadow-sm">
-            <Brain className="w-4 h-4 text-white" />
-          </div>
-          Forgot AI
-        </div>
-        
-        <button onClick={startNewChat} className="p-2 mr-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors" title="New Chat"><Plus className="w-4 h-4" /></button>
-          {/* Settings Menu */}
-        <div className="relative">
-          <button 
-            onClick={() => setIsMenuOpen(!isMenuOpen)} 
-            className={`p-2 rounded-full transition-colors ${isMenuOpen ? 'bg-neutral-100 text-neutral-900' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}`}
-            title="Menu"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-          
-          {isMenuOpen && (
-            <>
-              {/* Invisible overlay to catch clicks outside */}
-              <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
-              
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-neutral-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+      {/* Slide-out Navigation Drawer (Apollo SaaS Style) */}
+      {isMenuOpen && (
+        <div className="absolute inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-neutral-900/40 backdrop-blur-xs transition-opacity duration-200" 
+            onClick={() => setIsMenuOpen(false)} 
+          />
+
+          {/* Drawer Panel */}
+          <div className="relative w-[280px] max-w-[85%] bg-white h-full shadow-2xl flex flex-col justify-between z-10 animate-in slide-in-from-left duration-200 border-r border-neutral-200">
+            {/* Top & Navigation Section */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Drawer Header */}
+              <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-[15px] tracking-tight text-neutral-900">
+                  <div className="w-7 h-7 bg-neutral-900 rounded-md flex items-center justify-center shadow-sm">
+                    <Brain className="w-4 h-4 text-white" />
+                  </div>
+                  Forgot AI
+                </div>
                 <button 
-                  onClick={() => { openApp(); setIsMenuOpen(false); }} 
-                  className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-neutral-700 hover:bg-neutral-50 flex items-center gap-2.5 transition-colors"
+                  onClick={() => setIsMenuOpen(false)} 
+                  className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                  title="Close menu"
                 >
-                  <ExternalLink className="w-4 h-4 text-neutral-500" />
-                  Open Dashboard
-                </button>
-                <div className="h-[1px] bg-neutral-100 w-full my-0.5"></div>
-                <button 
-                  onClick={() => { logout(); setIsMenuOpen(false); }} 
-                  className="w-full text-left px-4 py-2.5 text-[14px] font-medium text-red-600 hover:bg-red-50 flex items-center gap-2.5 transition-colors"
-                >
-                  <LogOut className="w-4 h-4 text-red-500" />
-                  Log Out
+                  <PanelLeftClose className="w-4 h-4" />
                 </button>
               </div>
-            </>
-          )}
+
+              {/* Navigation Items */}
+              <div className="p-3 space-y-1">
+                <button 
+                  onClick={() => { openApp(); setIsMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition-colors text-left"
+                >
+                  <Folder className="w-4 h-4 text-neutral-500" />
+                  All Saved Notes
+                </button>
+
+                <button 
+                  onClick={() => { openSettings(); setIsMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition-colors text-left"
+                >
+                  <Settings className="w-4 h-4 text-neutral-500" />
+                  Settings
+                </button>
+
+                <button 
+                  onClick={() => { openGuide(); setIsMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition-colors text-left"
+                >
+                  <HelpCircle className="w-4 h-4 text-neutral-500" />
+                  Get Started Guide
+                </button>
+
+                <button 
+                  onClick={() => { openFeedback(); setIsMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition-colors text-left"
+                >
+                  <MessageSquareQuote className="w-4 h-4 text-neutral-500" />
+                  Feedback & Support
+                </button>
+              </div>
+
+              {/* Web App Promo Card */}
+              <div className="px-3 pt-2">
+                <div className="bg-gradient-to-br from-neutral-50 to-neutral-100/80 border border-neutral-200/80 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-500 tracking-wider uppercase">
+                    <Sparkles className="w-3.5 h-3.5 text-neutral-700" />
+                    Web Platform
+                  </div>
+                  <p className="text-[12px] text-neutral-600 leading-relaxed font-normal">
+                    Manage your memory library, search & folders in the web app.
+                  </p>
+                  <button 
+                    onClick={() => { openApp(); setIsMenuOpen(false); }}
+                    className="w-full py-2 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-[12px] font-medium flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    Open Dashboard
+                    <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* User Profile Footer */}
+            <div className="p-3 border-t border-neutral-100 bg-neutral-50/50">
+              {email ? (
+                <div className="flex items-center justify-between gap-2 p-1.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-neutral-900 text-white font-semibold text-[13px] flex items-center justify-center shrink-0 shadow-xs">
+                      {email.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex flex-col">
+                      <span className="text-[13px] font-medium text-neutral-900 truncate leading-tight" title={email}>
+                        {email}
+                      </span>
+                      <span className="text-[11px] text-neutral-400">Signed in</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => { logout(); setIsMenuOpen(false); }}
+                    className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                    title="Log out"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => { openAuth(); setIsMenuOpen(false); }}
+                  className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Header */}
+      <div className="flex-none px-3.5 py-3 border-b border-neutral-200 bg-white flex items-center justify-between shadow-xs z-10 relative">
+        <div className="flex items-center gap-2.5">
+          <button 
+            onClick={() => setIsMenuOpen(true)} 
+            className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+            title="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2 font-bold text-[15px] tracking-tight text-neutral-900">
+            <div className="w-7 h-7 bg-neutral-900 rounded-md flex items-center justify-center shadow-sm">
+              <Brain className="w-4 h-4 text-white" />
+            </div>
+            Forgot AI
+          </div>
+        </div>
+        
+        <button 
+          onClick={startNewChat} 
+          className="p-1.5 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors" 
+          title="New Chat"
+        >
+          <SquarePen className="w-5 h-5" />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-8 pb-32" ref={scrollRef}>
