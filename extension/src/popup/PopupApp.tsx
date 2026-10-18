@@ -11,6 +11,220 @@ interface ChatMessage {
   content: string;
 }
 
+function getNodeText(node: React.ReactNode): string {
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(getNodeText).join("");
+  if (node && typeof node === "object" && "props" in (node as any)) {
+    return getNodeText((node as any).props?.children);
+  }
+  return "";
+}
+
+function isUrlLike(text: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (/^(https?:\/\/|www\.)/i.test(trimmed)) {
+    return true;
+  }
+  return /^[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(\/.*)?$/i.test(trimmed);
+}
+
+function isUrlOrMatchesHref(text: string, href?: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (href) {
+    const cleanHref = href.trim();
+    if (trimmed === cleanHref || trimmed === cleanHref.replace(/^https?:\/\//i, "")) {
+      return true;
+    }
+  }
+  return isUrlLike(trimmed);
+}
+
+function formatUrlDisplay(rawText: string, href?: string): string {
+  try {
+    const target = href || (isUrlLike(rawText) ? rawText : "") || rawText;
+    const urlObj = new URL(
+      target.startsWith("http://") || target.startsWith("https://") ? target : `https://${target}`
+    );
+    const host = urlObj.port
+      ? `${urlObj.hostname.replace(/^www\./, "")}:${urlObj.port}`
+      : urlObj.hostname.replace(/^www\./, "");
+    const pathname = urlObj.pathname.replace(/\/$/, "");
+
+    if (!pathname || pathname === "") {
+      return urlObj.search ? `${host}/…` : host;
+    }
+
+    const pathSegments = pathname.split("/").filter(Boolean);
+    if (pathSegments.length === 0) {
+      return urlObj.search ? `${host}/…` : host;
+    }
+
+    if (pathSegments.length === 1) {
+      let seg = pathSegments[0];
+      try {
+        seg = decodeURIComponent(seg);
+      } catch {
+        // use raw segment
+      }
+      const shortSeg = seg.length > 20 ? seg.slice(0, 17) + "…" : seg;
+      return `${host}/${shortSeg}`;
+    }
+
+    let lastSegment = pathSegments[pathSegments.length - 1];
+    try {
+      lastSegment = decodeURIComponent(lastSegment);
+    } catch {
+      // use raw segment
+    }
+    const shortSegment = lastSegment.length > 20 ? lastSegment.slice(0, 17) + "…" : lastSegment;
+    return `${host}/…/${shortSegment}`;
+  } catch {
+    const text = rawText || href || "";
+    return text.length > 30 ? text.slice(0, 27) + "…" : text;
+  }
+}
+
+function ChatLink({
+  href,
+  children,
+  isUser = false,
+  node,
+  ...props
+}: {
+  href?: string;
+  children?: React.ReactNode;
+  isUser?: boolean;
+  node?: any;
+  [key: string]: any;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const fullUrl = href
+    ? (/^(https?:\/\/|mailto:)/i.test(href) ? href : `https://${href}`)
+    : "";
+  const childText = getNodeText(children).trim();
+
+  let displayLabel: string;
+  if (!childText || isUrlOrMatchesHref(childText, fullUrl)) {
+    displayLabel = formatUrlDisplay(childText || fullUrl, fullUrl);
+  } else {
+    displayLabel = childText.length > 35 ? childText.slice(0, 32) + "…" : childText;
+  }
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!fullUrl) return;
+    navigator.clipboard.writeText(fullUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const linkColor = isUser
+    ? "text-blue-300 hover:text-blue-200"
+    : "text-blue-600 hover:text-blue-800";
+
+  const copyButtonColor = isUser
+    ? "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
+    : "text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100";
+
+  const { className: _unused, ...domProps } = props;
+
+  return (
+    <span className="inline-flex items-center gap-1 max-w-full min-w-0 align-bottom my-0.5">
+      <a
+        href={fullUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={fullUrl}
+        className={`${linkColor} underline font-medium truncate min-w-0 transition-colors`}
+        {...domProps}
+      >
+        {displayLabel}
+      </a>
+      {fullUrl && (
+        <button
+          type="button"
+          onClick={handleCopy}
+          title={copied ? "Copied URL!" : "Copy full URL"}
+          className={`shrink-0 p-0.5 rounded transition-colors ${copyButtonColor}`}
+          aria-label="Copy URL"
+        >
+          {copied ? (
+            <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+          ) : (
+            <Copy className="w-3 h-3 shrink-0" />
+          )}
+        </button>
+      )}
+    </span>
+  );
+}
+
+function renderMessageWithLinks(content: string, isUser = false) {
+  if (!content) return null;
+
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = urlRegex.exec(content)) !== null) {
+    const matchStart = match.index;
+    let matchedUrl = match[0];
+
+    if (matchStart > lastIndex) {
+      parts.push(content.slice(lastIndex, matchStart));
+    }
+
+    let trailingPunct = "";
+    while (matchedUrl.length > 0) {
+      const lastChar = matchedUrl.slice(-1);
+      if (
+        lastChar === ")" &&
+        (matchedUrl.match(/\(/g) || []).length >= (matchedUrl.match(/\)/g) || []).length
+      ) {
+        break;
+      }
+      if (/[.,;:!?)'"]/.test(lastChar)) {
+        trailingPunct = lastChar + trailingPunct;
+        matchedUrl = matchedUrl.slice(0, -1);
+      } else {
+        break;
+      }
+    }
+
+    const fullHref = /^(https?:\/\/)/i.test(matchedUrl)
+      ? matchedUrl
+      : `https://${matchedUrl}`;
+
+    parts.push(
+      <ChatLink
+        key={`${matchStart}-${matchedUrl}`}
+        href={fullHref}
+        isUser={isUser}
+      >
+        {matchedUrl}
+      </ChatLink>
+    );
+
+    if (trailingPunct) {
+      parts.push(trailingPunct);
+    }
+
+    lastIndex = matchStart + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex));
+  }
+
+  return parts;
+}
+
 export default function PopupApp() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
@@ -434,7 +648,7 @@ export default function PopupApp() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-8 pb-32" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-8 pb-32" ref={scrollRef}>
         {/* Chat Thread */}
         <div className="space-y-4">
           {messages.length === 0 ? (
@@ -512,29 +726,29 @@ export default function PopupApp() {
           ) : (
             <div className="space-y-6">
               {messages.map((msg, i) => (
-                <div key={i} className={`group flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
+                <div key={i} className={`group flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-full min-w-0`}>
+                  <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} w-full min-w-0`}>
                     {msg.role === 'assistant' && (
                        <div className="w-7 h-7 mr-3 mt-0.5 shrink-0 bg-neutral-900 rounded-full flex items-center justify-center shadow-sm">
                          <Brain className="w-3.5 h-3.5 text-white" />
                        </div>
                     )}
-                    <div className={`text-[14px] leading-relaxed ${
-                      msg.role === 'user' ? 'max-w-[85%] bg-neutral-900 text-white rounded-3xl rounded-br-md px-4 py-3 shadow-sm' : 'max-w-[90%] text-neutral-800'
+                    <div className={`text-[14px] leading-relaxed break-words min-w-0 ${
+                      msg.role === 'user' ? 'max-w-[85%] bg-neutral-900 text-white rounded-3xl rounded-br-md px-4 py-3 shadow-sm whitespace-pre-wrap' : 'max-w-[90%] text-neutral-800'
                     }`}>
                       {msg.role === 'assistant' ? (
-                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold">
+                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold break-words min-w-0">
                           <ReactMarkdown 
                             remarkPlugins={[remarkGfm]}
                             components={{
-                              a: ({node, ...props}) => <a className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />
+                              a: ({node, ...props}) => <ChatLink isUser={false} {...props} />
                             }}
                           >
                             {msg.content}
                           </ReactMarkdown>
                         </div>
                       ) : (
-                        msg.content
+                        renderMessageWithLinks(msg.content, true)
                       )}
                     </div>
                   </div>
