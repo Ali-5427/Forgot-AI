@@ -98,6 +98,10 @@ function AppContent() {
   return (
     <>
       <Routes>
+        {/* Dedicated Auth Routes */}
+        <Route path="/login" element={<AuthGate />} />
+        <Route path="/signup" element={<AuthGate initialMode="register" />} />
+
         {/* Public Marketing & Legal Pages */}
         <Route element={<PublicLayout onOpenApp={() => setShowAuth(true)} />}>
           {!user && <Route path="/" element={<LandingPage onOpenApp={() => setShowAuth(true)} />} />}
@@ -131,16 +135,8 @@ function AppContent() {
       
       {!user && showAuth && (
         <div className="fixed inset-0 z-[100] bg-white overflow-y-auto flex flex-col">
-          <button
-            type="button"
-            onClick={() => setShowAuth(false)}
-            className="absolute left-4 top-4 z-[110] text-sm text-muted-foreground hover:text-foreground"
-            data-testid="auth-back"
-          >
-            Back
-          </button>
           <div className="relative min-h-screen">
-            <AuthGate />
+            <AuthGate onClose={() => setShowAuth(false)} />
           </div>
         </div>
       )}

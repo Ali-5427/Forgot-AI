@@ -1,16 +1,19 @@
 // Service worker: routes SAVE_MEMORY messages, opens auth tab.
 import { api } from "../lib/api";
+import { CONFIG } from "../lib/config";
 import type {
   ExtMessage,
   SaveResponse,
   GetAuthResponse,
 } from "../lib/messages";
-import { getSession } from "../lib/storage";
+import { getSession, setSession, clearSession } from "../lib/storage";
 
-chrome.runtime.onInstalled.addListener(async () => {
-  const s = await getSession();
-  if (!s) {
-    chrome.tabs.create({ url: chrome.runtime.getURL("src/auth/index.html") });
+chrome.runtime.onInstalled.addListener(async (details) => {
+  if (details.reason === "install") {
+    const s = await getSession();
+    if (!s) {
+      chrome.tabs.create({ url: `${CONFIG.APP_URL}/login?source=extension` });
+    }
   }
 });
 
@@ -47,7 +50,25 @@ chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) =>
         return;
       }
       if (msg.type === "OPEN_AUTH_TAB") {
-        chrome.tabs.create({ url: chrome.runtime.getURL("src/auth/index.html") });
+        chrome.tabs.create({ url: `${CONFIG.APP_URL}/login?source=extension` });
+        sendResponse({ ok: true });
+        return;
+      }
+      if (msg.type === "SYNC_AUTH_FROM_WEB") {
+        await setSession({
+          token: msg.payload.token,
+          refresh_token: msg.payload.refresh_token,
+          user: {
+            id: msg.payload.user.id,
+            email: msg.payload.user.email,
+            created_at: msg.payload.user.created_at || new Date().toISOString(),
+          },
+        });
+        sendResponse({ ok: true });
+        return;
+      }
+      if (msg.type === "CLEAR_AUTH_FROM_WEB") {
+        await clearSession();
         sendResponse({ ok: true });
         return;
       }
@@ -65,3 +86,4 @@ chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) =>
   })();
   return true; // keep channel open for async response
 });
+

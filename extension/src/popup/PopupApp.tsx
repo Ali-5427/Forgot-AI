@@ -316,7 +316,7 @@ export default function PopupApp() {
   };
 
   const openAuth = () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("src/auth/index.html") });
+    chrome.tabs.create({ url: `${CONFIG.APP_URL}/login?source=extension` });
   };
   const openApp = () => {
     chrome.tabs.create({ url: CONFIG.APP_URL });

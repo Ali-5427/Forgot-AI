@@ -279,11 +279,31 @@ let lastHref = location.href;
 setInterval(() => {
   if (location.href !== lastHref) {
     lastHref = location.href;
-    // Rebuild Mode B on SPA route change
-    // for (const [t, p] of modeBPills.entries()) {
-    //   p.destroy();
-    //   modeBPills.delete(t);
-    // }
-    // setTimeout(refreshModeB, 400);
   }
 }, 800);
+
+// -----------------------------------------------------------------------------
+// Web Auth Sync: Syncs session between Forgot AI Web App and Extension
+// -----------------------------------------------------------------------------
+window.addEventListener("message", (event) => {
+  if (event.source !== window) return;
+  if (event.data?.type === "FORGOT_AI_AUTH_SYNC" && event.data?.session?.token) {
+    chrome.runtime.sendMessage(
+      {
+        type: "SYNC_AUTH_FROM_WEB",
+        payload: event.data.session,
+      },
+      () => {
+        window.postMessage({ type: "FORGOT_AI_AUTH_SYNC_SUCCESS" }, "*");
+      }
+    );
+  } else if (event.data?.type === "FORGOT_AI_AUTH_LOGOUT") {
+    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" });
+  }
+});
+
+// Request active session from web page if currently on Forgot AI web app
+try {
+  window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
+} catch {}
+

@@ -1,19 +1,53 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import { Loader2, Eye, EyeOff, Check, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/auth";
-import { formatApiErrorDetail } from "@/api";
+import { formatApiErrorDetail, getToken, getRefreshToken } from "@/api";
 
-export default function AuthGate() {
-  const { login, register } = useAuth();
-  const [mode, setMode] = useState("login");
+export default function AuthGate({ initialMode = "login", onClose }) {
+  const { user, login, register } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isExtension = searchParams.get("source") === "extension";
+  const urlMode = searchParams.get("mode");
+
+  const [mode, setMode] = useState(urlMode === "signup" ? "register" : initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Sync to extension and optionally auto-close if authenticated
+  useEffect(() => {
+    if (user && isExtension) {
+      if (typeof window !== "undefined") {
+        window.postMessage(
+          {
+            type: "FORGOT_AI_AUTH_SYNC",
+            session: {
+              token: getToken(),
+              refresh_token: getRefreshToken() || undefined,
+              user: {
+                id: user.id,
+                email: user.email,
+                created_at: user.created_at || new Date().toISOString(),
+              },
+            },
+          },
+          "*"
+        );
+      }
+      const timer = setTimeout(() => {
+        try {
+          window.close();
+        } catch {}
+      }, 1800);
+      return () => clearTimeout(timer);
+    }
+  }, [user, isExtension]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -29,15 +63,82 @@ export default function AuthGate() {
     }
   };
 
+  // If already authenticated:
+  if (user) {
+    if (isExtension) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-white p-6 relative">
+          <div className="max-w-md w-full text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="mx-auto w-16 h-16 bg-neutral-900 rounded-2xl flex items-center justify-center shadow-lg shadow-black/10">
+              <Check className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
+                Connected to Extension
+              </h1>
+              <p className="text-sm text-neutral-600 mt-2">
+                Signed in as <span className="font-semibold text-neutral-900">{user.email}</span>
+              </p>
+              <p className="text-xs text-neutral-400 mt-1">
+                Your Forgot AI extension is now synced. You can close this tab.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <Button
+                variant="outline"
+                onClick={() => window.close()}
+                className="h-10 px-5 text-sm font-medium"
+              >
+                Close tab
+              </Button>
+              <Button
+                onClick={() => navigate("/")}
+                className="h-10 px-5 text-sm font-medium"
+              >
+                Open Web Dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return <Navigate to="/" replace />;
+  }
+
   return (
-    <div className="min-h-screen flex bg-white">
+    <div className="min-h-screen flex bg-white relative">
+      {/* Back button */}
+      {onClose ? (
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute left-6 top-6 z-20 flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+      ) : (
+        <Link
+          to="/"
+          className="absolute left-6 top-6 z-20 flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Home
+        </Link>
+      )}
+
       {/* Left: Login Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
-          <div className="flex items-center gap-2 mb-10">
+          <div className="flex items-center gap-2 mb-8">
             <img src="/logo.jpg" alt="Forgot AI Logo" className="h-8 w-8 rounded-md object-cover" />
             <span className="font-semibold text-xl tracking-tight">Forgot AI</span>
           </div>
+
+          {isExtension && (
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-neutral-100 border border-neutral-200/60 text-neutral-700 text-xs font-medium mb-6">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Sign in to connect Forgot AI Extension
+            </div>
+          )}
 
           <h1 className="text-3xl font-bold tracking-tight mb-2">
             {mode === "login" ? "Welcome back" : "Create your account"}
@@ -138,3 +239,4 @@ export default function AuthGate() {
     </div>
   );
 }
+
