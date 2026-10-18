@@ -1685,6 +1685,25 @@ def classify_agent_action(query: str, has_history: bool) -> str:
     return "search"
 
 
+def format_memory_blocks(items: list) -> str:
+    """Format memory items into clean indexed XML blocks with clear URL indicators."""
+    blocks = []
+    for idx, item in enumerate(items):
+        safe_text = (item.get('searchable_text', '') + ' ' + item.get('extracted_text', ''))[:1000]
+        raw_url = (item.get('source_url') or item.get('url') or '').strip()
+        url_line = f"URL: {raw_url}\n" if raw_url else "URL: None (Saved Image / Note without URL)\n"
+        created_at = item.get('created_at') or ''
+        date_line = f"SavedDate: {created_at[:10]}\n" if created_at else ""
+        content_type = item.get('content_type', 'note')
+        type_line = f"Type: {content_type}\n"
+        title = item.get('title') or 'Untitled'
+        summary = item.get('summary') or ''
+        blocks.append(
+            f'<memory index="{idx+1}">\nTitle: {title}\n{type_line}{url_line}{date_line}Summary: {summary}\nText: {safe_text}\n</memory>'
+        )
+    return "\n\n".join(blocks)
+
+
 async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
     user_id = lib
     conv_id = payload.conversation_id
@@ -1748,25 +1767,14 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
                 context_items = []
 
         final_ids = list(dict.fromkeys([it["id"] for it in context_items] + session_cited_ids))[:10]
-        
-        context_str = ""
-        for idx, item in enumerate(context_items):
-            safe_text = (item.get('searchable_text', '') + ' ' + item.get('extracted_text', ''))[:1000]
-            url = item.get('source_url') or item.get('url') or ''
-            url_line = f"URL: {url}\n" if url else ""
-            created_at = item.get('created_at') or ''
-            date_line = f"SavedDate: {created_at[:10]}\n" if created_at else ""
-            type_line = f"Type: {item.get('content_type', 'note')}\n"
-            title = item.get('title') or 'Untitled'
-            summary = item.get('summary') or ''
-            context_str += f'<memory index="{idx+1}">\nTitle: {title}\n{type_line}{url_line}{date_line}Summary: {summary}\nText: {safe_text}\n</memory>\n\n'
+        context_str = format_memory_blocks(context_items)
 
         system_prompt = (
             f"You are Forgot AI, an intelligent personal memory assistant. Today's date is {today_str}.\n"
             "The user is asking a follow-up question about an item or topic already discussed in this conversation.\n"
             "Use the conversation history and the saved memories below to answer the user directly and helpfully.\n"
             "- If the user asks about 'the 4th one', 'the 5th one', 'the second link', etc., identify that exact item from your previous message in the chat history.\n"
-            "- Provide the exact clickable markdown link [Title](URL) if requested.\n"
+            "- Link formatting rule: If an item has a URL, format it as a clickable markdown link [Title](URL). If an item has NO URL (URL is None, such as an uploaded image, screenshot, or text note), do NOT create a markdown link; write it in bold text: **Title** (Image) or **Title** (Note).\n"
             "- NEVER claim an item does not exist or that you made a mistake if it was already mentioned or appears in the chat history.\n"
             "- Do NOT output raw database IDs. Refer to items by their title or clean clickable link.\n\n"
             f"Previously discussed memories:\n{context_str}"
@@ -1782,24 +1790,13 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
             context_items = []
 
         final_ids = list(dict.fromkeys([it["id"] for it in context_items] + session_cited_ids))[:10]
-
-        context_str = ""
-        for idx, item in enumerate(context_items):
-            safe_text = (item.get('searchable_text', '') + ' ' + item.get('extracted_text', ''))[:1000]
-            url = item.get('source_url') or item.get('url') or ''
-            url_line = f"URL: {url}\n" if url else ""
-            created_at = item.get('created_at') or ''
-            date_line = f"SavedDate: {created_at[:10]}\n" if created_at else ""
-            type_line = f"Type: {item.get('content_type', 'note')}\n"
-            title = item.get('title') or 'Untitled'
-            summary = item.get('summary') or ''
-            context_str += f'<memory index="{idx+1}">\nTitle: {title}\n{type_line}{url_line}{date_line}Summary: {summary}\nText: {safe_text}\n</memory>\n\n'
+        context_str = format_memory_blocks(context_items)
 
         system_prompt = (
             f"You are Forgot AI, an intelligent personal memory assistant. Today's date is {today_str}.\n"
             "You have access to the user's recently saved items in the <memory> blocks below.\n"
             "- List the user's recently saved items clearly as a clean numbered list (1., 2., 3., etc.).\n"
-            "- For each item, provide the exact clickable markdown link [Title](URL).\n"
+            "- Link formatting rule: If an item has a URL, format it as a clickable markdown link [Title](URL). If an item has NO URL (URL is None, such as an uploaded image, screenshot, or text note), do NOT create a markdown link; write it in bold text: **Title** (Image) or **Title** (Note).\n"
             "- If asked about 'today' or 'yesterday', check the SavedDate of each memory against today's date ({today_str[:10]}).\n"
             "- Do NOT output raw database IDs. Refer to memories by their title or clean clickable link.\n"
             "- Answer directly, concisely, and helpfully.\n\n"
@@ -1847,22 +1844,12 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
         final_ids = list(dict.fromkeys([it["id"] for it in context_items] + session_cited_ids))[:10]
 
         if context_items:
-            context_str = ""
-            for idx, item in enumerate(context_items):
-                safe_text = (item.get('searchable_text', '') + ' ' + item.get('extracted_text', ''))[:1000]
-                url = item.get('source_url') or item.get('url') or ''
-                url_line = f"URL: {url}\n" if url else ""
-                created_at = item.get('created_at') or ''
-                date_line = f"SavedDate: {created_at[:10]}\n" if created_at else ""
-                type_line = f"Type: {item.get('content_type', 'note')}\n"
-                title = item.get('title') or 'Untitled'
-                summary = item.get('summary') or ''
-                context_str += f'<memory index="{idx+1}">\nTitle: {title}\n{type_line}{url_line}{date_line}Summary: {summary}\nText: {safe_text}\n</memory>\n\n'
+            context_str = format_memory_blocks(context_items)
 
             system_prompt = (
                 f"You are Forgot AI, an intelligent personal memory assistant. Today's date is {today_str}.\n"
                 "You have access to the user's saved items matching their search in the <memory> blocks below.\n"
-                "- Provide the exact clickable markdown link (e.g. [Title](URL)) for relevant results.\n"
+                "- Link formatting rule: If an item has a URL, format it as a clickable markdown link [Title](URL). If an item has NO URL (URL is None, such as an uploaded image, screenshot, or text note), do NOT create a markdown link; write it in bold text: **Title** (Image) or **Title** (Note).\n"
                 "- Answer the user's question directly and concisely using information from their memories.\n"
                 "- Do NOT output raw database IDs like [uuid]. Refer to memories by their title or clean clickable link.\n\n"
                 f"Search Results:\n{context_str}"
