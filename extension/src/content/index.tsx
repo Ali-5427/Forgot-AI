@@ -327,10 +327,18 @@ try {
 
 // Initialize Draggable Quick-Access Floating Dock
 if (window.top === window) {
-  try {
-    initFloatingDock();
-  } catch (e) {
-    console.error("Forgot AI Floating Dock init error:", e);
+  const mountDock = () => {
+    try {
+      initFloatingDock();
+    } catch (e) {
+      console.error("Forgot AI Floating Dock init error:", e);
+    }
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mountDock);
+  } else {
+    mountDock();
   }
 }
 

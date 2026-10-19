@@ -60,13 +60,18 @@ const ICONS = {
 const DOCK_CSS = `
 :host {
   all: initial;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 2147483647;
+  pointer-events: none;
 }
 
 .dock-root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   position: fixed;
   right: 0;
-  z-index: 2147483640;
+  z-index: 2147483647;
   user-select: none;
   display: flex;
   flex-direction: column;
@@ -421,6 +426,11 @@ export function initFloatingDock() {
   const host = document.createElement("div");
   host.setAttribute("data-forgot-ai", "floating-dock");
   host.style.all = "unset";
+  host.style.position = "fixed";
+  host.style.right = "0";
+  host.style.top = "0";
+  host.style.zIndex = "2147483647";
+  host.style.pointerEvents = "none";
 
   const shadow = host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
@@ -506,7 +516,7 @@ export function initFloatingDock() {
   `;
 
   shadow.appendChild(root);
-  document.documentElement.appendChild(host);
+  (document.body || document.documentElement).appendChild(host);
 
   // ---------------------------------------------------------------------------
   // Dragging Logic along Y-Axis
