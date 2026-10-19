@@ -845,17 +845,32 @@ export default function PopupApp() {
                   </div>
                   
                   {/* Action Buttons */}
-                  <div className={`flex items-center gap-2 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === 'user' ? 'pr-2' : 'pl-10'}`}>
-                    <button type="button" onClick={() => handleCopy(msg.content, i)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Copy">
-                      {copiedIdx === i ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <div className={`flex items-center gap-1.5 mt-1.5 ${msg.role === 'user' ? 'pr-2' : 'pl-10'}`}>
+                    <button 
+                      type="button" 
+                      onClick={() => handleCopy(msg.content, i)} 
+                      className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors" 
+                      title="Copy message"
+                    >
+                      {copiedIdx === i ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                     {msg.role === 'assistant' && !chatting && i === messages.length - 1 && (
-                      <button type="button" onClick={() => handleRetry(i)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Retry">
+                      <button 
+                        type="button" 
+                        onClick={() => handleRetry(i)} 
+                        className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors" 
+                        title="Retry response"
+                      >
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
                     )}
                     {msg.role === 'user' && !chatting && (
-                      <button type="button" onClick={() => handleEdit(msg.content)} className="p-1 text-neutral-400 hover:text-neutral-800 transition-colors" title="Edit">
+                      <button 
+                        type="button" 
+                        onClick={() => handleEdit(msg.content)} 
+                        className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors" 
+                        title="Edit message"
+                      >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                     )}
