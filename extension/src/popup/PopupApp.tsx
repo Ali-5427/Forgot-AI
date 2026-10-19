@@ -849,7 +849,7 @@ export default function PopupApp() {
                     <button 
                       type="button" 
                       onClick={() => handleCopy(msg.content, i)} 
-                      className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors" 
+                      className="p-1 text-neutral-700 rounded-md" 
                       title="Copy message"
                     >
                       {copiedIdx === i ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
@@ -858,7 +858,7 @@ export default function PopupApp() {
                       <button 
                         type="button" 
                         onClick={() => handleRetry(i)} 
-                        className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors" 
+                        className="p-1 text-neutral-700 rounded-md" 
                         title="Retry response"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -868,7 +868,7 @@ export default function PopupApp() {
                       <button 
                         type="button" 
                         onClick={() => handleEdit(msg.content)} 
-                        className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors" 
+                        className="p-1 text-neutral-700 rounded-md" 
                         title="Edit message"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
