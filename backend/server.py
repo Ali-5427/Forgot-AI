@@ -22,6 +22,7 @@ from starlette.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
 from supabase_db import SupabaseDatabase, create_supabase_client
 from supabase import create_client as make_supabase_client
+from ai_provider import embed_texts, llm_chat, llm_chat_stream
 from billing import (
     CheckoutIn,
     SupabaseBillingStore,
@@ -750,22 +751,65 @@ def rel_age(iso: str) -> str:
 
 
 async def retrieve(query: str, lib: str, limit: int = 30):
-    docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(200)
+    try:
+        ready_docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(200)
+    except Exception as e:
+        logger.error(f"Error fetching ready items in retrieve: {e}")
+        ready_docs = []
+
+    try:
+        proc_docs = await db.items.find({"status": "processing", "library_id": lib}).sort("created_at", -1).to_list(15)
+    except Exception as e:
+        logger.error(f"Error fetching processing items in retrieve: {e}")
+        proc_docs = []
+
+    seen_ids = set()
+    docs = []
+    for d in (proc_docs + ready_docs):
+        if d.get("id") and d["id"] not in seen_ids:
+            docs.append(d)
+            seen_ids.add(d["id"])
     
     if not docs:
         return [], {}
 
+    # Extract clean target keywords (length >= 3, skipping common conversational stop words)
+    q_lower = query.lower()
+    clean_q_words = [w.strip() for w in re.sub(r'[^\w\s]', ' ', q_lower).split() if len(w.strip()) >= 3]
+    stop_words = {"the", "and", "for", "with", "from", "that", "this", "what", "which", "where", "when", "some", "note", "notes", "saved", "about", "have", "there", "show", "tell", "like"}
+    target_words = [w for w in clean_q_words if w not in stop_words]
+
     catalog = []
+    exact_matches = []
+    by_id = {d["id"]: clean(d) for d in docs}
+
     for d in docs:
-        text_comb = (d.get("searchable_text", "") + " " + d.get("extracted_text", "")).strip()
+        text_comb = (
+            (d.get("original_text") or "") + " " +
+            (d.get("searchable_text") or "") + " " +
+            (d.get("extracted_text") or "")
+        ).strip()
+        
+        title_str = d.get("title", "") or ""
+        summary_str = d.get("summary", "") or ""
+        kws = d.get("keywords") or []
+        kw_str = " ".join(kws) if isinstance(kws, list) else str(kws)
+
+        # Check for direct keyword matches (guarantees names and specific words are never missed)
+        full_haystack = f"{title_str} {summary_str} {kw_str} {text_comb}".lower()
+        if target_words and any(tw in full_haystack for tw in target_words):
+            exact_copy = by_id[d["id"]].copy()
+            exact_copy["match_reason"] = "Direct keyword match in title or content"
+            exact_matches.append(exact_copy)
+
         catalog.append({
             "id": d["id"],
-            "title": d.get("title", ""),
+            "title": title_str,
             "type": d.get("content_type", ""),
             "category": d.get("category", ""),
             "domain": d.get("source_domain", ""),
-            "keywords": d.get("keywords", []),
-            "summary": d.get("summary", ""),
+            "keywords": kws if isinstance(kws, list) else [],
+            "summary": summary_str,
             "saved": rel_age(d.get("created_at", "")),
             "saved_at": d.get("created_at", ""),
             "text": text_comb[:600]
@@ -781,21 +825,41 @@ async def retrieve(query: str, lib: str, limit: int = 30):
     )
     user_prompt = f"Query: {query}\n\nCatalog:\n{json.dumps(catalog, indent=2)}"
 
-    raw_response = await llm_text(system_prompt, user_prompt)
-    parsed = parse_json_block(raw_response)
-    results_list = parsed.get("results", [])
+    results_list = []
+    try:
+        raw_response = await llm_chat(system_prompt, [{"role": "user", "content": user_prompt}])
+        parsed = parse_json_block(raw_response)
+        results_list = parsed.get("results", []) if isinstance(parsed, dict) else []
+    except Exception as e:
+        logger.error(f"llm_chat search ranking error: {e}")
+        try:
+            raw_response = await llm_text(system_prompt, user_prompt)
+            parsed = parse_json_block(raw_response)
+            results_list = parsed.get("results", []) if isinstance(parsed, dict) else []
+        except Exception as e2:
+            logger.error(f"llm_text fallback search ranking error: {e2}")
+            results_list = []
 
-    by_id = {d["id"]: clean(d) for d in docs}
-    
     final_results = []
+    seen_result_ids = set()
+
     for r in results_list:
+        if not isinstance(r, dict):
+            continue
         item_id = r.get("id")
-        if item_id in by_id:
+        if item_id in by_id and item_id not in seen_result_ids:
             item_copy = by_id[item_id].copy()
             item_copy["match_reason"] = r.get("reason", "")
             final_results.append(item_copy)
+            seen_result_ids.add(item_id)
 
-    return final_results, by_id
+    # Append any direct keyword matches that the LLM ranker didn't include
+    for em in exact_matches:
+        if em["id"] not in seen_result_ids:
+            final_results.append(em)
+            seen_result_ids.add(em["id"])
+
+    return final_results[:limit], by_id
 
 
 async def import_library(source_lib: str, user_id: str) -> int:
@@ -1804,43 +1868,30 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
         )
 
     else:  # action == "search"
-        standalone_query = query
+        search_query = query
         if messages:
             hist_text = "\n".join([f"{m['role']}: {m['content']}" for m in messages[-4:]])
-            rewrite_prompt = f"Given the following chat history, rewrite the user's latest query to be a standalone search query. If it already makes sense, just return it exactly. Do NOT answer the question. History:\n{hist_text}\n\nLatest query: {query}"
+            rewrite_prompt = (
+                f"Given the following chat history, extract or rewrite the user's latest query to be the core search query/keywords. "
+                "Keep key entity names, people names, or core topics. If it already makes sense as a keyword, return it concisely. "
+                f"History:\n{hist_text}\n\nLatest query: {query}"
+            )
             try:
-                standalone_query = await llm_chat("You are a helpful query rewriter. Output only the standalone query.", [{"role": "user", "content": rewrite_prompt}])
+                rewritten = await llm_chat("You are a helpful query rewriter. Output only the standalone search query or keywords.", [{"role": "user", "content": rewrite_prompt}])
+                if rewritten and len(rewritten.strip()) > 1:
+                    search_query = rewritten.strip()
             except Exception as e:
                 logger.error(f"Query rewrite failed: {e}")
-                standalone_query = query
+                search_query = query
 
-        try:
-            embeddings = await embed_texts([standalone_query], input_type="query")
-            q_emb = embeddings[0]
-        except Exception as e:
-            logger.error(f"Query embedding failed: {e}")
-            q_emb = None
+        # 1. Use the unified AI search ranker (retrieve) - exactly like the webapp!
+        retrieved_results, _ = await retrieve(search_query, lib, limit=8)
+        
+        # 2. If rewritten search returned nothing, fallback to user's original query directly
+        if not retrieved_results and search_query != query:
+            retrieved_results, _ = await retrieve(query, lib, limit=8)
 
-        rpc_params = {"p_library": lib, "p_query": standalone_query, "p_embedding": q_emb, "p_limit": 8}
-        top_ids = []
-        try:
-            search_res = db.supabase.rpc("hybrid_search_items", rpc_params).execute()
-            if search_res.data:
-                top_ids = [r["id"] for r in search_res.data]
-        except Exception as e:
-            logger.error(f"Hybrid search failed: {e}")
-            top_ids = []
-
-        if top_ids:
-            try:
-                items_res = db.supabase.table("items").select("*").in_("id", top_ids).eq("library_id", lib).execute()
-                context_items = deduplicate_items(items_res.data or [])[:6]
-            except Exception as e:
-                logger.error(f"Failed to fetch search items: {e}")
-                context_items = []
-        else:
-            context_items = []
-
+        context_items = deduplicate_items(retrieved_results)[:8]
         final_ids = list(dict.fromkeys([it["id"] for it in context_items] + session_cited_ids))[:10]
 
         if context_items:
