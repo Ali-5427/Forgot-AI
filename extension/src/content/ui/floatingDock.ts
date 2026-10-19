@@ -2,7 +2,7 @@
 // Renders inside a Shadow Root to guarantee zero style bleed on host websites.
 
 const DOCK_STORAGE_KEY_TOP = "forgot_ai_dock_top";
-const DOCK_STORAGE_KEY_COLLAPSED = "forgot_ai_dock_collapsed";
+const DOCK_STORAGE_KEY_COLLAPSED = "forgot_ai_dock_collapsed_v2";
 
 const ICONS = {
   brain: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -247,31 +247,52 @@ const DOCK_CSS = `
 }
 
 /* Collapsed Mini Nub */
+/* Collapsed Mini Nub - Highly visible curved white tab with brain icon */
 .collapsed-nub {
   display: none;
-  width: 14px;
-  height: 52px;
-  background: #18181B;
-  border-radius: 8px 0 0 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  width: 44px;
+  height: 44px;
+  background: #FFFFFF;
+  border-radius: 22px 0 0 22px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-right: none;
+  box-shadow: 0 6px 24px -2px rgba(0, 0, 0, 0.22);
   cursor: pointer;
-  pointer-events: auto;
+  pointer-events: auto !important;
   align-items: center;
   justify-content: center;
-  color: #FFFFFF;
-  opacity: 0.65;
-  transition: opacity 150ms ease, width 150ms ease, background 150ms ease;
-}
-
-.collapsed-nub svg {
-  width: 12px;
-  height: 12px;
+  gap: 2px;
+  padding-left: 4px;
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease;
 }
 
 .collapsed-nub:hover {
-  opacity: 1;
-  width: 20px;
-  background: #09090B;
+  transform: translateX(-4px);
+  box-shadow: 0 8px 30px -2px rgba(0, 0, 0, 0.3);
+}
+
+.collapsed-nub .nub-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.collapsed-nub .nub-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.collapsed-nub .nub-arrow {
+  color: #4B5563;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+}
+.collapsed-nub .nub-arrow svg {
+  width: 12px;
+  height: 12px;
 }
 
 .dock-root.collapsed .trigger-bar,
@@ -442,8 +463,15 @@ export function initFloatingDock() {
 
   // Initial vertical position
   const savedTop = localStorage.getItem(DOCK_STORAGE_KEY_TOP);
-  const defaultTop = window.innerHeight ? Math.max(120, window.innerHeight - 220) : 500;
-  const initialTop = savedTop ? parseInt(savedTop, 10) : defaultTop;
+  const vh = window.innerHeight || 800;
+  const defaultTop = Math.max(120, vh - 220);
+  let initialTop = defaultTop;
+  if (savedTop) {
+    const parsed = parseInt(savedTop, 10);
+    if (!isNaN(parsed) && parsed > 50 && parsed < (vh - 80)) {
+      initialTop = parsed;
+    }
+  }
   root.style.top = `${initialTop}px`;
 
   // Initial collapsed state
@@ -491,8 +519,9 @@ export function initFloatingDock() {
     </div>
 
     <!-- Collapsed Edge Nub -->
-    <div class="collapsed-nub" title="Expand Forgot AI">
-      ${ICONS.chevronLeft}
+    <div class="collapsed-nub" title="Forgot AI (Click to expand)">
+      <div class="nub-icon">${ICONS.brain}</div>
+      <div class="nub-arrow">${ICONS.chevronLeft}</div>
     </div>
 
     <!-- Quick Note Inline Popover -->
@@ -534,7 +563,7 @@ export function initFloatingDock() {
     isDragging = true;
     hasMoved = false;
     startY = e.clientY;
-    startTop = root.offsetTop;
+    startTop = root.getBoundingClientRect().top;
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
     e.preventDefault();
@@ -546,7 +575,7 @@ export function initFloatingDock() {
     if (Math.abs(dy) > 3) hasMoved = true;
     
     let newTop = startTop + dy;
-    const vh = window.innerHeight;
+    const vh = window.innerHeight || 800;
     newTop = Math.max(60, Math.min(vh - 120, newTop));
     root.style.top = `${newTop}px`;
   }
@@ -556,7 +585,10 @@ export function initFloatingDock() {
     isDragging = false;
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("mouseup", onMouseUp);
-    localStorage.setItem(DOCK_STORAGE_KEY_TOP, String(root.offsetTop));
+    const finalTop = Math.round(root.getBoundingClientRect().top);
+    if (finalTop > 50) {
+      localStorage.setItem(DOCK_STORAGE_KEY_TOP, String(finalTop));
+    }
   }
 
   // ---------------------------------------------------------------------------

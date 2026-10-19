@@ -275,11 +275,16 @@ if (document.readyState === "loading") {
 }
 */
 
-// Handle SPA navigations
+// Handle SPA navigations & ensure floating dock remains mounted
 let lastHref = location.href;
 setInterval(() => {
   if (location.href !== lastHref) {
     lastHref = location.href;
+  }
+  if (window.top === window) {
+    try {
+      initFloatingDock();
+    } catch {}
   }
 }, 800);
 
