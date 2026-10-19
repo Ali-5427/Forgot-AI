@@ -29,10 +29,12 @@ export type SyncAuthRequest = {
   };
 };
 export type ClearAuthRequest = { type: "CLEAR_AUTH_FROM_WEB" };
+export type OpenSidePanelRequest = { type: "OPEN_SIDE_PANEL" };
 
 export type ExtMessage =
   | SaveRequest
   | OpenAuthRequest
+  | OpenSidePanelRequest
   | GetAuthRequest
   | GetSessionRequest
   | SyncAuthRequest

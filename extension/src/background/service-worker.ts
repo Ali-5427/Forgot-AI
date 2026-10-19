@@ -54,6 +54,13 @@ chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) =>
         sendResponse({ ok: true });
         return;
       }
+      if (msg.type === "OPEN_SIDE_PANEL") {
+        if (_sender.tab?.id) {
+          (chrome as any).sidePanel?.open?.({ tabId: _sender.tab.id })?.catch?.(console.error);
+        }
+        sendResponse({ ok: true });
+        return;
+      }
       if (msg.type === "SYNC_AUTH_FROM_WEB") {
         await setSession({
           token: msg.payload.token,

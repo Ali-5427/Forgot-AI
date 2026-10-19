@@ -4,6 +4,7 @@
 
 import { createPill, positionNearSelectionRect, positionAnchored } from "./ui/pill";
 import type { PillHandle } from "./ui/pill";
+import { initFloatingDock } from "./ui/floatingDock";
 import { pickAdapter, genericArticleAdapter } from "./adapters";
 import type { Adapter } from "./adapters/types";
 import type { SaveResponse } from "../lib/messages";
@@ -323,5 +324,14 @@ try {
   sendSessionToWeb();
   window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
 } catch {}
+
+// Initialize Draggable Quick-Access Floating Dock
+if (window.top === window) {
+  try {
+    initFloatingDock();
+  } catch (e) {
+    console.error("Forgot AI Floating Dock init error:", e);
+  }
+}
 
 
