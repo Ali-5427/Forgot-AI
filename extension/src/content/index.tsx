@@ -283,8 +283,22 @@ setInterval(() => {
 }, 800);
 
 // -----------------------------------------------------------------------------
-// Web Auth Sync: Syncs session between Forgot AI Web App and Extension
+// Web Auth Sync: Syncs session between Forgot AI Web App and Extension (2-Way)
 // -----------------------------------------------------------------------------
+function sendSessionToWeb() {
+  chrome.runtime.sendMessage({ type: "GET_FULL_SESSION" }, (resp: any) => {
+    if (resp?.session?.token) {
+      window.postMessage(
+        {
+          type: "FORGOT_AI_EXT_SYNC_SESSION",
+          session: resp.session,
+        },
+        "*"
+      );
+    }
+  });
+}
+
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   if (event.data?.type === "FORGOT_AI_AUTH_SYNC" && event.data?.session?.token) {
@@ -299,11 +313,15 @@ window.addEventListener("message", (event) => {
     );
   } else if (event.data?.type === "FORGOT_AI_AUTH_LOGOUT") {
     chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" });
+  } else if (event.data?.type === "FORGOT_AI_REQUEST_SESSION_FROM_EXT") {
+    sendSessionToWeb();
   }
 });
 
-// Request active session from web page if currently on Forgot AI web app
+// Proactively offer extension session to web app on load
 try {
+  sendSessionToWeb();
   window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
 } catch {}
+
 

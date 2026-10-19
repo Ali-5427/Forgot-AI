@@ -17,10 +17,21 @@ export function getLibraryId() {
   return id;
 }
 
+const USER_KEY = "forgot_ai_user";
+
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
 export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY);
 export const setRefreshToken = (rt) => (rt ? localStorage.setItem(REFRESH_KEY, rt) : localStorage.removeItem(REFRESH_KEY));
+export const getCachedUser = () => {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+export const setCachedUser = (u) => (u ? localStorage.setItem(USER_KEY, JSON.stringify(u)) : localStorage.removeItem(USER_KEY));
 
 // Attach auth token (if signed in) + the browser's anonymous library id to every request.
 axios.interceptors.request.use((config) => {
@@ -32,6 +43,16 @@ axios.interceptors.request.use((config) => {
 });
 
 let isRefreshing = false;
+let refreshSubscribers = [];
+
+function subscribeTokenRefresh(cb) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
 
 // If a signed-in request is rejected (expired/logged-out token), attempt refresh once or drop session.
 axios.interceptors.response.use(
@@ -44,22 +65,65 @@ axios.interceptors.response.use(
     if (error?.response?.status === 401 && getToken() && !isAuthCall && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
       const rt = getRefreshToken();
-      if (rt && !isRefreshing) {
-        isRefreshing = true;
-        try {
-          const res = await axios.post(`${API}/auth/refresh`, { refresh_token: rt });
-          if (res.data?.token) {
-            setToken(res.data.token);
-            if (res.data.refresh_token) setRefreshToken(res.data.refresh_token);
-            originalRequest.headers["Authorization"] = `Bearer ${res.data.token}`;
-            isRefreshing = false;
-            return axios(originalRequest);
-          }
-        } catch {
-          isRefreshing = false;
-        }
+
+      if (!rt) {
+        return Promise.reject(error);
       }
-      return Promise.reject(error);
+
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          subscribeTokenRefresh((token) => {
+            if (originalRequest.headers) {
+              if (typeof originalRequest.headers.set === "function") {
+                originalRequest.headers.set("Authorization", `Bearer ${token}`);
+              } else {
+                originalRequest.headers["Authorization"] = `Bearer ${token}`;
+              }
+            }
+            resolve(axios(originalRequest));
+          });
+        });
+      }
+
+      isRefreshing = true;
+      try {
+        const res = await axios.post(
+          `${API}/auth/refresh`,
+          { refresh_token: rt },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "X-Library-Id": getLibraryId(),
+            },
+          }
+        );
+        if (res.data?.token) {
+          const newToken = res.data.token;
+          setToken(newToken);
+          if (res.data.refresh_token) setRefreshToken(res.data.refresh_token);
+          if (res.data.user) setCachedUser(res.data.user);
+
+          if (originalRequest.headers) {
+            if (typeof originalRequest.headers.set === "function") {
+              originalRequest.headers.set("Authorization", `Bearer ${newToken}`);
+            } else {
+              originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+            }
+          }
+          isRefreshing = false;
+          onRefreshed(newToken);
+          return axios(originalRequest);
+        }
+      } catch (refreshErr) {
+        isRefreshing = false;
+        refreshSubscribers = [];
+        if (refreshErr?.response?.status === 401) {
+          setToken(null);
+          setRefreshToken(null);
+          setCachedUser(null);
+        }
+        return Promise.reject(refreshErr);
+      }
     }
     return Promise.reject(error);
   }

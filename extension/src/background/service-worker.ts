@@ -80,6 +80,11 @@ chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) =>
         sendResponse(resp);
         return;
       }
+      if (msg.type === "GET_FULL_SESSION") {
+        const s = await getSession();
+        sendResponse({ ok: true, session: s });
+        return;
+      }
     } catch (e: any) {
       sendResponse({ ok: false, error: String(e?.message || e) });
     }

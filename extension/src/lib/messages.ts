@@ -10,6 +10,16 @@ export type OpenAuthRequest = { type: "OPEN_AUTH_TAB" };
 export type GetAuthRequest = { type: "GET_AUTH_STATUS" };
 export type GetAuthResponse = { authenticated: boolean; email?: string };
 
+export type GetSessionRequest = { type: "GET_FULL_SESSION" };
+export type GetSessionResponse = {
+  ok: boolean;
+  session?: {
+    token: string;
+    refresh_token?: string;
+    user: { id: string; email: string; created_at: string };
+  } | null;
+};
+
 export type SyncAuthRequest = {
   type: "SYNC_AUTH_FROM_WEB";
   payload: {
@@ -24,6 +34,7 @@ export type ExtMessage =
   | SaveRequest
   | OpenAuthRequest
   | GetAuthRequest
+  | GetSessionRequest
   | SyncAuthRequest
   | ClearAuthRequest;
 
