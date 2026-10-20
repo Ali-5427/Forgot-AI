@@ -1,4 +1,4 @@
-﻿
+
 import { Link } from "react-router-dom";
 import { useEffect } from "react";
 
@@ -12,13 +12,13 @@ export default function SecurityPage() {
       <div className="flex-1 mx-auto max-w-3xl px-5 py-16 sm:py-24">
         <Link to="/" className="text-sm text-ink-muted hover:text-ink mb-8 inline-block">&larr; Back to Home</Link>
         <h1 className="font-display text-4xl font-medium tracking-tight mb-4">Security at Forgot AI</h1>
-        <p className="text-sm text-ink-muted mb-8">Last updated: September 17, 2026</p>
+        <p className="text-sm text-ink-muted mb-8">Last updated: October 20, 2026</p>
         
         <div className="prose prose-neutral max-w-none text-ink-muted">
           <p>We take the security and privacy of your personal memories seriously. Here is how we protect your data.</p>
           
-          <h2 className="text-ink font-medium text-xl mt-8 mb-4">Data Isolation & Ownership</h2>
-          <p>Your data is strictly isolated. We utilize Row Level Security (RLS) on our Supabase database to ensure that you, and only you, can access, read, or modify your saved memories. Other users cannot access your data.</p>
+          <h2 className="text-ink font-medium text-xl mt-8 mb-4">Data Isolation &amp; Ownership</h2>
+          <p>Your data is strictly isolated to your account. All requests are authenticated, and access is enforced by private user-level scoping across our backend services and database.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">Encryption in Transit</h2>
           <p>All data transmitted between your browser, our Chrome extension, our backend, and our database is encrypted using industry-standard HTTPS/TLS protocols.</p>
@@ -40,5 +40,3 @@ export default function SecurityPage() {
     </div>
   );
 }
-
-
