@@ -29,14 +29,14 @@ export default function PrivacyPage() {
           <p>The Forgot AI Chrome extension requires the <code>&lt;all_urls&gt;</code> permission. This is strictly necessary to allow the "Save to Forgot AI" button to appear when you highlight text on any webpage. We do NOT monitor your background browsing activity, and we only access and transmit webpage data when you explicitly interact with the "Save" button.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">3. How we process your data (AI)</h2>
-          <p>To enrich and organize your saved content, our backend uses AI services from multiple providers: <strong>Ollama</strong> processes your saved text to generate titles, summaries, and keywords; <strong>Groq</strong> processes uploaded images to extract and describe visual content; and <strong>Nvidia</strong> generates vector embeddings that power semantic search. For conversational chat queries, your question and relevant saved memories are sent to an AI language model for response generation. Your content is processed solely to provide the service and is not used to train our own foundational AI models.</p>
+          <p>To enrich and organize your saved content, our backend uses AI services from multiple providers: <strong>Ollama</strong> processes your saved text to generate titles, summaries, and keywords; <strong>Groq</strong> processes uploaded images to extract and describe visual content; and <strong>Nvidia</strong> generates vector embeddings that power semantic search. Your content is processed solely to provide the service and is not used to train our own foundational AI models.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">4. Third-Party Services</h2>
           <p>We rely on trusted third-party providers to operate our service:</p>
           <ul className="list-disc pl-5 space-y-2 mt-4">
             <li><strong>Supabase:</strong> For secure database storage and user authentication.</li>
             <li><strong>Vercel &amp; Render:</strong> For hosting our website and backend API.</li>
-            <li><strong>Ollama:</strong> For AI-powered text enrichment — generating titles, summaries, keywords, and categories from your saved content, and for powering conversational chat responses. Your saved content text is transmitted to this provider for processing.</li>
+            <li><strong>Ollama:</strong> For AI-powered text enrichment — generating titles, summaries, keywords, and categories from your saved content. Your saved content text is transmitted to this provider for processing.</li>
             <li><strong>Groq:</strong> For AI vision processing — extracting and describing content from images you save.</li>
             <li><strong>Nvidia:</strong> For vector embedding generation used to power semantic search.</li>
             <li><strong>Dodo Payments:</strong> Merchant of Record for Pro subscriptions and Lifetime purchases. Payment processing is handled entirely by Dodo Payments — we do not store your card details.</li>
@@ -47,8 +47,10 @@ export default function PrivacyPage() {
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">5. What we do NOT do</h2>
           <p>We believe your memories are yours. We do NOT sell your personal data. We do NOT use your saved content for targeted advertising. We do NOT track your browsing history outside of the specific items you intentionally save.</p>
 
-          <h2 className="text-ink font-medium text-xl mt-8 mb-4">6. Local Storage and Tracking</h2>
-          <p>We use browser local storage (localStorage) to securely store your authentication token and keep you logged in across sessions. We do not set advertising or cross-site tracking cookies. We use Umami Analytics for privacy-friendly, cookieless website usage statistics — no personal identifiers are collected.</p>
+          <h2 className="text-ink font-medium text-xl mt-8 mb-4">6. Local Storage, Cookies and Tracking</h2>
+          <p>We use browser local storage (localStorage) to securely store your authentication token and keep you logged in across sessions. We do not set advertising or cross-site tracking cookies from our own application.</p>
+          <p className="mt-3">For website analytics, we use <strong>Umami Analytics</strong> — a privacy-focused, cookieless analytics tool. Umami does not use cookies, does not collect personal identifiers, and does not track you across other websites. It only records anonymized page view statistics to help us understand how the product is used.</p>
+          <p className="mt-3">Our website loads fonts from <strong>Google Fonts</strong>. This causes your browser to make a request to Google's servers, which may log your IP address per Google's own privacy policy. No personal data from your Forgot AI account is shared with Google Fonts.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">7. Data Retention and Deletion</h2>
           <p>We retain your account information and saved memories as long as your account is active. You can request full deletion of your account and all associated data at any time. For more information, see our <Link to="/data-deletion" className="underline">Data &amp; Account Deletion</Link> page.</p>
