@@ -23,7 +23,6 @@ export default function PrivacyPage() {
             <li><strong>Account Information:</strong> When you sign up, we collect your email address to securely authenticate you and tie your memories to your account.</li>
             <li><strong>Intentionally Saved Content:</strong> When you use the "Save to Forgot AI" button in our extension or web app, we capture the exact text, images, or links you chose to save, along with the source URL and page title.</li>
             <li><strong>AI Metadata:</strong> Our system processes your saved content to generate private metadata (like summaries, titles, and searchable text) to help you find it later.</li>
-            <li><strong>Conversational Chat History:</strong> When you use the "Ask your memory" chat feature, we store your questions and the AI-generated responses in your account so you can refer back to past conversations.</li>
           </ul>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">2. Chrome Extension Data Collection</h2>
