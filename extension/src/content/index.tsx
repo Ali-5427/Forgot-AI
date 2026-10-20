@@ -8,6 +8,7 @@ import { initFloatingDock } from "./ui/floatingDock";
 import { pickAdapter, genericArticleAdapter } from "./adapters";
 import type { Adapter } from "./adapters/types";
 import type { SaveResponse } from "../lib/messages";
+import { setSession, clearSession } from "../lib/storage";
 
 // -----------------------------------------------------------------------------
 // State
@@ -275,22 +276,48 @@ if (document.readyState === "loading") {
 }
 */
 
-// Handle SPA navigations & ensure floating dock remains mounted
-let lastHref = location.href;
-setInterval(() => {
-  if (location.href !== lastHref) {
-    lastHref = location.href;
-  }
-  if (window.top === window) {
-    try {
-      initFloatingDock();
-    } catch {}
-  }
-}, 800);
-
 // -----------------------------------------------------------------------------
 // Web Auth Sync: Syncs session between Forgot AI Web App and Extension (2-Way)
 // -----------------------------------------------------------------------------
+const isForgotAiHost =
+  location.hostname === "forgot-ai.vercel.app" ||
+  location.hostname.endsWith(".forgot-ai.vercel.app") ||
+  location.hostname === "localhost" ||
+  location.hostname === "127.0.0.1";
+
+function syncAuthFromDom(): boolean {
+  if (!isForgotAiHost) return false;
+  try {
+    const raw = document.documentElement?.getAttribute("data-forgot-ai-session");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.token && parsed?.user) {
+        const sessionPayload = {
+          token: parsed.token,
+          refresh_token: parsed.refresh_token,
+          user: {
+            id: parsed.user.id,
+            email: parsed.user.email,
+            created_at: parsed.user.created_at || new Date().toISOString(),
+          },
+        };
+        // 1. Immediately store to chrome.storage.local
+        setSession(sessionPayload).catch(console.error);
+
+        // 2. Also notify background service worker
+        chrome.runtime.sendMessage({
+          type: "SYNC_AUTH_FROM_WEB",
+          payload: sessionPayload,
+        }).catch(() => {});
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to sync auth from DOM:", e);
+  }
+  return false;
+}
+
 function sendSessionToWeb() {
   chrome.runtime.sendMessage({ type: "GET_FULL_SESSION" }, (resp: any) => {
     if (resp?.session?.token) {
@@ -305,30 +332,99 @@ function sendSessionToWeb() {
   });
 }
 
+// Handle SPA navigations & ensure floating dock remains mounted
+let lastHref = location.href;
+setInterval(() => {
+  if (location.href !== lastHref) {
+    lastHref = location.href;
+    if (isForgotAiHost) {
+      syncAuthFromDom();
+    }
+  }
+  if (window.top === window) {
+    try {
+      initFloatingDock();
+    } catch {}
+  }
+}, 800);
+
+// Listen to webpage messages
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   if (event.data?.type === "FORGOT_AI_AUTH_SYNC" && event.data?.session?.token) {
+    const session = event.data.session;
+    // Save directly to chrome.storage.local first
+    setSession({
+      token: session.token,
+      refresh_token: session.refresh_token,
+      user: {
+        id: session.user.id,
+        email: session.user.email,
+        created_at: session.user.created_at || new Date().toISOString(),
+      },
+    }).catch(console.error);
+
     chrome.runtime.sendMessage(
       {
         type: "SYNC_AUTH_FROM_WEB",
-        payload: event.data.session,
+        payload: session,
       },
       () => {
         window.postMessage({ type: "FORGOT_AI_AUTH_SYNC_SUCCESS" }, "*");
       }
-    );
+    ).catch(() => {});
   } else if (event.data?.type === "FORGOT_AI_AUTH_LOGOUT") {
-    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" });
+    clearSession().catch(console.error);
+    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }).catch(() => {});
   } else if (event.data?.type === "FORGOT_AI_REQUEST_SESSION_FROM_EXT") {
     sendSessionToWeb();
   }
 });
 
-// Proactively offer extension session to web app on load
-try {
-  sendSessionToWeb();
-  window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
-} catch {}
+// Listen to extension runtime messages (e.g., popup requesting session sync from page)
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === "REQUEST_AUTH_FROM_PAGE") {
+    const synced = syncAuthFromDom();
+    if (!synced) {
+      window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
+    }
+    sendResponse({ ok: true, synced });
+  }
+});
+
+// Setup DOM observer & proactive sync on Forgot AI website
+if (isForgotAiHost) {
+  // Sync immediately
+  syncAuthFromDom();
+
+  // Observe attribute changes on <html>
+  try {
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === "attributes" && m.attributeName === "data-forgot-ai-session") {
+          if (document.documentElement.hasAttribute("data-forgot-ai-session")) {
+            syncAuthFromDom();
+          } else {
+            clearSession().catch(console.error);
+            chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }).catch(() => {});
+          }
+        }
+      }
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-forgot-ai-session"],
+    });
+  } catch (e) {
+    console.warn("Forgot AI auth MutationObserver error:", e);
+  }
+
+  // Also offer extension session or request session
+  try {
+    sendSessionToWeb();
+    window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
+  } catch {}
+}
 
 // Initialize Draggable Quick-Access Floating Dock
 if (window.top === window) {
@@ -346,5 +442,3 @@ if (window.top === window) {
     mountDock();
   }
 }
-
-

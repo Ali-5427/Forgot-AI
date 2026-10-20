@@ -1,32 +1,52 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { api, getToken, setToken, setRefreshToken, getLibraryId, getCachedUser, setCachedUser } from "@/api";
+import { api, getToken, setToken, getRefreshToken, setRefreshToken, getLibraryId, getCachedUser, setCachedUser } from "@/api";
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 function broadcastAuthSync(token, refreshToken, user) {
   if (typeof window !== "undefined" && token && user) {
+    const sessionPayload = {
+      token,
+      refresh_token: refreshToken || undefined,
+      user: {
+        id: user.id,
+        email: user.email,
+        created_at: user.created_at || new Date().toISOString(),
+      },
+    };
+
+    // 1. Post message to extension content scripts
     window.postMessage(
       {
         type: "FORGOT_AI_AUTH_SYNC",
-        session: {
-          token,
-          refresh_token: refreshToken || undefined,
-          user: {
-            id: user.id,
-            email: user.email,
-            created_at: user.created_at || new Date().toISOString(),
-          },
-        },
+        session: sessionPayload,
       },
       "*"
     );
+
+    // 2. DOM bridge for zero-latency synchronous sync
+    try {
+      if (document.documentElement) {
+        document.documentElement.setAttribute(
+          "data-forgot-ai-session",
+          JSON.stringify(sessionPayload)
+        );
+      }
+    } catch (e) {
+      console.warn("Could not set data-forgot-ai-session attribute:", e);
+    }
   }
 }
 
 function broadcastAuthLogout() {
   if (typeof window !== "undefined") {
     window.postMessage({ type: "FORGOT_AI_AUTH_LOGOUT" }, "*");
+    try {
+      if (document.documentElement) {
+        document.documentElement.removeAttribute("data-forgot-ai-session");
+      }
+    } catch (e) {}
   }
 }
 
@@ -38,6 +58,15 @@ export const AuthProvider = ({ children }) => {
     return false;
   });
   const [importPrompt, setImportPrompt] = useState(null); // {count}
+
+  // Synchronously set DOM attribute and broadcast immediately if we have a cached session
+  useEffect(() => {
+    const t = getToken();
+    const u = getCachedUser();
+    if (t && u) {
+      broadcastAuthSync(t, getRefreshToken(), u);
+    }
+  }, []);
 
   const check = useCallback(async () => {
     const t = getToken();
@@ -68,6 +97,7 @@ export const AuthProvider = ({ children }) => {
         const cached = getCachedUser();
         if (cached) {
           setUser(cached);
+          broadcastAuthSync(getToken(), getRefreshToken(), cached);
         }
       }
     }
@@ -80,8 +110,12 @@ export const AuthProvider = ({ children }) => {
   // Listen for extension handshake requests to sync existing session in both directions
   useEffect(() => {
     const handleMessage = (e) => {
-      if (e.data?.type === "FORGOT_AI_REQUEST_SESSION" && user && getToken()) {
-        broadcastAuthSync(getToken(), getRefreshToken(), user);
+      if (e.data?.type === "FORGOT_AI_REQUEST_SESSION") {
+        const t = getToken();
+        const u = user || getCachedUser();
+        if (t && u && typeof u === "object") {
+          broadcastAuthSync(t, getRefreshToken(), u);
+        }
       } else if (e.data?.type === "FORGOT_AI_EXT_SYNC_SESSION" && e.data?.session?.token) {
         const s = e.data.session;
         setToken(s.token);
@@ -89,6 +123,7 @@ export const AuthProvider = ({ children }) => {
         if (s.user) {
           setUser(s.user);
           setCachedUser(s.user);
+          broadcastAuthSync(s.token, s.refresh_token, s.user);
         }
       }
     };
@@ -145,4 +180,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-

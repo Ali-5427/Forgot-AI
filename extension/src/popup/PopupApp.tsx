@@ -272,8 +272,44 @@ export default function PopupApp() {
   const [inputHeight, setInputHeight] = useState(52);
 
   useEffect(() => {
-    getSession().then((s) => {
-      setEmail(s?.user?.email || null);
+    getSession().then(async (s) => {
+      if (s?.user?.email) {
+        setEmail(s.user.email);
+        setLoading(false);
+        return;
+      }
+
+      // If no session found yet in extension storage, check if user has Forgot AI open in any tab
+      try {
+        if (typeof chrome !== "undefined" && chrome.tabs?.query) {
+          const tabs = await chrome.tabs.query({
+            url: [
+              "*://forgot-ai.vercel.app/*",
+              "*://localhost/*",
+              "*://127.0.0.1/*",
+            ],
+          });
+          if (tabs && tabs.length > 0) {
+            for (const tab of tabs) {
+              if (tab.id) {
+                chrome.tabs.sendMessage(tab.id, { type: "REQUEST_AUTH_FROM_PAGE" }).catch(() => {});
+              }
+            }
+            // Give 250ms for storage change event to propagate
+            await new Promise((r) => setTimeout(r, 250));
+            const refreshed = await getSession();
+            if (refreshed?.user?.email) {
+              setEmail(refreshed.user.email);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        // Fall back gracefully
+      }
+
+      setEmail(null);
       setLoading(false);
     });
     const off = onSessionChange((s) => setEmail(s?.user?.email || null));
