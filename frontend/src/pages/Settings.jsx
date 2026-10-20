@@ -25,10 +25,6 @@ export default function Settings() {
   const [billing, setBilling] = useState(null);
   const [loadingBilling, setLoadingBilling] = useState(true);
 
-  // Profile Edit State
-  const [profileName, setProfileName] = useState(user?.name || "");
-  const [savingProfile, setSavingProfile] = useState(false);
-
   // Change password state
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -53,19 +49,6 @@ export default function Settings() {
     loadBilling();
   }, []);
 
-  useEffect(() => {
-      if(user?.name) setProfileName(user.name);
-  }, [user]);
-
-  const handleUpdateProfile = (e) => {
-    e.preventDefault();
-    setSavingProfile(true);
-    // Simulate API call for now
-    setTimeout(() => {
-      setSavingProfile(false);
-      toast.success("Profile updated successfully");
-    }, 600);
-  };
 
   const handleExportRequest = async () => {
     try {
@@ -215,38 +198,17 @@ export default function Settings() {
         {activeTab === "account" && (
           <div className="space-y-10 animate-in fade-in duration-300">
             <div>
-              <h2 className="text-xl font-semibold text-neutral-900">Profile</h2>
-              <p className="text-sm text-neutral-500 mt-1">Update your personal information.</p>
+              <h2 className="text-xl font-semibold text-neutral-900">Account</h2>
+              <p className="text-sm text-neutral-500 mt-1">Manage your account credentials and access.</p>
             </div>
             
-            <form className="space-y-6" onSubmit={handleUpdateProfile}>
-              <div className="flex items-center gap-5">
-                <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center border border-neutral-200 text-neutral-400 shrink-0">
-                  <User className="h-6 w-6" />
-                </div>
-                <div>
-                    <Button variant="outline" type="button" size="sm">Upload Avatar</Button>
-                    <p className="text-xs text-neutral-500 mt-2">JPG, GIF or PNG. 1MB max.</p>
-                </div>
+            <div className="border border-neutral-200 rounded-xl p-6 bg-white shadow-sm space-y-4">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Email Address</label>
+                <p className="text-base font-medium text-neutral-900 mt-1">{user?.email || "Not signed in"}</p>
+                <p className="text-xs text-neutral-500 mt-1">Your email address is your unique identity across the web app and Chrome extension.</p>
               </div>
-
-              <div className="space-y-2 max-w-md">
-                <label className="text-sm font-medium text-neutral-700">Full Name</label>
-                <Input value={profileName} onChange={e => setProfileName(e.target.value)} />
-              </div>
-
-              <div className="space-y-2 max-w-md">
-                <label className="text-sm font-medium text-neutral-700">Email Address</label>
-                <Input value={user?.email || ""} disabled className="bg-neutral-50 text-neutral-500 cursor-not-allowed" />
-                <p className="text-[13px] text-neutral-500">Your email address is tied to your login identity and cannot be changed.</p>
-              </div>
-              
-              <Button type="submit" disabled={savingProfile}>
-                 {savingProfile ? "Saving..." : "Save Changes"}
-              </Button>
-            </form>
-            
-            <hr className="border-neutral-200" />
+            </div>
 
             <div className="pt-2 space-y-6">
               <div>
@@ -257,7 +219,7 @@ export default function Settings() {
               <div className="border border-red-200 bg-red-50/50 rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-medium text-neutral-900">Delete Account</h3>
-                  <p className="text-[13px] text-neutral-600 mt-0.5">Permanently remove your account and all data.</p>
+                  <p className="text-[13px] text-neutral-600 mt-0.5">Permanently remove your account, memories, and files.</p>
                 </div>
                 <Button variant="destructive" onClick={() => setDeleteModalOpen(true)} className="shrink-0">
                   Delete Account

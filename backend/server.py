@@ -1032,6 +1032,43 @@ async def export_data(user: dict = Depends(get_current_user)):
 @api_router.delete("/account")
 async def delete_account(request: Request, user: dict = Depends(get_current_user)):
     token = _bearer(request)
+    # 1. Cancel active Dodo subscription if one exists
+    try:
+        b_store = get_billing_store()
+        sub_row = await b_store.get_subscription(user["id"])
+        if sub_row and sub_row.get("dodo_subscription_id") and sub_row.get("status") in ("active_pro", "trial", "on_hold"):
+            await cancel_subscription(b_store, user["id"])
+    except Exception as e:
+        logger.warning(f"Failed to cancel subscription during account deletion for user {user['id']}: {e}")
+
+    # 2. Delete user's image assets from Supabase Storage
+    try:
+        user_items = await db.items.find({"library_id": user["id"]}).to_list(10000)
+        image_paths = [
+            it["image_path"] for it in user_items
+            if it.get("image_path") and not it["image_path"].startswith("http")
+        ]
+        if image_paths:
+            def _remove_files():
+                supabase.storage.from_(STORAGE_BUCKET).remove(image_paths)
+            await asyncio.to_thread(_remove_files)
+    except Exception as e:
+        logger.warning(f"Failed to delete storage objects for user {user['id']}: {e}")
+
+    # 3. Clean up related database tables
+    try:
+        db.supabase.table("feedback").delete().eq("user_id", user["id"]).execute()
+    except Exception:
+        pass
+    try:
+        db.supabase.table("conversations").delete().eq("user_id", user["id"]).execute()
+    except Exception:
+        pass
+    try:
+        db.supabase.table("groups").delete().eq("user_id", user["id"]).execute()
+    except Exception:
+        pass
+
     # Delete all user's items
     await db.items.delete_many({"library_id": user["id"]})
     # Delete session

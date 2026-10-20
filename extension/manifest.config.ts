@@ -3,7 +3,7 @@ import { defineManifest } from "@crxjs/vite-plugin";
 export default defineManifest({
   manifest_version: 3,
   name: "Forgot AI",
-  description: "Save highlights, tweets, AI responses, and articles to Forgot AI in one click.",
+  description: "Save highlights, notes, links, and articles to Forgot AI in one click.",
   version: "1.0.0",
   action: {
     default_title: "Forgot AI",

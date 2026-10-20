@@ -31,7 +31,7 @@ async def sweep_stuck_items():
             # If older than 10 minutes (600 seconds), mark as failed
             if age > 600:
                 logger.warning(f"Item {doc['id']} stuck in processing for {age/60:.1f} mins. Marking as failed.")
-                await db.items.update_one({"id": doc["id"]}, {"": {"status": "failed"}})
+                await db.items.update_one({"id": doc["id"]}, {"$set": {"status": "failed"}})
                 
     except Exception as e:
         logger.error(f"Sweeper error: {e}")
