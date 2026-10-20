@@ -37,7 +37,7 @@ export default function DataDeletionPage() {
             <li>Your authentication credentials and profile information are permanently removed.</li>
             <li>All your saved memories, links, texts, images, and AI-generated metadata are permanently purged from our active database.</li>
             <li>Any active Pro subscription is automatically cancelled.</li>
-            <li>We do not retain "ghost" copies of your saved content after a deletion request is processed.</li>
+            <li>We do not retain copies of your saved content in our active application systems after deletion. Automated backups held by our cloud infrastructure providers are purged according to standard retention cycles.</li>
           </ul>
         </div>
       </div>

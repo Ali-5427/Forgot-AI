@@ -340,7 +340,7 @@ export default function Settings() {
                          <span className="font-medium text-neutral-900">{formatBillingDate(billing.current_period_end)}</span>
                       </div>
                     )}
-                    {billing.status === 'active_pro' && (
+                    {(billing.status === 'active_pro' || billing.status === 'trial') && (
                       <div className="pt-2">
                         <Button variant="outline" onClick={() => setCancelModalOpen(true)}>
                           Cancel Subscription

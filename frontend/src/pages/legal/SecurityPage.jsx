@@ -18,7 +18,7 @@ export default function SecurityPage() {
           <p>We take the security and privacy of your personal memories seriously. Here is how we protect your data.</p>
           
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">Data Isolation &amp; Ownership</h2>
-          <p>Your data is strictly isolated to your account. All requests are authenticated, and access is enforced by private user-level scoping across our backend services and database.</p>
+          <p>Your data is strictly isolated to your account. All user-facing requests require authentication, and access is enforced by private user-level scoping across our backend services and database.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">Encryption in Transit</h2>
           <p>All data transmitted between your browser, our Chrome extension, our backend, and our database is encrypted using industry-standard HTTPS/TLS protocols.</p>
@@ -30,7 +30,7 @@ export default function SecurityPage() {
           <p>We use Supabase Auth for secure session management. Your authentication tokens are handled securely, and you are automatically protected from unauthorized access.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">Continuous Improvement</h2>
-          <p>Security is continuously improved as the product evolves. We regularly audit our dependencies, monitor error logs for anomalies, and adhere to least-privilege architecture principles.</p>
+          <p>Security is continuously improved as the product evolves. We review application logs, monitor our services for unexpected behavior, and adhere to least-privilege architecture principles.</p>
 
           <h2 className="text-ink font-medium text-xl mt-8 mb-4">Report a Vulnerability</h2>
           <p>If you believe you have discovered a security vulnerability in Forgot AI, please report it to us immediately at <a href="mailto:jmohammadali5427@gmail.com">jmohammadali5427@gmail.com</a>.</p>
