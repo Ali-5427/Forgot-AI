@@ -33,6 +33,7 @@ from billing import (
     event_from_unwrapped,
     process_dodo_webhook,
     process_verified_webhook,
+    user_has_active_access,
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -392,6 +393,18 @@ async def resolve_library(request: Request) -> str:
             return u["id"]
         raise HTTPException(401, "Invalid or expired session")
     raise HTTPException(401, "Please sign in to Forgot AI.")
+
+
+async def require_active_subscription(request: Request) -> str:
+    """Ensure user is authenticated AND currently has active trial, pro, or lifetime access."""
+    user_id = await resolve_library(request)
+    row = await get_billing_store().get_subscription(user_id)
+    if not user_has_active_access(row):
+        raise HTTPException(
+            status_code=402,
+            detail="Active trial or subscription required. Please choose a plan to save and search memories."
+        )
+    return user_id
 
 
 async def get_current_user(request: Request) -> dict:
@@ -1275,7 +1288,7 @@ async def check_duplicate(payload: CheckIn, lib: str = Depends(resolve_library))
 
 
 @api_router.post("/items/text", response_model=SavedItem)
-async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str = Depends(resolve_library)):
+async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str = Depends(require_active_subscription)):
     limiter.check(lib, 60, 60)
     if not payload.text.strip():
         raise HTTPException(400, "Text is empty")
@@ -1295,7 +1308,7 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str =
 
 
 @api_router.post("/items/url", response_model=SavedItem)
-async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = Depends(resolve_library)):
+async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = Depends(require_active_subscription)):
     limiter.check(lib, 60, 60)
     url = payload.url.strip()
     if not url:
@@ -1320,7 +1333,7 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
 async def save_image(background: BackgroundTasks, file: UploadFile = File(...),
                      source_url: Optional[str] = Form(None), source_title: Optional[str] = Form(None),
                      user_note: Optional[str] = Form(None),
-                     lib: str = Depends(resolve_library)):
+                     lib: str = Depends(require_active_subscription)):
     limiter.check(lib, 60, 60)
     data = await file.read()
     if not data:
@@ -1512,7 +1525,7 @@ async def ask_item(item_id: str, payload: AskIn, lib: str = Depends(resolve_libr
 
 
 @api_router.post("/search")
-async def search(payload: SearchIn, lib: str = Depends(resolve_library)):
+async def search(payload: SearchIn, lib: str = Depends(require_active_subscription)):
     limiter.check(lib, 30, 60)
     q = payload.query.strip()
     if not q:

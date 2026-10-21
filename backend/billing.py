@@ -373,12 +373,28 @@ class SupabaseBillingStore:
 
 def billing_public_fields(row: Optional[dict]) -> dict:
     if not row:
-        return dict(DEFAULT_BILLING)
+        return {
+            **dict(DEFAULT_BILLING),
+            "has_access": False,
+        }
+    status = row.get("status") or "none"
+    plan_type = row.get("plan_type") or "free"
+    # User has access if on active_pro, trial, or lifetime
+    has_access = status in ("active_pro", "trial", "lifetime")
     return {
-        "plan_type": row.get("plan_type") or "free",
-        "status": row.get("status") or "none",
+        "plan_type": plan_type,
+        "status": status,
         "current_period_end": row.get("current_period_end"),
+        "has_access": has_access,
     }
+
+
+def user_has_active_access(row: Optional[dict]) -> bool:
+    """Return True if user currently has valid trial, pro, or lifetime access."""
+    if not row:
+        return False
+    status = row.get("status") or "none"
+    return status in ("active_pro", "trial", "lifetime")
 
 
 async def apply_entitlement(store, user_id: str, values: dict) -> dict:

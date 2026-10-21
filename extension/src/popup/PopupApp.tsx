@@ -228,6 +228,7 @@ function renderMessageWithLinks(content: string, isUser = false) {
 export default function PopupApp() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
+  const [billing, setBilling] = useState<{ plan_type: string; status: string; has_access: boolean } | null>(null);
   
   const [chatQuery, setChatQuery] = useState("");
   const [chatting, setChatting] = useState(false);
@@ -275,6 +276,7 @@ export default function PopupApp() {
     getSession().then(async (s) => {
       if (s?.user?.email) {
         setEmail(s.user.email);
+        api.billingStatus().then(b => setBilling(b)).catch(() => {});
         setLoading(false);
         return;
       }
@@ -300,6 +302,7 @@ export default function PopupApp() {
             const refreshed = await getSession();
             if (refreshed?.user?.email) {
               setEmail(refreshed.user.email);
+              api.billingStatus().then(b => setBilling(b)).catch(() => {});
               setLoading(false);
               return;
             }
@@ -356,6 +359,9 @@ export default function PopupApp() {
   };
   const openApp = () => {
     chrome.tabs.create({ url: CONFIG.APP_URL });
+  };
+  const openPricing = () => {
+    chrome.tabs.create({ url: `${CONFIG.APP_URL}/pricing` });
   };
   const openSettings = () => {
     chrome.tabs.create({ url: `${CONFIG.APP_URL}/settings` });
@@ -713,7 +719,42 @@ export default function PopupApp() {
               </div>
             </div>
 
-            {/* User Profile Footer */}
+            {/* Subscription / Plan Badge Card */}
+              {email && (
+                <div className="px-3 pb-2">
+                  <div className={`border rounded-2xl p-3 flex items-center justify-between shadow-xs ${
+                    billing?.has_access 
+                      ? 'bg-emerald-50/60 border-emerald-200/80' 
+                      : 'bg-amber-50/60 border-amber-200/80'
+                  }`}>
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+                        Current Plan
+                      </div>
+                      <div className="text-[13px] font-semibold text-neutral-900 mt-0.5">
+                        {billing?.status === 'lifetime' ? 'Founding Lifetime' :
+                         billing?.status === 'active_pro' ? 'Pro Active' :
+                         billing?.status === 'trial' ? '7-Day Free Trial' :
+                         'Inactive / Expired'}
+                      </div>
+                    </div>
+                    {!billing?.has_access ? (
+                      <button 
+                        onClick={() => { openPricing(); setIsMenuOpen(false); }}
+                        className="py-1.5 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-[11px] font-semibold shadow-xs transition-colors"
+                      >
+                        Upgrade
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full uppercase">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* User Profile Footer */}
             <div className="p-3 border-t border-neutral-100 bg-neutral-50/50">
               {email ? (
                 <div className="flex items-center justify-between gap-2 p-1.5">
@@ -762,7 +803,19 @@ export default function PopupApp() {
             <div className="w-7 h-7 bg-neutral-900 rounded-md flex items-center justify-center shadow-sm">
               <Brain className="w-4 h-4 text-white" />
             </div>
-            Forgot AI
+            <span>Forgot AI</span>
+            {billing && (
+              <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full tracking-wide ${
+                billing.has_access
+                  ? 'bg-neutral-100 text-neutral-700 border border-neutral-200/80'
+                  : 'bg-amber-100 text-amber-800 border border-amber-200/80'
+              }`}>
+                {billing.status === 'lifetime' ? 'Lifetime' :
+                 billing.status === 'active_pro' ? 'Pro' :
+                 billing.status === 'trial' ? 'Trial' :
+                 'Expired'}
+              </span>
+            )}
           </div>
         </div>
         
@@ -778,6 +831,24 @@ export default function PopupApp() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-8 pb-32" ref={scrollRef}>
         {/* Chat Thread */}
         <div className="space-y-4">
+          {billing && !billing.has_access && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200/90 rounded-2xl text-amber-900 shadow-xs mb-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-[13px]">Subscription Inactive</span>
+                <span className="text-[10px] font-semibold uppercase bg-amber-200/80 px-2 py-0.5 rounded-full text-amber-900">Paid Only</span>
+              </div>
+              <p className="text-[12px] text-amber-800 leading-relaxed mb-2.5">
+                Forgot AI requires an active 7-day trial, Pro subscription, or Lifetime purchase to save new memories.
+              </p>
+              <button
+                onClick={openPricing}
+                className="w-full py-2 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-[12px] font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+              >
+                Choose a Plan ($5/mo or $49)
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           {messages.length === 0 ? (
                           <div className="flex flex-col items-center justify-center pt-8 pb-4 w-full">
                 {/* Header */}

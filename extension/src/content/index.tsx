@@ -364,18 +364,20 @@ window.addEventListener("message", (event) => {
       },
     }).catch(console.error);
 
-    chrome.runtime.sendMessage(
-      {
-        type: "SYNC_AUTH_FROM_WEB",
-        payload: session,
-      },
-      () => {
-        window.postMessage({ type: "FORGOT_AI_AUTH_SYNC_SUCCESS" }, "*");
-      }
-    ).catch(() => {});
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "SYNC_AUTH_FROM_WEB",
+          payload: session,
+        },
+        () => {
+          window.postMessage({ type: "FORGOT_AI_AUTH_SYNC_SUCCESS" }, "*");
+        }
+      );
+    } catch {}
   } else if (event.data?.type === "FORGOT_AI_AUTH_LOGOUT") {
     clearSession().catch(console.error);
-    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }).catch(() => {});
+    try { chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }); } catch {}
   } else if (event.data?.type === "FORGOT_AI_REQUEST_SESSION_FROM_EXT") {
     sendSessionToWeb();
   }
@@ -406,7 +408,7 @@ if (isForgotAiHost) {
             syncAuthFromDom();
           } else {
             clearSession().catch(console.error);
-            chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }).catch(() => {});
+            try { chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }); } catch {}
           }
         }
       }
