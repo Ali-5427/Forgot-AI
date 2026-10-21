@@ -2072,7 +2072,7 @@ async def submit_feedback(payload: FeedbackIn, request: Request, background_task
 @api_router.post("/billing/checkout")
 async def billing_checkout(payload: CheckoutIn, user: dict = Depends(get_current_user)):
     try:
-        checkout_url = await asyncio.to_thread(create_checkout_url, user, payload.plan)
+        checkout_url = await create_checkout_url(user, payload.plan)
     except ValueError:
         raise HTTPException(400, "Invalid plan")
     except RuntimeError as e:
