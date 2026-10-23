@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Home, Layers, Search, Settings, Plus, RefreshCw, MessageSquare, MoreHorizontal } from "lucide-react";
+import { Home, Layers, Search, Settings, Plus, RefreshCw, MessageSquare, MoreHorizontal, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
 import { ItemDetailView } from "./ItemDetailView";
 import { FeedbackWidget } from "./FeedbackWidget";
+import ProductTour, { startTour } from "./ProductTour";
 import { api } from "@/api";
 
 const nav = [
@@ -124,6 +125,13 @@ export const Layout = () => {
           >
             <MessageSquare className="h-4 w-4" /> Feedback
           </button>
+          <button
+            onClick={startTour}
+            data-testid="nav-take-tour"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-neutral-600 hover:bg-neutral-100 w-full text-left"
+          >
+            <Sparkles className="h-4 w-4" /> Take Tour
+          </button>
         </nav>
 
         <div className="mt-6 px-3">
@@ -219,6 +227,7 @@ export const Layout = () => {
       </nav>
 
       <FeedbackWidget />
+      <ProductTour />
 
       {/* Create Group Modal */}
       {isCreatingGroup && (

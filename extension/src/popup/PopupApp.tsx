@@ -5,6 +5,7 @@ import { CONFIG } from "../lib/config";
 import { clearSession, getSession, onSessionChange } from "../lib/storage";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import ExtensionTour, { resetExtensionTour } from "./ExtensionTour";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -54,12 +55,12 @@ function formatUrlDisplay(rawText: string, href?: string): string {
     const pathname = urlObj.pathname.replace(/\/$/, "");
 
     if (!pathname || pathname === "") {
-      return urlObj.search ? `${host}/…` : host;
+      return urlObj.search ? `${host}/â€¦` : host;
     }
 
     const pathSegments = pathname.split("/").filter(Boolean);
     if (pathSegments.length === 0) {
-      return urlObj.search ? `${host}/…` : host;
+      return urlObj.search ? `${host}/â€¦` : host;
     }
 
     if (pathSegments.length === 1) {
@@ -69,7 +70,7 @@ function formatUrlDisplay(rawText: string, href?: string): string {
       } catch {
         // use raw segment
       }
-      const shortSeg = seg.length > 20 ? seg.slice(0, 17) + "…" : seg;
+      const shortSeg = seg.length > 20 ? seg.slice(0, 17) + "â€¦" : seg;
       return `${host}/${shortSeg}`;
     }
 
@@ -79,11 +80,11 @@ function formatUrlDisplay(rawText: string, href?: string): string {
     } catch {
       // use raw segment
     }
-    const shortSegment = lastSegment.length > 20 ? lastSegment.slice(0, 17) + "…" : lastSegment;
-    return `${host}/…/${shortSegment}`;
+    const shortSegment = lastSegment.length > 20 ? lastSegment.slice(0, 17) + "â€¦" : lastSegment;
+    return `${host}/â€¦/${shortSegment}`;
   } catch {
     const text = rawText || href || "";
-    return text.length > 30 ? text.slice(0, 27) + "…" : text;
+    return text.length > 30 ? text.slice(0, 27) + "â€¦" : text;
   }
 }
 
@@ -111,7 +112,7 @@ function ChatLink({
   if (!childText || isUrlOrMatchesHref(childText, fullUrl)) {
     displayLabel = formatUrlDisplay(childText || fullUrl, fullUrl);
   } else {
-    displayLabel = childText.length > 35 ? childText.slice(0, 32) + "…" : childText;
+    displayLabel = childText.length > 35 ? childText.slice(0, 32) + "â€¦" : childText;
   }
 
   const handleCopy = (e: React.MouseEvent) => {
@@ -690,6 +691,14 @@ export default function PopupApp() {
                 </button>
 
                 <button 
+                  onClick={() => { setIsMenuOpen(false); setTimeout(() => resetExtensionTour(), 200); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition-colors text-left"
+                >
+                  <Sparkles className="w-4 h-4 text-neutral-500" />
+                  Replay Tour
+                </button>
+
+                <button 
                   onClick={() => { openFeedback(); setIsMenuOpen(false); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition-colors text-left"
                 >
@@ -1035,6 +1044,8 @@ export default function PopupApp() {
           )}
         </form>
       </div>
+
+      <ExtensionTour />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { API, getToken } from "@/api";
 import { useAuth } from "@/auth";
 import { Button } from "@/components/ui/button";
+import { resetTour } from "@/components/ProductTour";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -234,7 +235,14 @@ export default function Settings() {
           </button>
         </nav>
 
-        <div className="mt-8 pt-6 border-t border-neutral-200">
+        <div className="mt-8 pt-6 border-t border-neutral-200 space-y-1">
+          <button
+            onClick={() => { resetTour(); }}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+          >
+            <Sparkles className="h-4 w-4" />
+            Replay Product Tour
+          </button>
           <button
             onClick={logout}
             className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -373,7 +381,7 @@ export default function Settings() {
                 {isLifetime && (
                   <div className="flex items-center justify-between text-sm pt-2">
                     <span className="text-neutral-500">Billing Cycle</span>
-                    <span className="font-medium text-neutral-900">One-time payment — Never expires</span>
+                    <span className="font-medium text-neutral-900">One-time payment â€” Never expires</span>
                   </div>
                 )}
 
@@ -422,7 +430,7 @@ export default function Settings() {
                 <label className="text-sm font-medium text-neutral-700">Current password</label>
                 <Input
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                   required
@@ -453,7 +461,7 @@ export default function Settings() {
                 <label className="text-sm font-medium text-neutral-700">Confirm new password</label>
                 <Input
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
