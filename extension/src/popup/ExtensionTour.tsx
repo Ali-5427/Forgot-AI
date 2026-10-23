@@ -15,29 +15,36 @@ const TOUR_STEPS: TourStep[] = [
   {
     target: null,
     title: "Welcome to Forgot AI ✨",
-    description: "Your AI memory assistant right in the browser. Save anything you find while browsing and ask questions about your saved memories.",
+    description: "Your AI memory assistant right in your browser. Save pages with 1 click and recall your notes and thoughts effortlessly.",
     icon: Brain,
     badge: "Welcome",
   },
   {
-    target: '[title="Save to Memory"]',
-    title: "1. Quick Capture",
-    description: "Tap the + button to save text notes, web links, or upload screenshots. You can also use the action cards above to save the current tab instantly!",
+    target: '[data-tour="save-shortcuts"]',
+    title: "1. Quick Save Shortcuts",
+    description: "Click 'Save Current Tab' to instantly grab the current URL and webpage you're viewing. Use 'Save Note' to jot down quick notes or upload screenshots.",
     icon: Plus,
-    badge: "Capture",
+    badge: "Shortcuts",
   },
   {
-    target: 'textarea[placeholder="Ask AI..."]',
-    title: "2. Ask Your Memory",
-    description: "Type any question here to search your saved memories using AI. Try 'What did I save today?' or 'Summarize my recent links' — it only answers from your library.",
+    target: '[data-tour="suggestions"]',
+    title: "2. 1-Click AI Suggestions",
+    description: "Tap any prompt chip—like 'What did I save today?' or 'Summarize my recent links'—to immediately query and summarize your saved memories without typing.",
+    icon: Sparkles,
+    badge: "Suggestions",
+  },
+  {
+    target: 'form:has(textarea[placeholder="Ask AI..."]), textarea[placeholder="Ask AI..."]',
+    title: "3. Ask Your Memory Anything",
+    description: "Or type your own custom question in the chat bar below. Forgot AI searches your stored memories and answers grounded strictly in what you have saved.",
     icon: MessageSquare,
     badge: "Ask AI",
   },
   {
     target: '[title="Open menu"]',
-    title: "3. Menu & Settings",
-    description: "Open the menu to access your full library on the web, manage settings, check your plan, or get help. Everything syncs in real-time with your web dashboard!",
-    icon: Sparkles,
+    title: "4. Menu & Web Dashboard",
+    description: "Open the menu anytime to view your full memory library on the web, check your plan, manage settings, or replay this tour.",
+    icon: Brain,
     badge: "Menu",
   },
 ];
@@ -87,8 +94,18 @@ export default function ExtensionTour({ autoStart = true }: { autoStart?: boolea
       return;
     }
 
-    const el = document.querySelector(step.target);
+    const selectors = step.target.split(",").map((s) => s.trim());
+    let el: Element | null = null;
+    for (const sel of selectors) {
+      const found = document.querySelector(sel);
+      if (found) {
+        el = found;
+        break;
+      }
+    }
+
     if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
       setTargetRect(el.getBoundingClientRect());
     } else {
       setTargetRect(null);
@@ -147,14 +164,14 @@ export default function ExtensionTour({ autoStart = true }: { autoStart?: boolea
     const spaceBelow = window.innerHeight - targetRect.bottom;
     const spaceAbove = targetRect.top;
 
-    if (spaceBelow >= 240) {
-      popoverTop = `${targetRect.bottom + 12}px`;
+    if (spaceBelow >= 220) {
+      popoverTop = `${targetRect.bottom + 10}px`;
       popoverTransform = "none";
-    } else if (spaceAbove >= 240) {
-      popoverTop = `${targetRect.top - 12}px`;
+    } else if (spaceAbove >= 220) {
+      popoverTop = `${targetRect.top - 10}px`;
       popoverTransform = "translateY(-100%)";
     } else {
-      // Center
+      // If neither side has enough clearance, center popover
       popoverTop = "50%";
       popoverTransform = "translateY(-50%)";
     }
@@ -173,7 +190,7 @@ export default function ExtensionTour({ autoStart = true }: { autoStart?: boolea
                 y={targetRect.top - padding}
                 width={targetRect.width + padding * 2}
                 height={targetRect.height + padding * 2}
-                rx="12"
+                rx="14"
                 fill="black"
                 style={{ transition: "all 0.3s ease-out" }}
               />
@@ -202,7 +219,7 @@ export default function ExtensionTour({ autoStart = true }: { autoStart?: boolea
             zIndex: 9992,
             transition: "all 0.3s ease-out",
           }}
-          className="pointer-events-none rounded-[12px] ring-2 ring-white/80 ring-offset-1 ring-offset-black/30"
+          className="pointer-events-none rounded-[14px] ring-2 ring-white/80 ring-offset-1 ring-offset-black/30 animate-pulse"
         />
       )}
 
@@ -212,12 +229,12 @@ export default function ExtensionTour({ autoStart = true }: { autoStart?: boolea
         style={{
           position: "fixed",
           top: popoverTop,
-          left: "8px",
-          right: "8px",
+          left: "12px",
+          right: "12px",
           transform: popoverTransform,
           zIndex: 9995,
         }}
-        className="bg-white rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.3)] border border-neutral-200/80 p-4 flex flex-col gap-3"
+        className="bg-white rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.35)] border border-neutral-200/90 p-4 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200"
       >
         {/* Header */}
         <div className="flex items-center justify-between">
