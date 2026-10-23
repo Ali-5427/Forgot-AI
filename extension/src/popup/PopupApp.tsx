@@ -870,7 +870,7 @@ export default function PopupApp() {
                 </div>
 
                 {/* Primary Actions Grid */}
-                <div data-tour="save-shortcuts" className="grid grid-cols-2 gap-3 w-full mb-8">
+                <div className="grid grid-cols-2 gap-3 w-full mb-8">
                   <button
                     onClick={() => {
                       if (window.chrome && chrome.tabs) {
@@ -906,7 +906,7 @@ export default function PopupApp() {
                 </div>
 
                 {/* Suggestion Chips */}
-                <div data-tour="suggestions" className="w-full flex flex-col items-center">
+                <div className="w-full flex flex-col items-center">
                   <div className="flex items-center gap-3 w-full mb-4">
                     <div className="h-px bg-neutral-200 flex-1"></div>
                     <span className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider">Or ask your memory</span>
