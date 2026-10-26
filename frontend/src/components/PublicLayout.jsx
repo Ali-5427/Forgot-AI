@@ -50,6 +50,7 @@ export function PublicLayout({ onOpenApp }) {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-ink-muted">
             <button onClick={() => handleNav('#how-it-works')} className="hover:text-ink transition-colors">How it works</button>
             <button onClick={() => handleNav('#use-cases')} className="hover:text-ink transition-colors">Use cases</button>
+            <Link to="/extension" className="hover:text-ink transition-colors">Extension</Link>
             <Link to="/pricing" className="hover:text-ink transition-colors">Pricing</Link>
             <button onClick={() => handleNav('#faq')} className="hover:text-ink transition-colors">FAQ</button>
           </nav>
@@ -72,4 +73,3 @@ export function PublicLayout({ onOpenApp }) {
     </div>
   );
 }
-

@@ -23,7 +23,8 @@ export function Footer() {
             <h3 className="font-display text-sm font-medium text-ink mb-4">Product</h3>
             <ul className="space-y-3 text-sm text-ink-muted">
               <li><Link to="/" className="hover:text-ink transition-colors">Home</Link></li>
-              <li><a href="https://chrome.google.com/webstore" target="_blank" rel="noreferrer" className="hover:text-ink transition-colors">Chrome Extension</a></li>
+              <li><Link to="/extension" className="hover:text-ink transition-colors">Chrome Extension</Link></li>
+              <li><Link to="/pricing" className="hover:text-ink transition-colors">Pricing</Link></li>
               <li><Link to="/#faq" className="hover:text-ink transition-colors">FAQ</Link></li>
             </ul>
           </div>
@@ -55,4 +56,3 @@ export function Footer() {
     </footer>
   );
 }
-
