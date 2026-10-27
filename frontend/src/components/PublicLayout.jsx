@@ -51,6 +51,7 @@ export function PublicLayout({ onOpenApp }) {
             <button onClick={() => handleNav('#how-it-works')} className="hover:text-ink transition-colors">How it works</button>
             <button onClick={() => handleNav('#use-cases')} className="hover:text-ink transition-colors">Use cases</button>
             <Link to="/extension" className="hover:text-ink transition-colors">Extension</Link>
+            <Link to="/den" className="hover:text-ink transition-colors">Den</Link>
             <Link to="/pricing" className="hover:text-ink transition-colors">Pricing</Link>
             <button onClick={() => handleNav('#faq')} className="hover:text-ink transition-colors">FAQ</button>
           </nav>

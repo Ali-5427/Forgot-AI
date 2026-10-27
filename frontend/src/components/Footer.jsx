@@ -24,6 +24,7 @@ export function Footer() {
             <ul className="space-y-3 text-sm text-ink-muted">
               <li><Link to="/" className="hover:text-ink transition-colors">Home</Link></li>
               <li><Link to="/extension" className="hover:text-ink transition-colors">Chrome Extension</Link></li>
+              <li><Link to="/den" className="hover:text-ink transition-colors">Den (Desktop)</Link></li>
               <li><Link to="/pricing" className="hover:text-ink transition-colors">Pricing</Link></li>
               <li><Link to="/#faq" className="hover:text-ink transition-colors">FAQ</Link></li>
             </ul>

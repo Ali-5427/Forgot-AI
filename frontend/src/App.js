@@ -21,6 +21,7 @@ import NotFound from "@/pages/NotFound";
 
 // Product Pages
 import ExtensionPage from "@/pages/ExtensionPage";
+import DenPage from "@/pages/DenPage";
 
 // Pricing & Checkout
 import PricingPage from "@/pages/PricingPage";
@@ -109,6 +110,7 @@ function AppContent() {
           {!user && <Route path="/" element={<LandingPage onOpenApp={() => setShowAuth(true)} />} />}
           <Route path="/extension" element={<ExtensionPage />} />
           <Route path="/chrome-extension" element={<Navigate to="/extension" replace />} />
+          <Route path="/den" element={<DenPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
           <Route path="/checkout/cancel" element={<CheckoutCancelPage />} />
