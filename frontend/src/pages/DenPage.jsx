@@ -30,12 +30,11 @@ import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Den Desktop Installers Configuration
-// Paste the public download links below when installers exist:
-// Preferred local paths: "/downloads/Den-1.0.0.dmg", "/downloads/Den-Setup-1.0.0.exe"
-// Or GitHub Releases / cloud storage URLs. Leave empty for "Coming soon" mode.
+// v1.0.0 Official GitHub Release Binaries
 // ---------------------------------------------------------------------------
-export const DEN_DMG_URL = ""; // macOS installer (.dmg)
-export const DEN_EXE_URL = ""; // Windows installer (.exe)
+export const DEN_DMG_URL = "https://github.com/Ali-5427/Homy/releases/download/v1.0.0/Den-1.0.0.dmg";
+export const DEN_DMG_ARM64_URL = "https://github.com/Ali-5427/Homy/releases/download/v1.0.0/Den-1.0.0-arm64.dmg";
+export const DEN_EXE_URL = "https://github.com/Ali-5427/Homy/releases/download/v1.0.0/Den.Setup.1.0.0.exe";
 
 export default function DenPage() {
   const [email, setEmail] = useState("");
@@ -43,6 +42,7 @@ export default function DenPage() {
   const [notified, setNotified] = useState(false);
 
   const hasMacUrl = Boolean(DEN_DMG_URL && DEN_DMG_URL.trim().length > 0);
+  const hasMacArm64Url = Boolean(DEN_DMG_ARM64_URL && DEN_DMG_ARM64_URL.trim().length > 0);
   const hasWinUrl = Boolean(DEN_EXE_URL && DEN_EXE_URL.trim().length > 0);
 
   const handleNotifySubmit = async (e) => {
@@ -55,13 +55,13 @@ export default function DenPage() {
     setSubmitting(true);
     try {
       if (api.submitFeedback) {
-        await api.submitFeedback(`Den Desktop Waitlist Request: ${email.trim()}`);
+        await api.submitFeedback(`Den Desktop Updates Request: ${email.trim()}`);
       }
       setNotified(true);
-      toast.success("You're on the list! We'll notify you as soon as installers are ready.");
+      toast.success("You're on the list! We'll keep you updated on new releases.");
     } catch (err) {
       setNotified(true);
-      toast.success("You're on the list! We'll notify you as soon as installers are ready.");
+      toast.success("You're on the list! We'll keep you updated on new releases.");
     } finally {
       setSubmitting(false);
     }
@@ -82,7 +82,7 @@ export default function DenPage() {
     },
     {
       q: "What operating systems are supported?",
-      a: "Den is built for both macOS (Apple Silicon and Intel) and Windows (64-bit). Linux support is planned for later.",
+      a: "Den is built for both macOS (Apple Silicon M-series and Intel) and Windows (64-bit). Linux support is planned for later.",
     },
   ];
 
@@ -94,9 +94,12 @@ export default function DenPage() {
       <section className="px-5 sm:px-8 max-w-5xl mx-auto pt-14 pb-20 text-center">
         <Reveal>
           {/* Status Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium border mb-6 bg-cream border-line text-ink">
-            <Laptop className="w-3.5 h-3.5 text-ink-muted" />
-            <span>Standalone Desktop App · macOS & Windows</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium border mb-6 bg-emerald-500/10 text-emerald-900 border-emerald-500/30">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>v1.0.0 Available for macOS & Windows</span>
           </div>
 
           {/* Main Headline */}
@@ -111,10 +114,10 @@ export default function DenPage() {
           </p>
 
           {/* Download Buttons Group */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto mb-6">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto mb-4">
             {/* Mac Installer Button */}
             {hasMacUrl ? (
-              <a href={DEN_DMG_URL} download className="w-full sm:w-auto">
+              <a href={DEN_DMG_URL} className="w-full sm:w-auto">
                 <Button className="w-full sm:w-auto rounded-full h-12 px-7 text-sm font-medium shadow-soft flex items-center justify-center gap-2">
                   <Apple className="w-4 h-4" />
                   Download for Mac (.dmg)
@@ -133,7 +136,7 @@ export default function DenPage() {
 
             {/* Windows Installer Button */}
             {hasWinUrl ? (
-              <a href={DEN_EXE_URL} download className="w-full sm:w-auto">
+              <a href={DEN_EXE_URL} className="w-full sm:w-auto">
                 <Button className="w-full sm:w-auto rounded-full h-12 px-7 text-sm font-medium shadow-soft flex items-center justify-center gap-2">
                   <Download className="w-4 h-4" />
                   Download for Windows (.exe)
@@ -151,6 +154,19 @@ export default function DenPage() {
             )}
           </div>
 
+          {/* Apple Silicon link note */}
+          {hasMacArm64Url && (
+            <div className="text-xs text-ink-muted mb-6">
+              <span>Apple Silicon (M1/M2/M3/M4)? </span>
+              <a
+                href={DEN_DMG_ARM64_URL}
+                className="text-ink font-medium underline hover:opacity-80"
+              >
+                Download ARM64 .dmg
+              </a>
+            </div>
+          )}
+
           {/* Installation Honesty Note */}
           <div className="flex items-center justify-center gap-2 text-xs text-ink-muted max-w-xl mx-auto mb-8 bg-cream/60 border border-line rounded-xl px-4 py-2.5">
             <AlertCircle className="w-4 h-4 text-ink-muted shrink-0" />
@@ -158,16 +174,6 @@ export default function DenPage() {
               <strong>Install note:</strong> Early preview builds are indie-signed. macOS Gatekeeper or Windows SmartScreen may show a standard safety prompt on first launch.
             </p>
           </div>
-
-          {/* Quick link to notify if not live yet */}
-          {(!hasMacUrl || !hasWinUrl) && (
-            <div className="text-xs text-ink-muted">
-              <span>Want to be notified when installers drop? </span>
-              <a href="#notify-den" className="text-ink font-medium underline hover:opacity-80">
-                Join the early access list below
-              </a>
-            </div>
-          )}
         </Reveal>
       </section>
 
@@ -290,22 +296,22 @@ export default function DenPage() {
       </section>
 
       {/* ----------------------------------------------------------------- */}
-      {/* Notify / Early Access Section */}
+      {/* Notify / Updates Section */}
       {/* ----------------------------------------------------------------- */}
       <section id="notify-den" className="px-5 sm:px-8 max-w-3xl mx-auto mb-24 text-center">
         <Reveal>
           <div className="bg-cream rounded-3xl border border-line p-8 sm:p-12 shadow-soft">
             <h2 className="text-2xl sm:text-3xl font-display font-medium text-ink mb-3">
-              Get notified when Den installers drop.
+              Stay in the loop with Den releases.
             </h2>
             <p className="text-ink-muted text-sm sm:text-base max-w-lg mx-auto mb-8">
-              We'll send you an email the moment the macOS and Windows installer builds are available for download.
+              We'll send you an occasional email when major feature updates and new versions of Den are released.
             </p>
 
             {notified ? (
               <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 text-sm font-medium inline-flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600" />
-                You're on the list! We'll email you the moment downloads are live.
+                You're all set! We'll keep you posted on new releases.
               </div>
             ) : (
               <form onSubmit={handleNotifySubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
@@ -322,7 +328,7 @@ export default function DenPage() {
                   disabled={submitting}
                   className="rounded-full px-6 h-12 text-sm font-medium shadow-soft shrink-0"
                 >
-                  {submitting ? "Adding..." : "Notify Me"}
+                  {submitting ? "Adding..." : "Get Updates"}
                 </Button>
               </form>
             )}
