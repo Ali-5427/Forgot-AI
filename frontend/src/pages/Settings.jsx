@@ -1,7 +1,8 @@
-import { Database, LogOut, User, Trash2, ShieldAlert, CreditCard, Lock, HelpCircle, Download, Eye, EyeOff, CheckCircle2, Sparkles, AlertCircle, ArrowUpRight } from "lucide-react";
+import { Database, LogOut, User, Trash2, ShieldAlert, CreditCard, Lock, HelpCircle, Download, Eye, EyeOff, CheckCircle2, Sparkles, AlertCircle, ArrowUpRight, Bookmark } from "lucide-react";
 import { useState, useEffect } from "react";
 import { API, getToken } from "@/api";
 import { useAuth } from "@/auth";
+import { useStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { resetTour } from "@/components/ProductTour";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import { Link } from "react-router-dom";
 
 export default function Settings() {
   const { user, logout } = useAuth();
+  const { openImporter } = useStore();
   const [activeTab, setActiveTab] = useState("account");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -484,6 +486,16 @@ export default function Settings() {
             </div>
 
             <div className="space-y-6">
+              <div className="border border-neutral-200 rounded-xl p-6 bg-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-medium text-neutral-900">Import Browser Bookmarks</h3>
+                  <p className="text-[13px] text-neutral-500 mt-0.5">Import bookmarks from Chrome, Safari, Edge, or Brave into your AI memory.</p>
+                </div>
+                <Button variant="outline" onClick={openImporter} className="shrink-0">
+                  <Bookmark className="h-4 w-4 mr-2" /> Import Bookmarks
+                </Button>
+              </div>
+
               <div className="border border-neutral-200 rounded-xl p-6 bg-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-medium text-neutral-900">Export Data</h3>

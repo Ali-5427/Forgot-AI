@@ -10,6 +10,7 @@ import { StoreProvider, useStore } from "@/store";
 import { AuthProvider, useAuth } from "@/auth";
 import { Layout } from "@/components/Layout";
 import { SaveDialog } from "@/components/SaveDialog";
+import { BookmarkImporterModal } from "@/components/BookmarkImporterModal";
 import { LandingPage } from "@/components/landing-page/landing-page";
 import { PublicLayout } from "@/components/PublicLayout";
 import AuthGate from "@/pages/AuthGate";
@@ -41,7 +42,7 @@ import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 
 function GlobalDialogs() {
-  const { saveOpen, setSaveOpen, openItem, reloadItems } = useStore();
+  const { saveOpen, setSaveOpen, importerOpen, setImporterOpen, openItem, reloadItems } = useStore();
   const [params, setParams] = useSearchParams();
 
   useEffect(() => {
@@ -57,6 +58,7 @@ function GlobalDialogs() {
   return (
     <>
       <SaveDialog open={saveOpen} onOpenChange={setSaveOpen} onSaved={() => reloadItems()} onOpenExisting={(id) => openItem(id)} />
+      <BookmarkImporterModal open={importerOpen} onOpenChange={setImporterOpen} />
     </>
   );
 }

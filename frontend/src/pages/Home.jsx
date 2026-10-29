@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, Pin, RefreshCw } from "lucide-react";
+import { Search, Plus, Pin, RefreshCw, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ItemCard } from "@/components/ItemCard";
+import { SkeletonCard } from "@/components/ui/SkeletonCard";
 import { useItems } from "@/lib/useItems";
 import { useStore } from "@/store";
 import { FeedbackPrompt } from "@/components/FeedbackPrompt";
 
 export default function Home() {
-  const { openSave, openItem, togglePin } = useStore();
+  const { openSave, openItem, togglePin, openImporter } = useStore();
   const { items, loading } = useItems();
   const [q, setQ] = useState("");
   const navigate = useNavigate();
@@ -38,9 +39,9 @@ export default function Home() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search anything you've saved…"
-          className="w-full h-12 pl-11 pr-28 rounded-lg border border-border bg-white text-sm outline-none focus:border-neutral-900 transition-colors"
+          className="w-full h-12 pl-11 pr-28 rounded-xl border border-border bg-white text-sm outline-none focus:border-neutral-900 transition-colors shadow-sm"
         />
-        <Button type="submit" size="sm" className="absolute right-2 top-1/2 -translate-y-1/2" data-testid="home-search-btn">
+        <Button type="submit" size="sm" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg" data-testid="home-search-btn">
           Search
         </Button>
       </form>
@@ -60,25 +61,42 @@ export default function Home() {
 
       <div className="flex items-center justify-between mt-12 mb-4">
         <h2 className="text-lg font-semibold">Recent saves</h2>
-        <Button variant="outline" size="sm" onClick={openSave} data-testid="home-save-btn">
-          <Plus className="h-4 w-4 mr-1.5" /> Save
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openImporter}
+            className="text-xs text-neutral-600 hover:text-neutral-900 border-neutral-200 rounded-lg shadow-sm"
+          >
+            <Bookmark className="h-3.5 w-3.5 mr-1.5" /> Import Bookmarks
+          </Button>
+          <Button size="sm" onClick={openSave} data-testid="home-save-btn" className="rounded-lg shadow-sm">
+            <Plus className="h-4 w-4 mr-1.5" /> Save
+          </Button>
+        </div>
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading your memory…</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <SkeletonCard count={6} />
+        </div>
       ) : items.length === 0 ? (
-        <div className="border border-dashed border-border rounded-xl py-16 text-center bg-white">
+        <div className="border border-dashed border-border rounded-2xl py-16 text-center bg-white shadow-sm">
           <div className="h-12 w-12 mx-auto mb-4">
-              <img src="/logo.jpg" alt="Forgot AI Logo" className="w-full h-full object-cover rounded-xl shadow-sm" />
-            </div>
+            <img src="/logo.jpg" alt="Forgot AI Logo" className="w-full h-full object-cover rounded-xl shadow-sm" />
+          </div>
           <h3 className="text-base font-semibold">Save your first thing.</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
             Screenshots, text and links you want to remember later.
           </p>
-          <Button onClick={openSave} className="mt-5" data-testid="empty-save-btn">
-            <Plus className="h-4 w-4 mr-1.5" /> Save something
-          </Button>
+          <div className="flex items-center justify-center gap-3 mt-5">
+            <Button onClick={openSave} className="rounded-full px-5" data-testid="empty-save-btn">
+              <Plus className="h-4 w-4 mr-1.5" /> Save something
+            </Button>
+            <Button variant="outline" onClick={openImporter} className="rounded-full px-5">
+              <Bookmark className="h-4 w-4 mr-1.5" /> Import Bookmarks
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -109,8 +127,8 @@ const SyncButton = () => {
       title="Sync latest saves"
       className="flex items-center gap-2 p-2 px-4 rounded-full border border-neutral-200 hover:bg-neutral-50 transition-colors disabled:opacity-50 text-neutral-600 font-medium text-sm shadow-sm"
     >
-      <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin text-neutral-900' : ''}`} />
-      {syncing ? 'Syncing...' : 'Sync'}
+      <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin text-neutral-900" : ""}`} />
+      {syncing ? "Syncing..." : "Sync"}
     </button>
   );
 };

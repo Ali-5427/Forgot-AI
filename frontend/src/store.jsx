@@ -9,6 +9,7 @@ export const useStore = () => useContext(StoreContext);
 export const StoreProvider = ({ children }) => {
   const { user } = useAuth();
   const [saveOpen, setSaveOpen] = useState(false);
+  const [importerOpen, setImporterOpen] = useState(false);
   const [detailId, setDetailId] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   
@@ -60,11 +61,11 @@ export const StoreProvider = ({ children }) => {
             if (data.type === "NEW_ITEM") {
               setItems((prev) => {
                 // Ignore if we already have it to prevent duplicates
-                if (prev.find(i => i.id === data.item.id)) return prev;
+                if (prev.find((i) => i.id === data.item.id)) return prev;
                 return [data.item, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
               });
             } else if (data.type === "ITEM_UPDATED") {
-              setItems((prev) => prev.map(i => i.id === data.item.id ? data.item : i));
+              setItems((prev) => prev.map((i) => (i.id === data.item.id ? data.item : i)));
             }
           } catch (err) {
             console.error("WebSocket message error", err);
@@ -92,6 +93,7 @@ export const StoreProvider = ({ children }) => {
   }, [user, loadItems, loadGroups]);
 
   const openSave = () => setSaveOpen(true);
+  const openImporter = () => setImporterOpen(true);
   const openItem = (item) => {
     setDetailId(typeof item === "string" ? item : item.id);
     setDetailOpen(true);
@@ -140,6 +142,7 @@ export const StoreProvider = ({ children }) => {
         groups, reloadGroups: loadGroups,
         addGroupLocal, updateGroupLocal, deleteGroupLocal,
         saveOpen, setSaveOpen,
+        importerOpen, setImporterOpen, openImporter,
         detailId, detailOpen, setDetailOpen,
         items, loading, reloadItems: loadItems,
         openSave, openItem,
