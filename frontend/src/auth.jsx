@@ -73,10 +73,6 @@ export const AuthProvider = ({ children }) => {
     if (!t) {
       setUser(false);
       setCachedUser(null);
-      // Proactively ask extension if it already has a session
-      if (typeof window !== "undefined") {
-        window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION_FROM_EXT" }, "*");
-      }
       return;
     }
     try {
@@ -91,6 +87,7 @@ export const AuthProvider = ({ children }) => {
         setRefreshToken(null);
         setCachedUser(null);
         setUser(false);
+        broadcastAuthLogout();
       } else {
         // Network timeout / temporary server lag — preserve cached session
         console.warn("Could not reach auth server, keeping cached session:", err?.message);
@@ -107,7 +104,7 @@ export const AuthProvider = ({ children }) => {
     check();
   }, [check]);
 
-  // Listen for extension handshake requests to sync existing session in both directions
+  // Listen for extension handshake requests to sync current session (One-way: Web -> Extension)
   useEffect(() => {
     const handleMessage = (e) => {
       if (e.data?.type === "FORGOT_AI_REQUEST_SESSION") {
@@ -115,15 +112,6 @@ export const AuthProvider = ({ children }) => {
         const u = user || getCachedUser();
         if (t && u && typeof u === "object") {
           broadcastAuthSync(t, getRefreshToken(), u);
-        }
-      } else if (e.data?.type === "FORGOT_AI_EXT_SYNC_SESSION" && e.data?.session?.token) {
-        const s = e.data.session;
-        setToken(s.token);
-        if (s.refresh_token) setRefreshToken(s.refresh_token);
-        if (s.user) {
-          setUser(s.user);
-          setCachedUser(s.user);
-          broadcastAuthSync(s.token, s.refresh_token, s.user);
         }
       }
     };

@@ -318,68 +318,34 @@ function syncAuthFromDom(): boolean {
   return false;
 }
 
-function sendSessionToWeb() {
-  chrome.runtime.sendMessage({ type: "GET_FULL_SESSION" }, (resp: any) => {
-    if (resp?.session?.token) {
-      window.postMessage(
-        {
-          type: "FORGOT_AI_EXT_SYNC_SESSION",
-          session: resp.session,
-        },
-        "*"
-      );
-    }
-  });
-}
-
 // Handle SPA navigations & ensure floating dock remains mounted
 let lastHref = location.href;
 setInterval(() => {
   if (location.href !== lastHref) {
     lastHref = location.href;
-    if (isForgotAiHost) {
-      syncAuthFromDom();
-    }
   }
   if (window.top === window) {
     try {
       initFloatingDock();
     } catch {}
   }
-}, 800);
+}, 1500);
 
-// Listen to webpage messages
+// Listen to webpage messages (Web -> Extension one-way sync)
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   if (event.data?.type === "FORGOT_AI_AUTH_SYNC" && event.data?.session?.token) {
     const session = event.data.session;
-    // Save directly to chrome.storage.local first
-    setSession({
-      token: session.token,
-      refresh_token: session.refresh_token,
-      user: {
-        id: session.user.id,
-        email: session.user.email,
-        created_at: session.user.created_at || new Date().toISOString(),
-      },
-    }).catch(console.error);
-
     try {
-      chrome.runtime.sendMessage(
-        {
-          type: "SYNC_AUTH_FROM_WEB",
-          payload: session,
-        },
-        () => {
-          window.postMessage({ type: "FORGOT_AI_AUTH_SYNC_SUCCESS" }, "*");
-        }
-      );
+      chrome.runtime.sendMessage({
+        type: "SYNC_AUTH_FROM_WEB",
+        payload: session,
+      });
     } catch {}
   } else if (event.data?.type === "FORGOT_AI_AUTH_LOGOUT") {
-    clearSession().catch(console.error);
-    try { chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }); } catch {}
-  } else if (event.data?.type === "FORGOT_AI_REQUEST_SESSION_FROM_EXT") {
-    sendSessionToWeb();
+    try {
+      chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" });
+    } catch {}
   }
 });
 
@@ -396,7 +362,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 // Setup DOM observer & proactive sync on Forgot AI website
 if (isForgotAiHost) {
-  // Sync immediately
+  // Sync immediately on initial load
   syncAuthFromDom();
 
   // Observe attribute changes on <html>
@@ -407,8 +373,7 @@ if (isForgotAiHost) {
           if (document.documentElement.hasAttribute("data-forgot-ai-session")) {
             syncAuthFromDom();
           } else {
-            clearSession().catch(console.error);
-            try { chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }); } catch {}
+            chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }).catch(() => {});
           }
         }
       }
@@ -421,9 +386,8 @@ if (isForgotAiHost) {
     console.warn("Forgot AI auth MutationObserver error:", e);
   }
 
-  // Also offer extension session or request session
+  // Request current session from web page if not already in DOM
   try {
-    sendSessionToWeb();
     window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
   } catch {}
 }

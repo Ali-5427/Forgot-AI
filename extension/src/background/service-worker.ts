@@ -62,6 +62,17 @@ chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) =>
         return;
       }
       if (msg.type === "SYNC_AUTH_FROM_WEB") {
+        const existing = await getSession();
+        const incomingUserId = msg.payload?.user?.id;
+        const incomingEmail = msg.payload?.user?.email;
+
+        // If the user changed (e.g. user switched accounts on the website),
+        // clear conversation ID, cached memories, and old storage entries.
+        if (existing?.user?.id && incomingUserId && existing.user.id !== incomingUserId) {
+          console.log(`[Forgot AI Auth] Switching account from ${existing.user.email} to ${incomingEmail}`);
+          await chrome.storage.local.remove(["extension_conv_id", "forgot_ai_library"]);
+        }
+
         await setSession({
           token: msg.payload.token,
           refresh_token: msg.payload.refresh_token,
@@ -76,6 +87,7 @@ chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) =>
       }
       if (msg.type === "CLEAR_AUTH_FROM_WEB") {
         await clearSession();
+        await chrome.storage.local.remove(["extension_conv_id", "forgot_ai_library"]);
         sendResponse({ ok: true });
         return;
       }
