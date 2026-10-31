@@ -4,7 +4,7 @@ import { API, getToken } from "@/api";
 import { useAuth } from "@/auth";
 import { useStore } from "@/store";
 import { Button } from "@/components/ui/button";
-import { resetTour } from "@/components/ProductTour";
+import { resetTour, startTour } from "@/components/ProductTour";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -289,6 +289,16 @@ export default function Settings() {
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   Synced via Web Session
                 </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-neutral-100 text-sm">
+                <div>
+                  <span className="text-neutral-900 font-medium block">Interactive Product Tour</span>
+                  <span className="text-xs text-neutral-500">Replay the 2-minute walkthrough of Forgot AI.</span>
+                </div>
+                <Button variant="outline" size="sm" onClick={startTour} className="rounded-lg text-xs">
+                  <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Replay Tour
+                </Button>
               </div>
             </div>
 
