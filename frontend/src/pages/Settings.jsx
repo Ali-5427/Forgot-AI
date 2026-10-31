@@ -226,11 +226,11 @@ export default function Settings() {
   return (
     <div className="flex flex-col md:flex-row min-h-screen w-full bg-white select-none">
       {/* ------------------------------------------------------------- */}
-      {/* Column 2: Docked Settings Rail (Sellfyi style) */}
+      {/* Column 2: Docked Settings Rail (Option B - Roomy 320px / w-80) */}
       {/* ------------------------------------------------------------- */}
-      <aside className="w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-border bg-neutral-50/70 p-4 md:p-5 flex flex-col">
+      <aside className="w-full md:w-80 shrink-0 border-b md:border-b-0 md:border-r border-border bg-neutral-50/70 p-4 md:p-6 flex flex-col">
         {/* Rail Header */}
-        <div className="mb-6 px-1">
+        <div className="mb-6 px-1.5">
           <h1 className="text-base font-bold tracking-tight text-neutral-900">
             Settings
           </h1>
@@ -240,20 +240,20 @@ export default function Settings() {
         </div>
 
         {/* Rail Tabs */}
-        <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
+        <nav className="flex flex-row md:flex-col gap-1.5 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
           {tabs.map(({ id, label, Icon, badge }) => {
             const isActive = activeTab === id;
             return (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-all whitespace-nowrap ${
+                className={`flex items-center justify-between px-4 py-3 rounded-xl text-xs sm:text-[13px] transition-all whitespace-nowrap ${
                   isActive
                     ? "bg-white text-neutral-900 font-semibold shadow-xs border border-border/60"
                     : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/70 font-medium"
                 }`}
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-3">
                   <Icon
                     className={`h-4 w-4 shrink-0 ${
                       isActive ? "text-neutral-900" : "text-neutral-400"
@@ -263,7 +263,7 @@ export default function Settings() {
                 </div>
                 {badge && (
                   <span
-                    className={`text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded ${badge.className}`}
+                    className={`text-[9px] font-mono font-semibold uppercase px-2 py-0.5 rounded ${badge.className}`}
                   >
                     {badge.text}
                   </span>
@@ -275,9 +275,9 @@ export default function Settings() {
       </aside>
 
       {/* ------------------------------------------------------------- */}
-      {/* Column 3: Settings Content Canvas (Sellfyi Row-by-Row Layout) */}
+      {/* Column 3: Settings Content Canvas (Spacious max-w-5xl) */}
       {/* ------------------------------------------------------------- */}
-      <main className="flex-1 bg-white p-6 md:p-10 max-w-4xl overflow-y-auto">
+      <main className="flex-1 bg-white p-6 md:p-10 lg:p-12 max-w-5xl overflow-y-auto">
         {/* ========================================================= */}
         {/* TAB 1: ACCOUNT & PROFILE */}
         {/* ========================================================= */}
