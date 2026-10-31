@@ -21,9 +21,26 @@ import { api } from "@/api";
 
 // Core destinations in Option A order: Search -> Home -> All Saved
 const nav = [
-  { to: "/search", label: "Search", Icon: Search },
-  { to: "/", label: "Home", Icon: Home, end: true },
-  { to: "/all", label: "All Saved", Icon: Layers, end: true },
+  {
+    to: "/search",
+    label: "Search",
+    Icon: Search,
+    animation: "group-hover:-rotate-12 group-hover:scale-110",
+  },
+  {
+    to: "/",
+    label: "Home",
+    Icon: Home,
+    end: true,
+    animation: "group-hover:-translate-y-0.5 group-hover:scale-105",
+  },
+  {
+    to: "/all",
+    label: "All Saved",
+    Icon: Layers,
+    end: true,
+    animation: "group-hover:-translate-y-1 group-hover:scale-105",
+  },
 ];
 
 export const Layout = () => {
@@ -132,10 +149,10 @@ export const Layout = () => {
         <div className="p-3">
           <Button
             onClick={openSave}
-            className="w-full justify-start rounded-xl h-10 px-3.5 shadow-sm text-sm font-medium bg-neutral-900 hover:bg-neutral-800 text-white transition-all duration-150"
+            className="group w-full justify-start rounded-xl h-10 px-3.5 shadow-sm text-sm font-medium bg-neutral-900 hover:bg-neutral-800 text-white transition-all duration-150"
             data-testid="sidebar-save-btn"
           >
-            <Plus className="h-4 w-4 mr-2 stroke-[2.5]" />
+            <Plus className="h-4 w-4 mr-2 stroke-[2.5] transition-transform duration-200 ease-out group-hover:rotate-90 group-hover:scale-110" />
             Save something
           </Button>
         </div>
@@ -146,7 +163,7 @@ export const Layout = () => {
             Navigation
           </div>
           <nav className="flex flex-col gap-0.5">
-            {nav.map(({ to, label, Icon, end }) => (
+            {nav.map(({ to, label, Icon, end, animation }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -154,7 +171,7 @@ export const Layout = () => {
                 onClick={() => setDetailOpen(false)}
                 data-testid={`nav-${label.toLowerCase().replace(" ", "-")}`}
                 className={({ isActive }) =>
-                  `flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all duration-150 ${
+                  `group flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all duration-150 ${
                     isActive && !detailOpen
                       ? "bg-neutral-900 text-white font-medium shadow-sm"
                       : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/80"
@@ -162,7 +179,7 @@ export const Layout = () => {
                 }
               >
                 <div className="flex items-center gap-2.5">
-                  <Icon className="h-4 w-4 shrink-0" />
+                  <Icon className={`h-4 w-4 shrink-0 transition-transform duration-200 ease-out ${animation || ""}`} />
                   <span>{label}</span>
                 </div>
                 {/* Live total count badge on All Saved */}
@@ -188,17 +205,17 @@ export const Layout = () => {
             <span>My Groups</span>
             <button
               onClick={() => setIsCreatingGroup(true)}
-              className="text-neutral-400 hover:text-neutral-900 p-0.5 rounded transition-colors"
+              className="group text-neutral-400 hover:text-neutral-900 p-0.5 rounded transition-colors"
               title="Create new group"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5 transition-transform duration-200 ease-out group-hover:rotate-90 group-hover:scale-110" />
             </button>
           </div>
 
           <nav className="flex flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1 flex-1">
             {groups?.length === 0 && (
-              <div className="text-xs text-neutral-400 px-3 py-2 italic flex items-center gap-1.5">
-                <Folder className="h-3.5 w-3.5 opacity-40" />
+              <div className="group text-xs text-neutral-400 px-3 py-2 italic flex items-center gap-1.5">
+                <Folder className="h-3.5 w-3.5 opacity-40 transition-transform duration-200 ease-out group-hover:rotate-6" />
                 No groups yet
               </div>
             )}
@@ -216,7 +233,7 @@ export const Layout = () => {
                 }
               >
                 <div className="flex items-center gap-2.5 overflow-hidden">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.color }}></span>
+                  <span className="w-2 h-2 rounded-full shrink-0 transition-transform duration-200 group-hover:scale-125" style={{ backgroundColor: g.color }}></span>
                   <span className="truncate">{g.name}</span>
                 </div>
                 <button
@@ -244,23 +261,23 @@ export const Layout = () => {
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("open-feedback"))}
               data-testid="nav-feedback"
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-neutral-600 hover:text-neutral-900 hover:bg-white transition-all shadow-xs"
+              className="group flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-neutral-600 hover:text-neutral-900 hover:bg-white transition-all shadow-xs"
             >
-              <MessageSquare className="h-3.5 w-3.5" />
+              <MessageSquare className="h-3.5 w-3.5 transition-transform duration-200 ease-out group-hover:-rotate-12 group-hover:-translate-y-0.5" />
               <span>Feedback</span>
             </button>
             <NavLink
               to="/settings"
               onClick={() => setDetailOpen(false)}
               className={({ isActive }) =>
-                `flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all shadow-xs ${
+                `group flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all shadow-xs ${
                   isActive
                     ? "bg-neutral-900 text-white"
                     : "text-neutral-600 hover:text-neutral-900 hover:bg-white"
                 }`
               }
             >
-              <Settings className="h-3.5 w-3.5" />
+              <Settings className="h-3.5 w-3.5 transition-transform duration-500 ease-out group-hover:rotate-90" />
               <span>Settings</span>
             </NavLink>
           </div>
@@ -278,9 +295,9 @@ export const Layout = () => {
             <button
               onClick={logout}
               title="Sign Out"
-              className="p-1.5 text-neutral-400 hover:text-red-600 rounded-lg transition-colors"
+              className="group p-1.5 text-neutral-400 hover:text-red-600 rounded-lg transition-colors"
             >
-              <LogOut className="h-3.5 w-3.5" />
+              <LogOut className="h-3.5 w-3.5 transition-transform duration-200 ease-out group-hover:translate-x-1" />
             </button>
           </div>
         </div>
@@ -317,12 +334,12 @@ export const Layout = () => {
           to="/search"
           onClick={() => setDetailOpen(false)}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center w-16 gap-1 transition-colors ${
+            `group flex flex-col items-center justify-center w-16 gap-1 transition-colors ${
               isActive && !detailOpen ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-900"
             }`
           }
         >
-          <Search className="h-5 w-5" />
+          <Search className="h-5 w-5 transition-transform duration-200 ease-out group-hover:-rotate-12 group-hover:scale-110 active:scale-95" />
           <span className="text-[10px] font-medium">Search</span>
         </NavLink>
 
@@ -331,12 +348,12 @@ export const Layout = () => {
           end
           onClick={() => setDetailOpen(false)}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center w-16 gap-1 transition-colors ${
+            `group flex flex-col items-center justify-center w-16 gap-1 transition-colors ${
               isActive && !detailOpen ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-900"
             }`
           }
         >
-          <Home className="h-5 w-5" />
+          <Home className="h-5 w-5 transition-transform duration-200 ease-out group-hover:-translate-y-0.5 group-hover:scale-105 active:scale-95" />
           <span className="text-[10px] font-medium">Home</span>
         </NavLink>
 
@@ -345,20 +362,20 @@ export const Layout = () => {
           end
           onClick={() => setDetailOpen(false)}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center w-16 gap-1 transition-colors ${
+            `group flex flex-col items-center justify-center w-16 gap-1 transition-colors ${
               isActive && !detailOpen ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-900"
             }`
           }
         >
-          <Layers className="h-5 w-5" />
+          <Layers className="h-5 w-5 transition-transform duration-200 ease-out group-hover:-translate-y-1 group-hover:scale-105 active:scale-95" />
           <span className="text-[10px] font-medium">All Saved</span>
         </NavLink>
 
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("open-feedback"))}
-          className="flex flex-col items-center justify-center w-16 gap-1 transition-colors text-neutral-400 hover:text-neutral-900"
+          className="group flex flex-col items-center justify-center w-16 gap-1 transition-colors text-neutral-400 hover:text-neutral-900"
         >
-          <MessageSquare className="h-5 w-5" />
+          <MessageSquare className="h-5 w-5 transition-transform duration-200 ease-out group-hover:-rotate-12 group-hover:-translate-y-0.5 active:scale-95" />
           <span className="text-[10px] font-medium">Feedback</span>
         </button>
       </nav>
