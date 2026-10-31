@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { api, API, getToken } from "@/api";
+import { api, API, getToken, getCachedItems, setCachedItems, getCachedGroups, setCachedGroups } from "@/api";
 import { toast } from "sonner";
 import { useAuth } from "@/auth";
 
@@ -13,10 +13,23 @@ export const StoreProvider = ({ children }) => {
   const [detailId, setDetailId] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   
-  // Global items cache
-  const [items, setItems] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Instant Cache Hydration: Start with cached items & groups immediately (0ms First Paint)
+  const [items, setItems] = useState(() => {
+    const cached = getCachedItems();
+    return Array.isArray(cached) ? cached : [];
+  });
+  
+  const [groups, setGroups] = useState(() => {
+    const cached = getCachedGroups();
+    return Array.isArray(cached) ? cached : [];
+  });
+  
+  // Only show initial skeleton if we have literally 0 items in local cache
+  const [loading, setLoading] = useState(() => {
+    const cached = getCachedItems();
+    return !cached || cached.length === 0;
+  });
+
   const timer = useRef(null);
 
   const loadGroups = useCallback(async () => {
@@ -24,6 +37,7 @@ export const StoreProvider = ({ children }) => {
     try {
       const g = await api.getGroups();
       setGroups(g);
+      setCachedGroups(g);
     } catch (e) {}
   }, [user]);
 
@@ -32,6 +46,7 @@ export const StoreProvider = ({ children }) => {
     try {
       const data = await api.listItems();
       setItems(data);
+      setCachedItems(data);
       const anyProcessing = data.some((i) => i.status === "processing");
       clearTimeout(timer.current);
       if (anyProcessing) timer.current = setTimeout(loadItems, 3500);
@@ -46,6 +61,7 @@ export const StoreProvider = ({ children }) => {
     let ws = null;
 
     if (user) {
+      // Revalidate in background silently while user already sees cached cards
       loadGroups();
       loadItems();
       
@@ -62,10 +78,16 @@ export const StoreProvider = ({ children }) => {
               setItems((prev) => {
                 // Ignore if we already have it to prevent duplicates
                 if (prev.find((i) => i.id === data.item.id)) return prev;
-                return [data.item, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                const next = [data.item, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                setCachedItems(next);
+                return next;
               });
             } else if (data.type === "ITEM_UPDATED") {
-              setItems((prev) => prev.map((i) => (i.id === data.item.id ? data.item : i)));
+              setItems((prev) => {
+                const next = prev.map((i) => (i.id === data.item.id ? data.item : i));
+                setCachedItems(next);
+                return next;
+              });
             }
           } catch (err) {
             console.error("WebSocket message error", err);
@@ -99,30 +121,50 @@ export const StoreProvider = ({ children }) => {
     setDetailOpen(true);
   };
 
-  // Optimistic UI updates
+  // Optimistic UI updates with cache sync
   const updateItemLocal = (id, updates) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...updates } : i)));
+    setItems((prev) => {
+      const next = prev.map((i) => (i.id === id ? { ...i, ...updates } : i));
+      setCachedItems(next);
+      return next;
+    });
   };
 
   const deleteItemLocal = (id) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
+    setItems((prev) => {
+      const next = prev.filter((i) => i.id !== id);
+      setCachedItems(next);
+      return next;
+    });
   };
 
   const addGroupLocal = (group) => {
-    setGroups((prev) => [...prev, group]);
+    setGroups((prev) => {
+      const next = [...prev, group];
+      setCachedGroups(next);
+      return next;
+    });
   };
 
   const updateGroupLocal = (id, updates) => {
-    setGroups((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+    setGroups((prev) => {
+      const next = prev.map((g) => (g.id === id ? { ...g, ...updates } : g));
+      setCachedGroups(next);
+      return next;
+    });
   };
 
   const deleteGroupLocal = (id) => {
-    setGroups((prev) => prev.filter((g) => g.id !== id));
+    setGroups((prev) => {
+      const next = prev.filter((g) => g.id !== id);
+      setCachedGroups(next);
+      return next;
+    });
   };
 
   const togglePin = async (item) => {
     const newPinned = !item.pinned;
-    // 1. Optimistic Update
+    // 1. Optimistic Update (Immediate UI + cache)
     updateItemLocal(item.id, { pinned: newPinned });
     toast.success(newPinned ? "Pinned to top" : "Unpinned");
     

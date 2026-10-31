@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { api, getToken, setToken, getRefreshToken, setRefreshToken, getLibraryId, getCachedUser, setCachedUser } from "@/api";
+import { api, getToken, setToken, getRefreshToken, setRefreshToken, getLibraryId, getCachedUser, setCachedUser, clearAppCache } from "@/api";
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -146,6 +146,7 @@ export const AuthProvider = ({ children }) => {
     setRefreshToken(null);
     setCachedUser(null);
     setUser(false);
+    clearAppCache();
     broadcastAuthLogout();
     
     // Fire and forget the backend invalidation

@@ -18,6 +18,8 @@ export function getLibraryId() {
 }
 
 const USER_KEY = "forgot_ai_user";
+const ITEMS_CACHE_KEY = "forgot_ai_cached_items";
+const GROUPS_CACHE_KEY = "forgot_ai_cached_groups";
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
@@ -32,6 +34,57 @@ export const getCachedUser = () => {
   }
 };
 export const setCachedUser = (u) => (u ? localStorage.setItem(USER_KEY, JSON.stringify(u)) : localStorage.removeItem(USER_KEY));
+
+export const getCachedItems = () => {
+  try {
+    const raw = localStorage.getItem(ITEMS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const setCachedItems = (items) => {
+  try {
+    if (!items || !Array.isArray(items)) {
+      localStorage.removeItem(ITEMS_CACHE_KEY);
+      return;
+    }
+    // Only cache top 200 items in local storage to prevent quota overflow
+    const trimmed = items.slice(0, 200);
+    localStorage.setItem(ITEMS_CACHE_KEY, JSON.stringify(trimmed));
+  } catch (e) {
+    console.warn("Failed to write items to local cache:", e);
+  }
+};
+
+export const getCachedGroups = () => {
+  try {
+    const raw = localStorage.getItem(GROUPS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const setCachedGroups = (groups) => {
+  try {
+    if (!groups) {
+      localStorage.removeItem(GROUPS_CACHE_KEY);
+      return;
+    }
+    localStorage.setItem(GROUPS_CACHE_KEY, JSON.stringify(groups));
+  } catch (e) {
+    console.warn("Failed to write groups to local cache:", e);
+  }
+};
+
+export const clearAppCache = () => {
+  try {
+    localStorage.removeItem(ITEMS_CACHE_KEY);
+    localStorage.removeItem(GROUPS_CACHE_KEY);
+  } catch {}
+};
 
 // Attach auth token (if signed in) + the browser's anonymous library id to every request.
 axios.interceptors.request.use((config) => {
