@@ -393,7 +393,7 @@ export default function Settings() {
                 {isLifetime && (
                   <div className="flex items-center justify-between text-sm pt-2">
                     <span className="text-neutral-500">Billing Cycle</span>
-                    <span className="font-medium text-neutral-900">One-time payment â€” Never expires</span>
+                    <span className="font-medium text-neutral-900">One-time payment &mdash; Never expires</span>
                   </div>
                 )}
 
@@ -442,7 +442,7 @@ export default function Settings() {
                 <label className="text-sm font-medium text-neutral-700">Current password</label>
                 <Input
                   type="password"
-                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                  placeholder="••••••••"
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                   required
@@ -473,7 +473,7 @@ export default function Settings() {
                 <label className="text-sm font-medium text-neutral-700">Confirm new password</label>
                 <Input
                   type="password"
-                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                  placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required

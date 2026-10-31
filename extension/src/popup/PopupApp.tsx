@@ -55,12 +55,12 @@ function formatUrlDisplay(rawText: string, href?: string): string {
     const pathname = urlObj.pathname.replace(/\/$/, "");
 
     if (!pathname || pathname === "") {
-      return urlObj.search ? `${host}/â€¦` : host;
+      return urlObj.search ? `${host}/…` : host;
     }
 
     const pathSegments = pathname.split("/").filter(Boolean);
     if (pathSegments.length === 0) {
-      return urlObj.search ? `${host}/â€¦` : host;
+      return urlObj.search ? `${host}/…` : host;
     }
 
     if (pathSegments.length === 1) {
@@ -70,7 +70,7 @@ function formatUrlDisplay(rawText: string, href?: string): string {
       } catch {
         // use raw segment
       }
-      const shortSeg = seg.length > 20 ? seg.slice(0, 17) + "â€¦" : seg;
+      const shortSeg = seg.length > 20 ? seg.slice(0, 17) + "…" : seg;
       return `${host}/${shortSeg}`;
     }
 
@@ -80,11 +80,11 @@ function formatUrlDisplay(rawText: string, href?: string): string {
     } catch {
       // use raw segment
     }
-    const shortSegment = lastSegment.length > 20 ? lastSegment.slice(0, 17) + "â€¦" : lastSegment;
-    return `${host}/â€¦/${shortSegment}`;
+    const shortSegment = lastSegment.length > 20 ? lastSegment.slice(0, 17) + "…" : lastSegment;
+    return `${host}/…/${shortSegment}`;
   } catch {
     const text = rawText || href || "";
-    return text.length > 30 ? text.slice(0, 27) + "â€¦" : text;
+    return text.length > 30 ? text.slice(0, 27) + "…" : text;
   }
 }
 
@@ -112,7 +112,7 @@ function ChatLink({
   if (!childText || isUrlOrMatchesHref(childText, fullUrl)) {
     displayLabel = formatUrlDisplay(childText || fullUrl, fullUrl);
   } else {
-    displayLabel = childText.length > 35 ? childText.slice(0, 32) + "â€¦" : childText;
+    displayLabel = childText.length > 35 ? childText.slice(0, 32) + "…" : childText;
   }
 
   const handleCopy = (e: React.MouseEvent) => {
