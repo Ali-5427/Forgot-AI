@@ -14,6 +14,7 @@ import {
   Puzzle,
   Laptop,
   ShieldCheck,
+  LogOut,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { API, getToken } from "@/api";
@@ -402,7 +403,27 @@ export default function Settings() {
                 </Button>
               </div>
 
-              {/* Row 5: Danger Zone: Delete Account */}
+              {/* Row 5: Sign Out */}
+              <div className="py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-medium text-neutral-900">
+                    Sign Out
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Sign out of this browser session. Your saved memories remain safely encrypted.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={logout}
+                  className="rounded-xl text-xs gap-1.5 text-neutral-700 hover:text-red-600 hover:border-red-200"
+                >
+                  <LogOut className="w-3.5 h-3.5" /> Sign Out
+                </Button>
+              </div>
+
+              {/* Row 6: Danger Zone: Delete Account */}
               <div className="py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-medium text-red-600">

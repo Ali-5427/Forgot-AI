@@ -8,7 +8,6 @@ import {
   Plus,
   MessageSquare,
   MoreHorizontal,
-  LogOut,
   Folder,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,7 @@ const nav = [
 ];
 
 export const Layout = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const {
     openSave,
     detailOpen,
@@ -123,10 +122,6 @@ export const Layout = () => {
       console.error(e);
     }
   };
-
-  // User display name & initials
-  const userEmail = user?.email || "";
-  const userInitial = userEmail ? userEmail.charAt(0).toUpperCase() : "U";
 
   return (
     <div className="min-h-screen w-full bg-neutral-50 text-foreground">
@@ -254,52 +249,32 @@ export const Layout = () => {
           </nav>
         </div>
 
-        {/* Pinned Utility & User Footer */}
-        <div className="mt-auto border-t border-border/80 bg-neutral-50/50 p-2.5 flex flex-col gap-1">
-          {/* Feedback & Settings buttons */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent("open-feedback"))}
-              data-testid="nav-feedback"
-              className="group flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-neutral-600 hover:text-neutral-900 hover:bg-white transition-all shadow-xs"
-            >
-              <MessageSquare className="h-3.5 w-3.5 transition-transform duration-200 ease-out group-hover:-rotate-12 group-hover:-translate-y-0.5" />
-              <span>Feedback</span>
-            </button>
-            <NavLink
-              to="/settings"
-              onClick={() => setDetailOpen(false)}
-              className={({ isActive }) =>
-                `group flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all shadow-xs ${
-                  isActive
-                    ? "bg-neutral-900 text-white"
-                    : "text-neutral-600 hover:text-neutral-900 hover:bg-white"
-                }`
-              }
-            >
-              <Settings className="h-3.5 w-3.5 transition-transform duration-500 ease-out group-hover:rotate-90" />
-              <span>Settings</span>
-            </NavLink>
-          </div>
+        {/* Pinned Utility Footer: Stacked Feedback & Settings */}
+        <div className="mt-auto border-t border-border/80 bg-neutral-50/50 p-2.5 flex flex-col gap-0.5">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("open-feedback"))}
+            data-testid="nav-feedback"
+            className="group w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/80 transition-all duration-150"
+          >
+            <MessageSquare className="h-4 w-4 shrink-0 transition-transform duration-200 ease-out group-hover:-rotate-12 group-hover:-translate-y-0.5 text-neutral-500 group-hover:text-neutral-900" />
+            <span>Feedback</span>
+          </button>
 
-          {/* User Account Info & Quick Signout */}
-          <div className="mt-1 pt-2 border-t border-border/60 px-2 flex items-center justify-between">
-            <div className="flex items-center gap-2 overflow-hidden">
-              <div className="h-6 w-6 rounded-full bg-neutral-900 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-                {userInitial}
-              </div>
-              <span className="text-[11px] font-medium text-neutral-700 truncate max-w-[130px]" title={userEmail}>
-                {userEmail || "Account"}
-              </span>
-            </div>
-            <button
-              onClick={logout}
-              title="Sign Out"
-              className="group p-1.5 text-neutral-400 hover:text-red-600 rounded-lg transition-colors"
-            >
-              <LogOut className="h-3.5 w-3.5 transition-transform duration-200 ease-out group-hover:translate-x-1" />
-            </button>
-          </div>
+          <NavLink
+            to="/settings"
+            onClick={() => setDetailOpen(false)}
+            data-testid="nav-settings"
+            className={({ isActive }) =>
+              `group w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all duration-150 ${
+                isActive && !detailOpen
+                  ? "bg-neutral-900 text-white font-medium shadow-sm"
+                  : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/80 font-medium"
+              }`
+            }
+          >
+            <Settings className="h-4 w-4 shrink-0 transition-transform duration-500 ease-out group-hover:rotate-90" />
+            <span>Settings</span>
+          </NavLink>
         </div>
       </aside>
 
