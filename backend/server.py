@@ -254,6 +254,22 @@ class UrlSaveIn(BaseModel):
     new_group_name: Optional[str] = None
 
 
+class BulkBookmarkItem(BaseModel):
+    url: str
+    title: Optional[str] = None
+    user_note: Optional[str] = "Imported from browser bookmarks"
+
+
+class BulkBookmarkImportIn(BaseModel):
+    bookmarks: List[BulkBookmarkItem]
+
+
+class BulkBookmarkImportOut(BaseModel):
+    total_received: int
+    imported: int
+    skipped_duplicates: int
+
+
 class ItemUpdate(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
@@ -1327,6 +1343,83 @@ async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = D
     background.add_task(enrich_item, item.id, payload.user_note)
     await ws_manager.broadcast_user(lib, {"type": "NEW_ITEM", "item": clean(values)})
     return item
+
+
+async def _bulk_enrich_worker(item_ids: List[str], user_notes: Dict[str, Optional[str]]):
+    for i in range(0, len(item_ids), 3):
+        batch = item_ids[i:i+3]
+        for item_id in batch:
+            try:
+                await enrich_item(item_id, user_notes.get(item_id))
+            except Exception as e:
+                logger.error(f"Bulk enrichment failed for item {item_id}: {e}")
+        await asyncio.sleep(0.5)
+
+
+@api_router.post("/items/bulk-import", response_model=BulkBookmarkImportOut)
+async def bulk_import_bookmarks(payload: BulkBookmarkImportIn, background: BackgroundTasks, lib: str = Depends(require_active_subscription)):
+    if not payload.bookmarks:
+        return BulkBookmarkImportOut(total_received=0, imported=0, skipped_duplicates=0)
+
+    seen_in_payload = set()
+    cleaned_entries = []
+    for bm in payload.bookmarks:
+        u = bm.url.strip()
+        if not u:
+            continue
+        if not u.startswith("http"):
+            u = "https://" + u
+        norm = normalize_url(u)
+        if norm in seen_in_payload:
+            continue
+        seen_in_payload.add(norm)
+        cleaned_entries.append((u, norm, bm.title or u[:60], bm.user_note or "Imported from browser bookmarks"))
+
+    if not cleaned_entries:
+        return BulkBookmarkImportOut(total_received=len(payload.bookmarks), imported=0, skipped_duplicates=len(payload.bookmarks))
+
+    dedup_keys = [entry[1] for entry in cleaned_entries]
+    existing_cursor = db.items.find({"library_id": lib, "dedup_key": {"$in": dedup_keys}}, {"dedup_key": 1})
+    existing_keys = set()
+    async for doc in existing_cursor:
+        if "dedup_key" in doc:
+            existing_keys.add(doc["dedup_key"])
+
+    new_items = []
+    item_ids_to_enrich = []
+    user_notes_map = {}
+    for url, norm, title, user_note in cleaned_entries:
+        if norm in existing_keys:
+            continue
+        item = SavedItem(
+            library_id=lib,
+            content_type="url",
+            source_url=url,
+            source_title=title,
+            source_domain=domain_of(url),
+            dedup_key=norm,
+            title=title,
+            user_note=user_note
+        )
+        values = item.model_dump()
+        values["owner_user_id"] = lib
+        new_items.append(values)
+        item_ids_to_enrich.append(item.id)
+        user_notes_map[item.id] = user_note
+
+    imported_count = len(new_items)
+    skipped_count = len(payload.bookmarks) - imported_count
+
+    if new_items:
+        await db.items.insert_many(new_items)
+        background.add_task(_bulk_enrich_worker, item_ids_to_enrich, user_notes_map)
+        await ws_manager.broadcast_user(lib, {"type": "BULK_NEW_ITEMS", "count": imported_count})
+
+    return BulkBookmarkImportOut(
+        total_received=len(payload.bookmarks),
+        imported=imported_count,
+        skipped_duplicates=skipped_count
+    )
 
 
 @api_router.post("/items/image", response_model=SavedItem)
