@@ -1,20 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { Reveal } from "@/components/landing-page/reveal";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { api, getToken } from "@/api";
+import { useAuth } from "@/auth";
 
 export default function PricingPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [error, setError] = useState(null);
+  const [billing, setBilling] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    if (user && getToken()) {
+      api.billingStatus()
+        .then((data) => {
+          if (active) setBilling(data);
+        })
+        .catch((err) => {
+          console.warn("Could not load billing status:", err);
+        });
+    }
+    return () => { active = false; };
+  }, [user]);
+
+  const isPro = billing?.plan_type === "pro" && billing?.status === "active_pro";
+  const isTrial = billing?.status === "trial";
+  const isLifetime = billing?.plan_type === "lifetime" || billing?.status === "lifetime";
 
   const handleCheckout = async (plan) => {
     const token = getToken();
     if (!token) {
-      navigate('/login');
+      navigate(`/signup?plan=${plan}&intent=checkout`);
       return;
     }
 
@@ -28,17 +49,17 @@ export default function PricingPage() {
         window.location.href = response.checkout_url;
       } else {
         setError('Failed to start checkout. Please try again.');
+        setLoadingPlan(null);
       }
     } catch (err) {
       console.error('Checkout error:', err);
       if (err.response?.status === 401) {
-        navigate('/login');
+        navigate(`/signup?plan=${plan}&intent=checkout`);
       } else if (err.response?.status === 503) {
-        setError('Billing is not configured. Please contact support.');
+        setError('Billing is currently being configured. Please contact support.');
       } else {
         setError('Unable to start checkout. Please try again.');
       }
-    } finally {
       setLoadingPlan(null);
     }
   };
@@ -74,7 +95,7 @@ export default function PricingPage() {
     },
     {
       q: "Can I cancel Pro?",
-      a: "Yes. You can cancel Pro from Settings to stop future charges.",
+      a: "Yes. You can cancel Pro from Settings anytime to stop future charges."
     },
     {
       q: "What happens after my trial ends?",
@@ -127,14 +148,49 @@ export default function PricingPage() {
                 </div>
                 <p className="text-sm font-medium text-ink-muted">7-day free trial. Payment method required.</p>
               </div>
-              <Button
-                onClick={() => handleCheckout('pro')}
-                disabled={loadingPlan === 'pro'}
-                variant="outline"
-                className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper"
-              >
-                {loadingPlan === 'pro' ? 'Starting trial...' : 'Start 7-day free trial'}
-              </Button>
+
+              {isLifetime ? (
+                <Button
+                  disabled
+                  variant="outline"
+                  className="w-full rounded-full h-12 text-base font-medium mb-8 border-line bg-neutral-100 text-neutral-400 cursor-not-allowed"
+                >
+                  Lifetime Member ✓
+                </Button>
+              ) : isPro ? (
+                <Button
+                  onClick={() => navigate('/settings')}
+                  variant="outline"
+                  className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper text-emerald-700 bg-emerald-50/50"
+                >
+                  Current Plan (Manage in Settings)
+                </Button>
+              ) : isTrial ? (
+                <Button
+                  onClick={() => navigate('/settings')}
+                  variant="outline"
+                  className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper text-blue-700 bg-blue-50/50"
+                >
+                  Trial Active (Manage in Settings)
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => handleCheckout('pro')}
+                  disabled={loadingPlan === 'pro'}
+                  variant="outline"
+                  className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper"
+                >
+                  {loadingPlan === 'pro' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Opening checkout...
+                    </>
+                  ) : (
+                    'Start 7-day free trial'
+                  )}
+                </Button>
+              )}
+
               <div className="space-y-4 flex-1 mb-8">
                 {PRO_FEATURES.map((feature, i) => (
                   <div key={i} className="flex items-start gap-3">
@@ -164,14 +220,35 @@ export default function PricingPage() {
                 </div>
                 <p className="text-sm font-medium text-ink-muted">one-time</p>
               </div>
-              <Button
-                onClick={() => handleCheckout('lifetime')}
-                disabled={loadingPlan === 'lifetime'}
-                variant="outline"
-                className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper text-ink"
-              >
-                {loadingPlan === 'lifetime' ? 'Processing...' : 'Get Lifetime Access'}
-              </Button>
+
+              {isLifetime ? (
+                <Button
+                  disabled
+                  variant="outline"
+                  className="w-full rounded-full h-12 text-base font-medium mb-8 border-line bg-neutral-100 text-neutral-400 cursor-not-allowed"
+                >
+                  You Own Lifetime Access ✓
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => handleCheckout('lifetime')}
+                  disabled={loadingPlan === 'lifetime'}
+                  variant="outline"
+                  className="w-full rounded-full h-12 text-base font-medium mb-8 border-line hover:bg-paper text-ink"
+                >
+                  {loadingPlan === 'lifetime' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Opening checkout...
+                    </>
+                  ) : isPro || isTrial ? (
+                    'Upgrade to Lifetime ($49)'
+                  ) : (
+                    'Get Lifetime Access'
+                  )}
+                </Button>
+              )}
+
               <div className="space-y-4 flex-1 mb-8">
                 {LIFETIME_FEATURES.map((feature, i) => (
                   <div key={i} className="flex items-start gap-3">

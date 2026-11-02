@@ -80,20 +80,34 @@ def build_checkout_params(user: dict, plan: str, origin: Optional[str] = None) -
     return params
 
 
-def get_dodo_client():
-    from dodopayments import DodoPayments
+_dodo_client = None
+_dodo_client_config: tuple[str, str, Optional[str]] = ("", "", None)
 
+
+def get_dodo_client():
+    global _dodo_client, _dodo_client_config
     api_key = os.getenv("DODO_PAYMENTS_API_KEY", "").strip()
     webhook_key = os.getenv("DODO_PAYMENTS_WEBHOOK_KEY", "").strip() or None
+    env = dodo_environment()
+
     if not api_key:
         raise RuntimeError("DODO_PAYMENTS_API_KEY is not configured")
+
+    current_config = (api_key, env, webhook_key)
+    if _dodo_client is not None and _dodo_client_config == current_config:
+        return _dodo_client
+
+    from dodopayments import DodoPayments
+
     kwargs: dict[str, Any] = {
         "bearer_token": api_key,
-        "environment": dodo_environment(),
+        "environment": env,
     }
     if webhook_key:
         kwargs["webhook_key"] = webhook_key
-    return DodoPayments(**kwargs)
+    _dodo_client = DodoPayments(**kwargs)
+    _dodo_client_config = current_config
+    return _dodo_client
 
 
 async def create_checkout_url(user: dict, plan: str, origin: Optional[str] = None, client=None) -> str:

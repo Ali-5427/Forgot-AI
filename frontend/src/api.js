@@ -115,6 +115,18 @@ axios.interceptors.response.use(
     const url = originalRequest?.url || "";
     const isAuthCall = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh");
 
+    // Catch HTTP 402 Payment Required (trial expired, card lapsed, or non-subscribed user action)
+    if (error?.response?.status === 402) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("FORGOT_AI_PAYWALL_TRIGGER", {
+            detail: error.response?.data?.detail || "Active trial or subscription required.",
+          })
+        );
+      }
+      return Promise.reject(error);
+    }
+
     if (error?.response?.status === 401 && getToken() && !isAuthCall && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
       const rt = getRefreshToken();

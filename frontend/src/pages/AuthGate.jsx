@@ -4,7 +4,7 @@ import { Loader2, Eye, EyeOff, Check, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/auth";
-import { formatApiErrorDetail, getToken, getRefreshToken } from "@/api";
+import { api, formatApiErrorDetail, getToken, getRefreshToken } from "@/api";
 
 export default function AuthGate({ initialMode = "login", onClose }) {
   const { user, login, register } = useAuth();
@@ -12,13 +12,20 @@ export default function AuthGate({ initialMode = "login", onClose }) {
   const [searchParams] = useSearchParams();
   const isExtension = searchParams.get("source") === "extension";
   const urlMode = searchParams.get("mode");
+  const targetPlan = searchParams.get("plan");
+  const isTargetPlan = targetPlan === "pro" || targetPlan === "lifetime";
 
-  const [mode, setMode] = useState(urlMode === "signup" ? "register" : initialMode);
+  const [mode, setMode] = useState(() => {
+    if (urlMode === "login") return "login";
+    if (urlMode === "signup" || isTargetPlan) return "register";
+    return initialMode;
+  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirectingToCheckout, setRedirectingToCheckout] = useState(false);
 
   // Sync to extension and optionally auto-close if authenticated
   useEffect(() => {
@@ -49,6 +56,25 @@ export default function AuthGate({ initialMode = "login", onClose }) {
     }
   }, [user, isExtension]);
 
+  // If already authenticated and arriving with a plan intent, forward straight to checkout
+  useEffect(() => {
+    if (user && !isExtension && isTargetPlan && !redirectingToCheckout) {
+      setRedirectingToCheckout(true);
+      api.billingCheckout(targetPlan)
+        .then((res) => {
+          if (res?.checkout_url) {
+            window.location.href = res.checkout_url;
+          } else {
+            navigate("/pricing");
+          }
+        })
+        .catch((err) => {
+          console.error("Auto checkout error:", err);
+          navigate("/pricing");
+        });
+    }
+  }, [user, isExtension, isTargetPlan, targetPlan, redirectingToCheckout, navigate]);
+
   const submit = async (e) => {
     e.preventDefault();
     setError("");
@@ -56,12 +82,44 @@ export default function AuthGate({ initialMode = "login", onClose }) {
     try {
       if (mode === "login") await login(email, password);
       else await register(email, password);
+
+      if (isTargetPlan) {
+        setRedirectingToCheckout(true);
+        try {
+          const res = await api.billingCheckout(targetPlan);
+          if (res?.checkout_url) {
+            window.location.href = res.checkout_url;
+            return;
+          }
+        } catch (checkoutErr) {
+          console.error("Auto checkout error after auth:", checkoutErr);
+          navigate("/pricing");
+          return;
+        }
+      }
     } catch (err) {
       setError(formatApiErrorDetail(err?.response?.data?.detail) || "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
+
+  // If redirecting to checkout session
+  if (redirectingToCheckout) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white p-6">
+        <div className="text-center space-y-4 max-w-sm animate-in fade-in zoom-in-95 duration-200">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-neutral-900" />
+          <h2 className="text-xl font-bold tracking-tight text-neutral-900">Opening secure checkout...</h2>
+          <p className="text-xs text-neutral-500 leading-relaxed">
+            {targetPlan === "pro"
+              ? "Preparing your 7-day free trial of Pro. A payment method is required to begin, but you won't be charged today."
+              : "Preparing your Founding Lifetime membership checkout."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // If already authenticated:
   if (user) {
@@ -137,6 +195,24 @@ export default function AuthGate({ initialMode = "login", onClose }) {
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-neutral-100 border border-neutral-200/60 text-neutral-700 text-xs font-medium mb-6">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               Sign in to connect Forgot AI Extension
+            </div>
+          )}
+
+          {isTargetPlan && (
+            <div className="mb-6 p-4 bg-amber-50/60 border border-amber-200/70 rounded-2xl text-left">
+              <div className="flex items-start gap-3">
+                <span className="text-xl leading-none">✨</span>
+                <div>
+                  <h4 className="text-xs font-semibold text-amber-950 uppercase tracking-wider">
+                    {targetPlan === "pro" ? "7-Day Free Trial Included" : "Founding Lifetime Offer ($49)"}
+                  </h4>
+                  <p className="text-xs text-amber-900/80 mt-1 leading-relaxed">
+                    {targetPlan === "pro"
+                      ? "Create an account to start your trial. A payment method is required to begin, but you won't be charged today."
+                      : "Create an account to complete your one-time payment for lifetime access."}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -239,4 +315,3 @@ export default function AuthGate({ initialMode = "login", onClose }) {
     </div>
   );
 }
-

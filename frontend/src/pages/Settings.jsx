@@ -46,6 +46,37 @@ export default function Settings() {
   const [billing, setBilling] = useState(null);
   const [loadingBilling, setLoadingBilling] = useState(true);
   const [openingPortal, setOpeningPortal] = useState(false);
+  const [upgradingPlan, setUpgradingPlan] = useState(null);
+
+  const getTrialDaysRemaining = () => {
+    if (!billing?.current_period_end) return null;
+    try {
+      const end = new Date(billing.current_period_end);
+      const now = new Date();
+      const diffMs = end.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      return diffDays > 0 ? diffDays : 0;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleUpgrade = async (plan) => {
+    if (upgradingPlan) return;
+    setUpgradingPlan(plan);
+    try {
+      const res = await api.billingCheckout(plan);
+      if (res?.checkout_url) {
+        window.location.href = res.checkout_url;
+      } else {
+        toast.error("Failed to start checkout. Please try again.");
+        setUpgradingPlan(null);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Unable to start checkout. Please try again.");
+      setUpgradingPlan(null);
+    }
+  };
 
   useEffect(() => {
     if (searchParams.get("billing") === "success") {
@@ -499,7 +530,7 @@ export default function Settings() {
                       {isPro &&
                         "Your Pro plan includes unlimited saves, AI enrichment, OCR, and semantic search."}
                       {isTrial &&
-                        "You are in your 7-day free trial with full Pro capabilities enabled."}
+                        `You are in your 7-day free trial (${getTrialDaysRemaining() !== null ? `${getTrialDaysRemaining()} day(s) remaining` : "active"}). Full Pro features enabled.`}
                       {isExpired &&
                         "Your subscription has ended. Choose a plan to resume saving and searching."}
                     </p>
@@ -614,33 +645,40 @@ export default function Settings() {
                         >
                           Cancel Subscription
                         </Button>
-                        <Link to="/pricing">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs text-neutral-600"
-                          >
-                            Get Lifetime ($49){" "}
-                            <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleUpgrade("lifetime")}
+                          disabled={upgradingPlan !== null}
+                          className="text-xs text-neutral-600 hover:text-neutral-900"
+                        >
+                          {upgradingPlan === "lifetime" ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                          Get Lifetime ($49){" "}
+                          <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
+                        </Button>
                       </>
                     )}
                     {isExpired && (
                       <div className="flex items-center gap-2">
-                        <Link to="/pricing">
-                          <Button
-                            size="sm"
-                            className="bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs"
-                          >
-                            Subscribe to Pro ($5/mo)
-                          </Button>
-                        </Link>
-                        <Link to="/pricing">
-                          <Button variant="outline" size="sm" className="rounded-xl text-xs">
-                            Get Lifetime ($49)
-                          </Button>
-                        </Link>
+                        <Button
+                          size="sm"
+                          onClick={() => handleUpgrade("pro")}
+                          disabled={upgradingPlan !== null}
+                          className="bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs"
+                        >
+                          {upgradingPlan === "pro" ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                          Subscribe to Pro ($5/mo)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpgrade("lifetime")}
+                          disabled={upgradingPlan !== null}
+                          className="rounded-xl text-xs"
+                        >
+                          {upgradingPlan === "lifetime" ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                          Get Lifetime ($49)
+                        </Button>
                       </div>
                     )}
                     {isLifetime && (

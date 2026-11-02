@@ -12,6 +12,17 @@ export const StoreProvider = ({ children }) => {
   const [importerOpen, setImporterOpen] = useState(false);
   const [detailId, setDetailId] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallReason, setPaywallReason] = useState("");
+
+  useEffect(() => {
+    const handlePaywall = (e) => {
+      setPaywallReason(e.detail || "Active trial or subscription required.");
+      setPaywallOpen(true);
+    };
+    window.addEventListener("FORGOT_AI_PAYWALL_TRIGGER", handlePaywall);
+    return () => window.removeEventListener("FORGOT_AI_PAYWALL_TRIGGER", handlePaywall);
+  }, []);
   
   // Instant Cache Hydration: Start with cached items & groups immediately (0ms First Paint)
   const [items, setItems] = useState(() => {
@@ -188,7 +199,9 @@ export const StoreProvider = ({ children }) => {
         detailId, detailOpen, setDetailOpen,
         items, loading, reloadItems: loadItems,
         openSave, openItem,
-        updateItemLocal, deleteItemLocal, togglePin
+        updateItemLocal, deleteItemLocal, togglePin,
+        paywallOpen, setPaywallOpen, paywallReason,
+        openPaywall: (r) => { setPaywallReason(r || ""); setPaywallOpen(true); }
       }}
     >
       {children}
