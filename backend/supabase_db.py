@@ -54,6 +54,12 @@ class SupabaseCollection:
         response = self.client.table(self.table).insert(document).execute()
         return SimpleNamespace(inserted_id=document.get("id"), data=response.data)
 
+    async def insert_many(self, documents: list[dict]):
+        if not documents:
+            return SimpleNamespace(inserted_ids=[], data=[])
+        response = self.client.table(self.table).insert(documents).execute()
+        return SimpleNamespace(inserted_ids=[d.get("id") for d in documents], data=response.data)
+
     async def update_one(self, filters: dict, update: dict, upsert: bool = False):
         existing = await self.find_one(filters)
         if existing:

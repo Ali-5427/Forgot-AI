@@ -132,11 +132,9 @@ end;
 $$;
 
 
--- BILLING / SUBSCRIPTIONS (Stripe-named columns kept unused; Dodo is the provider)
+-- BILLING / SUBSCRIPTIONS (Dodo Payments is the exclusive provider)
 create table if not exists public.user_subscriptions (
     user_id uuid primary key references auth.users(id) on delete cascade,
-    stripe_customer_id text unique,
-    stripe_subscription_id text unique,
     dodo_customer_id text,
     dodo_subscription_id text,
     dodo_payment_id text,

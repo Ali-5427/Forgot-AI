@@ -46,18 +46,23 @@ def product_id_for_plan(plan: str) -> str:
     return product_id
 
 
-def return_url() -> str:
-    return (
-        os.getenv("DODO_PAYMENTS_RETURN_URL", "").strip()
-        or "http://localhost:3000/checkout/success"
-    )
+def return_url(origin: Optional[str] = None) -> str:
+    env_url = os.getenv("DODO_PAYMENTS_RETURN_URL", "").strip()
+    if env_url:
+        return env_url
+    if origin and origin.startswith("http"):
+        return f"{origin.rstrip('/')}/settings?billing=success"
+    frontend_url = os.getenv("FRONTEND_URL", "").strip()
+    if frontend_url:
+        return f"{frontend_url.rstrip('/')}/settings?billing=success"
+    return "https://forgot-ai.vercel.app/settings?billing=success"
 
 
 def lifetime_product_id() -> str:
     return os.getenv("DODO_PRODUCT_LIFETIME", "").strip()
 
 
-def build_checkout_params(user: dict, plan: str) -> dict:
+def build_checkout_params(user: dict, plan: str, origin: Optional[str] = None) -> dict:
     product_id = product_id_for_plan(plan)
     name = (user.get("name") or "").strip() or (user.get("email") or "").split("@")[0]
     params: dict[str, Any] = {
@@ -70,7 +75,7 @@ def build_checkout_params(user: dict, plan: str) -> dict:
             METADATA_USER_KEY: str(user["id"]),
             METADATA_PLAN_KEY: plan,
         },
-        "return_url": return_url(),
+        "return_url": return_url(origin),
     }
     return params
 
@@ -91,8 +96,8 @@ def get_dodo_client():
     return DodoPayments(**kwargs)
 
 
-async def create_checkout_url(user: dict, plan: str, client=None) -> str:
-    params = build_checkout_params(user, plan)
+async def create_checkout_url(user: dict, plan: str, origin: Optional[str] = None, client=None) -> str:
+    params = build_checkout_params(user, plan, origin)
     dodo = client or get_dodo_client()
     session = await asyncio.to_thread(dodo.checkout_sessions.create, **params)
     checkout_url = getattr(session, "checkout_url", None)
@@ -101,6 +106,23 @@ async def create_checkout_url(user: dict, plan: str, client=None) -> str:
     if not checkout_url:
         raise RuntimeError("Dodo did not return a checkout_url")
     return checkout_url
+
+
+async def get_customer_portal_url(customer_id: str, client=None) -> str:
+    """Create or return customer portal URL for managing subscription/invoices."""
+    if not customer_id:
+        raise ValueError("Customer ID is required")
+    dodo = client or get_dodo_client()
+    try:
+        if hasattr(dodo, "customer_portal"):
+            session = await asyncio.to_thread(dodo.customer_portal.create, customer_id=customer_id)
+            return getattr(session, "portal_url", None) or getattr(session, "url", None) or "https://app.dodopayments.com/customer-portal"
+        if hasattr(dodo, "portal_sessions"):
+            session = await asyncio.to_thread(dodo.portal_sessions.create, customer_id=customer_id)
+            return getattr(session, "portal_url", None) or getattr(session, "url", None) or "https://app.dodopayments.com/customer-portal"
+    except Exception as e:
+        logger.warning(f"Dodo customer portal session creation failed: {e}")
+    return "https://app.dodopayments.com/customer-portal"
 
 
 async def cancel_subscription(store, user_id: str) -> dict:

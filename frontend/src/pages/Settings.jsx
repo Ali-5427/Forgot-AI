@@ -17,7 +17,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { API, getToken } from "@/api";
+import { api, API, getToken } from "@/api";
 import { useAuth } from "@/auth";
 import { useStore } from "@/store";
 import { Button } from "@/components/ui/button";
@@ -34,16 +34,39 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 export default function Settings() {
   const { user, logout } = useAuth();
   const { openImporter, items } = useStore();
-  const [activeTab, setActiveTab] = useState("account");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => (searchParams.get("billing") === "success" ? "billing" : "account"));
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [billing, setBilling] = useState(null);
   const [loadingBilling, setLoadingBilling] = useState(true);
+  const [openingPortal, setOpeningPortal] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("billing") === "success") {
+      setActiveTab("billing");
+      toast.success("Payment approved! Your Forgot AI plan is now active.", { id: "billing-success" });
+    }
+  }, [searchParams]);
+
+  const handleOpenPortal = async () => {
+    setOpeningPortal(true);
+    try {
+      const res = await api.billingPortal();
+      if (res.portal_url) {
+        window.open(res.portal_url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Customer billing portal not available yet. Please contact support.");
+    } finally {
+      setOpeningPortal(false);
+    }
+  };
 
   // Change password state
   const [oldPassword, setOldPassword] = useState("");
@@ -547,7 +570,30 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* Row 4: Plan Actions */}
+                {/* Row 4: Customer Portal & Receipts */}
+                {(isTrial || isPro || isLifetime) && (
+                  <div className="py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium text-neutral-900">
+                        Invoices & Payment Methods
+                      </h3>
+                      <p className="text-xs text-neutral-500 mt-0.5">
+                        Download tax invoices, update credit card, or view past billing receipts via Dodo Portal
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOpenPortal}
+                      disabled={openingPortal}
+                      className="rounded-xl text-xs gap-1.5"
+                    >
+                      {openingPortal ? "Opening Portal..." : "Billing & Invoices Portal"} <ArrowUpRight className="w-3.5 h-3.5 text-neutral-400" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Row 5: Plan Actions */}
                 <div className="py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h3 className="text-sm font-medium text-neutral-900">

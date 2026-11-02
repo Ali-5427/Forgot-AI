@@ -30,6 +30,7 @@ from billing import (
     billing_summary,
     cancel_subscription,
     create_checkout_url,
+    get_customer_portal_url,
     event_from_unwrapped,
     process_dodo_webhook,
     process_verified_webhook,
@@ -2163,9 +2164,10 @@ async def submit_feedback(payload: FeedbackIn, request: Request, background_task
 
 
 @api_router.post("/billing/checkout")
-async def billing_checkout(payload: CheckoutIn, user: dict = Depends(get_current_user)):
+async def billing_checkout(payload: CheckoutIn, request: Request, user: dict = Depends(get_current_user)):
     try:
-        checkout_url = await create_checkout_url(user, payload.plan)
+        origin = request.headers.get("origin") or request.headers.get("referer")
+        checkout_url = await create_checkout_url(user, payload.plan, origin=origin)
     except ValueError:
         raise HTTPException(400, "Invalid plan")
     except RuntimeError as e:
@@ -2175,6 +2177,23 @@ async def billing_checkout(payload: CheckoutIn, user: dict = Depends(get_current
         logger.exception("Failed to create Dodo checkout session")
         raise HTTPException(502, "Unable to start checkout") from e
     return {"checkout_url": checkout_url}
+
+
+@api_router.post("/billing/portal")
+async def billing_portal(user: dict = Depends(get_current_user)):
+    """Generate or retrieve Dodo Customer Portal URL for subscription & invoice management."""
+    try:
+        row = await get_billing_store().get_subscription(user["id"])
+        customer_id = (row or {}).get("dodo_customer_id")
+        if not customer_id:
+            raise HTTPException(400, "No active customer record found for billing portal")
+        portal_url = await get_customer_portal_url(customer_id)
+        return {"portal_url": portal_url}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to create Dodo customer portal session")
+        raise HTTPException(502, "Unable to access customer portal") from e
 
 
 @api_router.get("/billing/status")

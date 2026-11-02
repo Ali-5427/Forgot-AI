@@ -302,6 +302,7 @@ export const api = {
   billingCheckout: (plan) => axios.post(`${API}/billing/checkout`, { plan }).then((r) => r.data),
   billingStatus: () => axios.get(`${API}/billing/status`).then((r) => r.data),
   cancelSubscription: () => axios.post(`${API}/billing/cancel`).then((r) => r.data),
+  billingPortal: () => axios.post(`${API}/billing/portal`).then((r) => r.data),
 };
 
 export function formatApiErrorDetail(detail) {
