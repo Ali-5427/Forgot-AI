@@ -127,6 +127,19 @@ function AppContent() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
 
+          {!user && (
+            <Route
+              path="/settings"
+              element={
+                window.location.search.includes("billing=success") || window.location.search.includes("subscription_id") ? (
+                  <Navigate to={`/checkout/success${window.location.search}`} replace />
+                ) : (
+                  <Navigate to="/login?redirect=/settings" replace />
+                )
+              }
+            />
+          )}
+
           {!user && <Route path="*" element={<NotFound />} />}
         </Route>
 

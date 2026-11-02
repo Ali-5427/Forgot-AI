@@ -330,8 +330,8 @@ export function getDirectCheckoutUrl(plan, user) {
       : (process.env.REACT_APP_DODO_PRODUCT_PRO || "pdt_0NolIEGrKG8a3MsswcefH");
 
     const returnUrl = typeof window !== "undefined"
-      ? `${window.location.origin}/settings?billing=success`
-      : "https://forgot-ai.vercel.app/settings?billing=success";
+      ? `${window.location.origin}/checkout/success`
+      : "https://forgot-ai.vercel.app/checkout/success";
 
     const params = new URLSearchParams();
     if (user?.email) params.set("email", user.email);

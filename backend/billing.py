@@ -51,11 +51,11 @@ def return_url(origin: Optional[str] = None) -> str:
     if env_url:
         return env_url
     if origin and origin.startswith("http"):
-        return f"{origin.rstrip('/')}/settings?billing=success"
+        return f"{origin.rstrip('/')}/checkout/success"
     frontend_url = os.getenv("FRONTEND_URL", "").strip()
     if frontend_url:
-        return f"{frontend_url.rstrip('/')}/settings?billing=success"
-    return "https://forgot-ai.vercel.app/settings?billing=success"
+        return f"{frontend_url.rstrip('/')}/checkout/success"
+    return "https://forgot-ai.vercel.app/checkout/success"
 
 
 def lifetime_product_id() -> str:
