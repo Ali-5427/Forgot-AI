@@ -10,7 +10,7 @@ import ipaddress
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
-from typing import List, Optional, Annotated, Literal
+from typing import List, Optional, Annotated, Literal, Dict, Any
 from collections import defaultdict
 import asyncio
 import aiohttp
@@ -31,6 +31,7 @@ from billing import (
     cancel_subscription,
     create_checkout_url,
     get_customer_portal_url,
+    sync_checkout_session,
     event_from_unwrapped,
     process_dodo_webhook,
     process_verified_webhook,
@@ -2177,6 +2178,43 @@ async def billing_checkout(payload: CheckoutIn, request: Request, user: dict = D
         logger.exception("Failed to create Dodo checkout session")
         raise HTTPException(502, "Unable to start checkout") from e
     return {"checkout_url": checkout_url}
+
+
+class SyncCheckoutIn(BaseModel):
+    subscription_id: Optional[str] = None
+    payment_id: Optional[str] = None
+    status: Optional[str] = None
+    email: Optional[str] = None
+
+
+@api_router.post("/billing/sync-checkout")
+async def sync_checkout_endpoint(payload: SyncCheckoutIn, request: Request):
+    """Direct server-to-server verification with Dodo Payments on post-checkout return."""
+    user_id = None
+    token = _bearer(request)
+    if token:
+        try:
+            u = await _user_from_token(token)
+            if u:
+                user_id = u["id"]
+        except Exception:
+            pass
+
+    try:
+        res = await sync_checkout_session(
+            store=get_billing_store(),
+            subscription_id=payload.subscription_id,
+            payment_id=payload.payment_id,
+            fallback_user_id=user_id,
+            fallback_email=payload.email,
+        )
+        return res
+    except ValueError as e:
+        logger.warning(f"Sync checkout rejected: {e}")
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.exception("Failed to sync checkout session with Dodo")
+        raise HTTPException(502, "Unable to verify transaction with payment provider")
 
 
 @api_router.post("/billing/portal")

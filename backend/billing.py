@@ -122,6 +122,116 @@ async def create_checkout_url(user: dict, plan: str, origin: Optional[str] = Non
     return checkout_url
 
 
+async def sync_checkout_session(
+    store,
+    subscription_id: Optional[str] = None,
+    payment_id: Optional[str] = None,
+    client=None,
+    fallback_user_id: Optional[str] = None,
+    fallback_email: Optional[str] = None,
+) -> dict:
+    """Directly query Dodo Payments API to verify and activate subscription on post-checkout return."""
+    dodo = client or get_dodo_client()
+    user_id = fallback_user_id
+
+    # 1. Handle Subscription Checkout
+    if subscription_id:
+        sub = await asyncio.to_thread(dodo.subscriptions.retrieve, subscription_id)
+        sub_dict = sub.dict() if hasattr(sub, "dict") else (sub.model_dump() if hasattr(sub, "model_dump") else _as_dict(sub))
+
+        status = str(sub_dict.get("status") or "").lower()
+        if status not in ("active", "on_hold", "trial"):
+            raise ValueError(f"Subscription is not active: {status}")
+
+        if not user_id:
+            user_id = user_id_from_data(sub_dict)
+        if not user_id:
+            cust_email = (
+                _as_dict(sub_dict.get("customer")).get("email")
+                or fallback_email
+                or ""
+            ).strip()
+            if cust_email and hasattr(store, "get_user_id_by_email"):
+                user_id = await store.get_user_id_by_email(cust_email)
+
+        if not user_id:
+            raise ValueError("Unable to identify account for this subscription")
+
+        trial_days = sub_dict.get("trial_period_days")
+        is_trial = bool(trial_days and trial_days > 0)
+        plan_status = "trial" if is_trial else "active_pro"
+
+        customer = _as_dict(sub_dict.get("customer"))
+        dodo_customer_id = customer.get("customer_id") or sub_dict.get("customer_id")
+        period_end = parse_period_end(sub_dict)
+
+        updated = await store.upsert_subscription(user_id, {
+            "plan_type": "pro",
+            "status": plan_status,
+            "dodo_customer_id": dodo_customer_id,
+            "dodo_subscription_id": subscription_id,
+            "current_period_end": period_end,
+            "provider": "dodo",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return {
+            "success": True,
+            "plan_type": "pro",
+            "status": plan_status,
+            "user_id": user_id,
+            "subscription": billing_public_fields(updated),
+        }
+
+    # 2. Handle One-time Payment (Lifetime) Checkout
+    if payment_id:
+        pay = None
+        if hasattr(dodo.payments, "retrieve"):
+            pay = await asyncio.to_thread(dodo.payments.retrieve, payment_id)
+        elif hasattr(dodo.payments, "get"):
+            pay = await asyncio.to_thread(dodo.payments.get, payment_id)
+
+        pay_dict = pay.dict() if hasattr(pay, "dict") else (pay.model_dump() if hasattr(pay, "model_dump") else _as_dict(pay))
+        status = str(pay_dict.get("status") or "").lower()
+        if status not in ("succeeded", "successful", "active", "completed"):
+            raise ValueError(f"Payment is not successful: {status}")
+
+        if not user_id:
+            user_id = user_id_from_data(pay_dict)
+        if not user_id:
+            cust_email = (
+                _as_dict(pay_dict.get("customer")).get("email")
+                or fallback_email
+                or ""
+            ).strip()
+            if cust_email and hasattr(store, "get_user_id_by_email"):
+                user_id = await store.get_user_id_by_email(cust_email)
+
+        if not user_id:
+            raise ValueError("Unable to identify account for this payment")
+
+        customer = _as_dict(pay_dict.get("customer"))
+        dodo_customer_id = customer.get("customer_id") or pay_dict.get("customer_id")
+
+        updated = await store.upsert_subscription(user_id, {
+            "plan_type": "lifetime",
+            "status": "lifetime",
+            "dodo_customer_id": dodo_customer_id,
+            "dodo_payment_id": payment_id,
+            "current_period_end": None,
+            "provider": "dodo",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return {
+            "success": True,
+            "plan_type": "lifetime",
+            "status": "lifetime",
+            "user_id": user_id,
+            "subscription": billing_public_fields(updated),
+        }
+
+    raise ValueError("Either subscription_id or payment_id is required")
+
+
 async def get_customer_portal_url(customer_id: str, client=None) -> str:
     """Create or return customer portal URL for managing subscription/invoices."""
     if not customer_id:

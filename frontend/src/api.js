@@ -315,6 +315,7 @@ export const api = {
   billingStatus: () => axios.get(`${API}/billing/status`).then((r) => r.data),
   cancelSubscription: () => axios.post(`${API}/billing/cancel`).then((r) => r.data),
   billingPortal: () => axios.post(`${API}/billing/portal`).then((r) => r.data),
+  syncCheckout: (payload) => axios.post(`${API}/billing/sync-checkout`, payload).then((r) => r.data),
   getDirectCheckoutUrl: (plan, user) => getDirectCheckoutUrl(plan, user),
 };
 
