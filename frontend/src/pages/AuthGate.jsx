@@ -59,6 +59,11 @@ export default function AuthGate({ initialMode = "login", onClose }) {
   // If already authenticated and arriving with a plan intent, forward straight to checkout
   useEffect(() => {
     if (user && !isExtension && isTargetPlan && !redirectingToCheckout) {
+      const directUrl = api.getDirectCheckoutUrl(targetPlan, user);
+      if (directUrl) {
+        window.location.href = directUrl;
+        return;
+      }
       setRedirectingToCheckout(true);
       api.billingCheckout(targetPlan)
         .then((res) => {
@@ -80,10 +85,18 @@ export default function AuthGate({ initialMode = "login", onClose }) {
     setError("");
     setLoading(true);
     try {
-      if (mode === "login") await login(email, password);
-      else await register(email, password);
+      let authData;
+      if (mode === "login") authData = await login(email, password);
+      else authData = await register(email, password);
 
       if (isTargetPlan) {
+        const authedUser = authData?.user || user || { email };
+        const directUrl = api.getDirectCheckoutUrl(targetPlan, authedUser);
+        if (directUrl) {
+          window.location.href = directUrl;
+          return;
+        }
+
         setRedirectingToCheckout(true);
         try {
           const res = await api.billingCheckout(targetPlan);

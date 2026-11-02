@@ -315,7 +315,38 @@ export const api = {
   billingStatus: () => axios.get(`${API}/billing/status`).then((r) => r.data),
   cancelSubscription: () => axios.post(`${API}/billing/cancel`).then((r) => r.data),
   billingPortal: () => axios.post(`${API}/billing/portal`).then((r) => r.data),
+  getDirectCheckoutUrl: (plan, user) => getDirectCheckoutUrl(plan, user),
 };
+
+export function getDirectCheckoutUrl(plan, user) {
+  try {
+    const isLive = process.env.REACT_APP_DODO_ENV === "live";
+    const baseUrl = isLive
+      ? "https://checkout.dodopayments.com/buy"
+      : "https://test.checkout.dodopayments.com/buy";
+
+    const productId = plan === "lifetime"
+      ? (process.env.REACT_APP_DODO_PRODUCT_LIFETIME || "pdt_0NolIEHwY2k9URmRzEddS")
+      : (process.env.REACT_APP_DODO_PRODUCT_PRO || "pdt_0NolIEGrKG8a3MsswcefH");
+
+    const returnUrl = typeof window !== "undefined"
+      ? `${window.location.origin}/settings?billing=success`
+      : "https://forgot-ai.vercel.app/settings?billing=success";
+
+    const params = new URLSearchParams();
+    if (user?.email) params.set("email", user.email);
+    const fullName = (user?.name || "").trim() || (user?.email ? user.email.split("@")[0] : "");
+    if (fullName) params.set("fullName", fullName);
+    if (user?.id) params.set("metadata_supabase_user_id", user.id);
+    params.set("metadata_forgot_ai_plan", plan || "pro");
+    params.set("redirect_url", returnUrl);
+
+    return `${baseUrl}/${productId}?${params.toString()}`;
+  } catch (err) {
+    console.error("Failed to construct direct checkout URL:", err);
+    return null;
+  }
+}
 
 export function formatApiErrorDetail(detail) {
   if (detail == null) return "Something went wrong. Please try again.";

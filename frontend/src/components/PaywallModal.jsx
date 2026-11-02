@@ -5,12 +5,22 @@ import { Check, Sparkles, Loader2, ArrowRight } from "lucide-react";
 import { api } from "@/api";
 import { useNavigate } from "react-router-dom";
 
+import { useAuth } from "@/auth";
+
 export function PaywallModal({ open, onOpenChange, reason }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [error, setError] = useState(null);
 
   const handleCheckout = async (plan) => {
+    // 1. Instant 0ms direct navigation
+    const directUrl = api.getDirectCheckoutUrl(plan, user);
+    if (directUrl) {
+      window.location.href = directUrl;
+      return;
+    }
+
     if (loadingPlan) return;
     setLoadingPlan(plan);
     setError(null);

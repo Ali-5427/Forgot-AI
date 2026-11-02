@@ -39,6 +39,14 @@ export default function PricingPage() {
       return;
     }
 
+    // 1. Instant 0ms checkout navigation
+    const directUrl = api.getDirectCheckoutUrl(plan, user);
+    if (directUrl) {
+      window.location.href = directUrl;
+      return;
+    }
+
+    // 2. Fallback to API session creation
     if (loadingPlan) return;
     setLoadingPlan(plan);
     setError(null);

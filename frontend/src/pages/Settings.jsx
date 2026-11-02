@@ -62,6 +62,14 @@ export default function Settings() {
   };
 
   const handleUpgrade = async (plan) => {
+    // 1. Instant 0ms direct navigation
+    const directUrl = api.getDirectCheckoutUrl(plan, user);
+    if (directUrl) {
+      window.location.href = directUrl;
+      return;
+    }
+
+    // 2. Fallback to API session
     if (upgradingPlan) return;
     setUpgradingPlan(plan);
     try {

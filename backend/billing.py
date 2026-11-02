@@ -229,7 +229,13 @@ def metadata_of(data: dict) -> dict:
 
 def user_id_from_data(data: dict) -> Optional[str]:
     meta = metadata_of(data)
-    user_id = meta.get(METADATA_USER_KEY) or meta.get("app_user_id")
+    user_id = (
+        meta.get(METADATA_USER_KEY)
+        or meta.get("metadata_supabase_user_id")
+        or meta.get("supabase_user_id")
+        or meta.get("app_user_id")
+        or meta.get("user_id")
+    )
     return user_id.strip() if user_id else None
 
 
@@ -313,6 +319,19 @@ class InMemoryBillingStore:
         merged["updated_at"] = datetime.now(timezone.utc).isoformat()
         self.subscriptions[user_id] = merged
         return dict(merged)
+
+    async def get_user_id_by_email(self, email: str) -> Optional[str]:
+        if not email:
+            return None
+        def _get():
+            try:
+                res = self.client.table("profiles").select("id").eq("email", email.lower().strip()).limit(1).execute()
+                if res.data:
+                    return str(res.data[0]["id"])
+            except Exception as e:
+                logger.warning("Failed to lookup profile by email %s: %s", email, e)
+            return None
+        return await asyncio.to_thread(_get)
 
     async def claim_webhook(self, webhook_id: str, event_type: str) -> str:
         existing = self.webhooks.get(webhook_id)
@@ -454,7 +473,18 @@ async def apply_entitlement(store, user_id: str, values: dict) -> dict:
 async def handle_verified_event(event_type: str, data: dict, store) -> str:
     user_id = user_id_from_data(data)
     if not user_id:
-        logger.warning("Ignoring Dodo event %s without supabase_user_id metadata", event_type)
+        customer_email = (
+            _as_dict(data.get("customer")).get("email")
+            or data.get("customer_email")
+            or data.get("email")
+            or ""
+        ).strip()
+        if customer_email and hasattr(store, "get_user_id_by_email"):
+            user_id = await store.get_user_id_by_email(customer_email)
+            if user_id:
+                logger.info("Resolved user_id %s from customer email %s", user_id, customer_email)
+    if not user_id:
+        logger.warning("Ignoring Dodo event %s without identifiable user", event_type)
         return "ignored"
 
     customer = _as_dict(data.get("customer"))
