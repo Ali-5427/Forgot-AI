@@ -235,21 +235,23 @@ async def sync_checkout_session(
     raise ValueError("Either subscription_id or payment_id is required")
 
 
-async def get_customer_portal_url(customer_id: str, client=None) -> str:
+async def get_customer_portal_url(customer_id: str = None, client=None) -> str:
     """Create or return customer portal URL for managing subscription/invoices."""
+    is_test = os.environ.get("DODO_PAYMENTS_ENVIRONMENT", "test_mode").lower() == "test_mode"
+    fallback = "https://test.dodopayments.com/customer-portal" if is_test else "https://app.dodopayments.com/customer-portal"
     if not customer_id:
-        raise ValueError("Customer ID is required")
+        return fallback
     dodo = client or get_dodo_client()
     try:
         if hasattr(dodo, "customer_portal"):
             session = await asyncio.to_thread(dodo.customer_portal.create, customer_id=customer_id)
-            return getattr(session, "portal_url", None) or getattr(session, "url", None) or "https://app.dodopayments.com/customer-portal"
+            return getattr(session, "portal_url", None) or getattr(session, "url", None) or fallback
         if hasattr(dodo, "portal_sessions"):
             session = await asyncio.to_thread(dodo.portal_sessions.create, customer_id=customer_id)
-            return getattr(session, "portal_url", None) or getattr(session, "url", None) or "https://app.dodopayments.com/customer-portal"
+            return getattr(session, "portal_url", None) or getattr(session, "url", None) or fallback
     except Exception as e:
         logger.warning(f"Dodo customer portal session creation failed: {e}")
-    return "https://app.dodopayments.com/customer-portal"
+    return fallback
 
 
 async def cancel_subscription(store, user_id: str) -> dict:

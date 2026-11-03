@@ -26,6 +26,7 @@ from ai_provider import embed_texts, llm_chat, llm_chat_stream
 from billing import (
     CheckoutIn,
     SupabaseBillingStore,
+    get_dodo_client,
     billing_public_fields,
     billing_summary,
     cancel_subscription,
@@ -2221,17 +2222,30 @@ async def sync_checkout_endpoint(payload: SyncCheckoutIn, request: Request):
 async def billing_portal(user: dict = Depends(get_current_user)):
     """Generate or retrieve Dodo Customer Portal URL for subscription & invoice management."""
     try:
-        row = await get_billing_store().get_subscription(user["id"])
+        store = get_billing_store()
+        row = await store.get_subscription(user["id"])
         customer_id = (row or {}).get("dodo_customer_id")
-        if not customer_id:
-            raise HTTPException(400, "No active customer record found for billing portal")
+        sub_id = (row or {}).get("dodo_subscription_id")
+
+        # If customer_id is missing, try to resolve it from the subscription via Dodo API
+        if not customer_id and sub_id:
+            try:
+                dodo = get_dodo_client()
+                sub = await asyncio.to_thread(dodo.subscriptions.retrieve, sub_id)
+                fetched_cid = getattr(sub, "customer_id", None) or getattr(sub, "customer", None)
+                if fetched_cid:
+                    customer_id = str(getattr(fetched_cid, "customer_id", fetched_cid))
+                    await store.update_subscription(user["id"], {"dodo_customer_id": customer_id})
+            except Exception as e:
+                logger.warning(f"Failed to fetch customer_id from subscription: {e}")
+
         portal_url = await get_customer_portal_url(customer_id)
         return {"portal_url": portal_url}
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.exception("Failed to create Dodo customer portal session")
-        raise HTTPException(502, "Unable to access customer portal") from e
+        logger.exception("Failed to create Dodo customer portal session: %s", e)
+        is_test = os.environ.get("DODO_PAYMENTS_ENVIRONMENT", "test_mode").lower() == "test_mode"
+        fallback_url = "https://test.dodopayments.com/customer-portal" if is_test else "https://app.dodopayments.com/customer-portal"
+        return {"portal_url": fallback_url}
 
 
 @api_router.get("/billing/status")

@@ -47,7 +47,7 @@ class SupabaseCollection:
         response = self._query(filters).limit(1).execute()
         return response.data[0] if response.data else None
 
-    def find(self, filters: dict | None = None):
+    def find(self, filters: dict | None = None, projection: dict | None = None, **kwargs):
         return SupabaseFind(self, filters or {})
 
     async def insert_one(self, document: dict):
@@ -128,6 +128,11 @@ class SupabaseFind:
             query = query.order(self.order_column, desc=self.descending)
         response = query.execute()
         return response.data or []
+
+    async def __aiter__(self):
+        items = await self.to_list(10000)
+        for item in items:
+            yield item
 
 
 class SupabaseDatabase:
