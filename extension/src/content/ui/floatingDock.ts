@@ -453,6 +453,19 @@ export function initFloatingDock() {
   host.style.zIndex = "2147483647";
   host.style.pointerEvents = "none";
 
+  if (typeof chrome !== "undefined" && chrome.storage?.local) {
+    chrome.storage.local.get(["forgot_ai_dock_disabled"], (res) => {
+      if (res?.forgot_ai_dock_disabled) {
+        host.style.display = "none";
+      }
+    });
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local" && "forgot_ai_dock_disabled" in changes) {
+        host.style.display = changes.forgot_ai_dock_disabled.newValue ? "none" : "";
+      }
+    });
+  }
+
   const shadow = host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
   style.textContent = DOCK_CSS;

@@ -233,6 +233,9 @@ export const api = {
 
   getGroups: () => request<any[]>("/api/groups", { auth: true }),
   billingStatus: () => request<{ plan_type: string; status: string; has_access: boolean; current_period_end: string | null }>("/api/billing/status", { auth: true }),
+  billingPortal: () => request<{ portal_url: string }>("/api/billing/portal", { method: "POST", auth: true }),
+  listItems: (limit = 100) => request<SavedItem[]>(`/api/items?limit=${limit}`, { auth: true }),
+  deleteItem: (id: string) => request<any>(`/api/items/${id}`, { method: "DELETE", auth: true }),
   saveText: (data: any) => 
     request<any>("/api/items/text", { method: "POST", body: JSON.stringify(data), auth: true }),
   saveUrl: (data: any) => 
