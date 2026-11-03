@@ -434,17 +434,7 @@ class InMemoryBillingStore:
         return dict(merged)
 
     async def get_user_id_by_email(self, email: str) -> Optional[str]:
-        if not email:
-            return None
-        def _get():
-            try:
-                res = self.client.table("profiles").select("id").eq("email", email.lower().strip()).limit(1).execute()
-                if res.data:
-                    return str(res.data[0]["id"])
-            except Exception as e:
-                logger.warning("Failed to lookup profile by email %s: %s", email, e)
-            return None
-        return await asyncio.to_thread(_get)
+        return None
 
     async def claim_webhook(self, webhook_id: str, event_type: str) -> str:
         existing = self.webhooks.get(webhook_id)
@@ -468,6 +458,19 @@ class InMemoryBillingStore:
 class SupabaseBillingStore:
     def __init__(self, client):
         self.client = client
+
+    async def get_user_id_by_email(self, email: str) -> Optional[str]:
+        if not email:
+            return None
+        def _get():
+            try:
+                res = self.client.table("profiles").select("id").eq("email", email.lower().strip()).limit(1).execute()
+                if res.data:
+                    return str(res.data[0]["id"])
+            except Exception as e:
+                logger.warning("Failed to lookup profile by email %s: %s", email, e)
+            return None
+        return await asyncio.to_thread(_get)
 
     async def get_subscription(self, user_id: str) -> Optional[dict]:
         def _get():
