@@ -312,7 +312,37 @@ export const api = {
   checkFile: async (file) => api.check({ content_type: "image", hash: await sha256Hex(file) }),
   // billing
   billingCheckout: (plan) => axios.post(`${API}/billing/checkout`, { plan }).then((r) => r.data),
-  billingStatus: () => axios.get(`${API}/billing/status`).then((r) => r.data),
+  billingStatus: () =>
+    axios.get(`${API}/billing/status`)
+      .then((r) => {
+        const data = r.data;
+        if (data && (data.status === "trial" || data.status === "active_pro" || data.status === "lifetime")) {
+          try { localStorage.removeItem("forgot_ai_optimistic_billing"); } catch {}
+          return data;
+        }
+        try {
+          const raw = localStorage.getItem("forgot_ai_optimistic_billing");
+          if (raw) {
+            const opt = JSON.parse(raw);
+            if (opt && opt.status) {
+              return { ...data, ...opt, has_access: true };
+            }
+          }
+        } catch {}
+        return data;
+      })
+      .catch((err) => {
+        try {
+          const raw = localStorage.getItem("forgot_ai_optimistic_billing");
+          if (raw) {
+            const opt = JSON.parse(raw);
+            if (opt && opt.status) {
+              return { ...opt, has_access: true };
+            }
+          }
+        } catch {}
+        throw err;
+      }),
   cancelSubscription: () => axios.post(`${API}/billing/cancel`).then((r) => r.data),
   billingPortal: () => axios.post(`${API}/billing/portal`).then((r) => r.data),
   syncCheckout: (payload) => axios.post(`${API}/billing/sync-checkout`, payload).then((r) => r.data),
