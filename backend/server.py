@@ -827,12 +827,21 @@ async def retrieve(query: str, lib: str, limit: int = 30):
         kws = d.get("keywords") or []
         kw_str = " ".join(kws) if isinstance(kws, list) else str(kws)
 
-        # Check for direct keyword matches (guarantees names and specific words are never missed)
+        # Check for direct keyword matches (strict multi-word matching so single-word noise does not pollute results)
         full_haystack = f"{title_str} {summary_str} {kw_str} {text_comb}".lower()
-        if target_words and any(tw in full_haystack for tw in target_words):
-            exact_copy = by_id[d["id"]].copy()
-            exact_copy["match_reason"] = "Direct keyword match in title or content"
-            exact_matches.append(exact_copy)
+        if target_words:
+            if q_lower in full_haystack:
+                exact_copy = by_id[d["id"]].copy()
+                exact_copy["match_reason"] = f"Exact phrase match for '{query}'"
+                exact_matches.append((100, exact_copy))
+            else:
+                matched_cnt = sum(1 for tw in target_words if tw in full_haystack)
+                match_ratio = matched_cnt / len(target_words)
+                # Only include if ALL keywords match (or >= 75% for queries with 3+ words)
+                if (len(target_words) <= 2 and match_ratio == 1.0) or (len(target_words) > 2 and match_ratio >= 0.75):
+                    exact_copy = by_id[d["id"]].copy()
+                    exact_copy["match_reason"] = "Matched all search keywords"
+                    exact_matches.append((int(match_ratio * 50), exact_copy))
 
         catalog.append({
             "id": d["id"],
@@ -885,8 +894,9 @@ async def retrieve(query: str, lib: str, limit: int = 30):
             final_results.append(item_copy)
             seen_result_ids.add(item_id)
 
-    # Append any direct keyword matches that the LLM ranker didn't include
-    for em in exact_matches:
+    # Append verified high-quality keyword matches not already in AI results, sorted by score
+    exact_matches.sort(key=lambda x: x[0], reverse=True)
+    for _, em in exact_matches:
         if em["id"] not in seen_result_ids:
             final_results.append(em)
             seen_result_ids.add(em["id"])
