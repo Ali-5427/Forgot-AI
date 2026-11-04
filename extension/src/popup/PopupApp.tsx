@@ -5,11 +5,11 @@ import {
   MessageSquare, Calendar, Link2, Menu, SquarePen, PanelLeftClose, Folder, 
   HelpCircle, MessageSquareQuote, ArrowLeft, Search, Trash2, FileText, 
   RefreshCw, Globe, CheckCircle2, ShieldCheck, ToggleLeft, ToggleRight, Keyboard,
-  Sparkle
+  Twitter, Linkedin, Smartphone, Mail
 } from "lucide-react";
 import { api, request, fetchStream, SavedItem } from "../lib/api";
 import { CONFIG } from "../lib/config";
-import { clearSession, getSession, onSessionChange } from "../lib/storage";
+import { clearSession, getSession, onSessionChange, getProPass, setProPass } from "../lib/storage";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ExtensionTour, { resetExtensionTour } from "./ExtensionTour";
@@ -247,13 +247,24 @@ function formatTimeAgo(dateString?: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+
+function getFaviconUrl(urlStr?: string): string | null {
+  if (!urlStr) return null;
+  try {
+    const u = new URL(urlStr.startsWith("http") ? urlStr : `https://${urlStr}`);
+    return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=32`;
+  } catch {
+    return null;
+  }
+}
+
 export default function PopupApp() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
   const [billing, setBilling] = useState<{ plan_type: string; status: string; has_access: boolean } | null>(null);
   
-  // Navigation View: "chat" | "saved" | "settings"
-  const [currentView, setCurrentView] = useState<"chat" | "saved" | "settings">("chat");
+  // Navigation View: "chat" | "saved" | "settings" | "feedback"
+  const [currentView, setCurrentView] = useState<"chat" | "saved" | "settings" | "feedback">("chat");
 
   // Chat State
   const [chatQuery, setChatQuery] = useState("");
@@ -267,12 +278,18 @@ export default function PopupApp() {
   const [itemsSearchQuery, setItemsSearchQuery] = useState("");
   const [itemFilter, setItemFilter] = useState<"all" | "link" | "text">("all");
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
+  const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
 
   // In-Extension Settings State
   const [dockEnabled, setDockEnabled] = useState(true);
   const [syncingPlan, setSyncingPlan] = useState(false);
   const [syncPlanSuccess, setSyncPlanSuccess] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
+
+  // In-Extension Feedback State
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   // Save Modal State
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -289,9 +306,15 @@ export default function PopupApp() {
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const [inputHeight, setInputHeight] = useState(52);
 
-  // Initialize conversation from local storage
+  // 1. 0ms INSTANT HYDRATION: Read Local Pro Pass from disk immediately
   useEffect(() => {
-    chrome.storage.local.get(["extension_conv_id"], async (res) => {
+    getProPass().then((cachedPass) => {
+      if (cachedPass && cachedPass.has_access) {
+        setBilling(cachedPass);
+      }
+    });
+
+    chrome.storage.local.get(["extension_conv_id", "forgot_ai_dock_disabled"], async (res) => {
       if (res.extension_conv_id) {
         try {
           const data = await api.getConversation(res.extension_conv_id);
@@ -306,21 +329,20 @@ export default function PopupApp() {
           chrome.storage.local.remove("extension_conv_id");
         }
       }
-    });
-
-    // Check floating dock preference
-    chrome.storage.local.get(["forgot_ai_dock_disabled"], (res) => {
       setDockEnabled(!res.forgot_ai_dock_disabled);
     });
   }, []);
 
-  // Fetch / Sync Session and Billing
+  // 2. Fetch / Sync Session and Silent Background Revalidation
   useEffect(() => {
     getSession().then(async (s) => {
       if (s?.user?.email) {
         setEmail(s.user.email);
-        api.billingStatus().then(b => setBilling(b)).catch(() => {});
         setLoading(false);
+        // Silent background check - never resets or blocks user if Render is asleep
+        api.billingStatus().then(b => {
+          if (b) setBilling(b);
+        }).catch(() => {});
         return;
       }
 
@@ -344,8 +366,10 @@ export default function PopupApp() {
             const refreshed = await getSession();
             if (refreshed?.user?.email) {
               setEmail(refreshed.user.email);
-              api.billingStatus().then(b => setBilling(b)).catch(() => {});
               setLoading(false);
+              api.billingStatus().then(b => {
+                if (b) setBilling(b);
+              }).catch(() => {});
               return;
             }
           }
@@ -424,9 +448,6 @@ export default function PopupApp() {
   const openPricing = () => {
     chrome.tabs.create({ url: `${CONFIG.APP_URL}/pricing` });
   };
-  const openFeedback = () => {
-    chrome.tabs.create({ url: `${CONFIG.APP_URL}/contact` });
-  };
   const logout = async () => {
     await api.logout();
     await clearSession();
@@ -446,7 +467,7 @@ export default function PopupApp() {
     try {
       setSyncingPlan(true);
       const b = await api.billingStatus();
-      setBilling(b);
+      if (b) setBilling(b);
       setSyncPlanSuccess(true);
       setTimeout(() => setSyncPlanSuccess(false), 2500);
     } catch (e) {
@@ -493,6 +514,33 @@ export default function PopupApp() {
     setTimeout(() => setCopiedItemId(null), 2000);
   };
 
+  // Submit native in-extension feedback
+  const handleSubmitFeedback = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackMessage.trim() || submittingFeedback) return;
+    try {
+      setSubmittingFeedback(true);
+      await (api as any).submitFeedback(feedbackMessage.trim());
+      setFeedbackSent(true);
+      setFeedbackMessage("");
+      setTimeout(() => {
+        setFeedbackSent(false);
+        setCurrentView("chat");
+      }, 2500);
+    } catch (err) {
+      alert("Failed to send feedback. Please try reaching founder directly.");
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
+  const socials = [
+    { name: "X (Twitter)", url: "https://x.com/mohammad_j43370", icon: Twitter, color: "hover:bg-neutral-100 text-neutral-700" },
+    { name: "LinkedIn", url: "https://www.linkedin.com/in/j-mohammad-ali-ai", icon: Linkedin, color: "hover:bg-blue-50 hover:text-blue-600 text-neutral-700" },
+    { name: "WhatsApp", url: "https://wa.me/918688697765", icon: Smartphone, color: "hover:bg-green-50 hover:text-green-600 text-neutral-700" },
+    { name: "Email", url: "mailto:founder@tesima-media.com", icon: Mail, color: "hover:bg-red-50 hover:text-red-600 text-neutral-700" },
+  ];
+
   const handleSmartSave = async () => {
     if (!saveText.trim() && !file) return;
     try {
@@ -525,7 +573,6 @@ export default function PopupApp() {
       setFile(null);
       setIsSaveModalOpen(false);
       
-      // Refresh saved items if user is on saved view
       if (currentView === "saved") {
         loadSavedItems();
       }
@@ -834,7 +881,7 @@ export default function PopupApp() {
                 </button>
 
                 <button 
-                  onClick={() => { openFeedback(); setIsMenuOpen(false); }}
+                  onClick={() => { setCurrentView("feedback"); setIsMenuOpen(false); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition-colors text-left"
                 >
                   <MessageSquareQuote className="w-4 h-4 text-neutral-500" />
@@ -977,7 +1024,9 @@ export default function PopupApp() {
               </button>
               <div className="h-4 w-px bg-neutral-200 mx-1" />
               <span className="font-bold text-[15px] tracking-tight text-neutral-900">
-                {currentView === "saved" ? "All Saved Notes" : "Settings"}
+                {currentView === "saved" ? "All Saved Notes" :
+                 currentView === "settings" ? "Settings" :
+                 "Feedback & Support"}
               </span>
             </div>
           )}
@@ -1003,7 +1052,7 @@ export default function PopupApp() {
         ) : null}
       </div>
 
-      {/* VIEW 1: IN-EXTENSION ALL SAVED NOTES */}
+      {/* VIEW 1: IN-EXTENSION ALL SAVED NOTES (PREMIUM REDESIGNED CARDS) */}
       {currentView === "saved" && (
         <div className="flex-1 flex flex-col overflow-hidden bg-neutral-50/50">
           {/* Search & Filter Header */}
@@ -1069,76 +1118,108 @@ export default function PopupApp() {
               filteredSavedItems.map((item) => {
                 const isUrl = item.content_type === "url" || !!item.source_url;
                 const displayTitle = item.title || item.source_title || (isUrl ? item.source_url : item.original_content) || "Saved Memory";
-                const hostname = isUrl ? (item.source_url ? new URL(item.source_url.startsWith("http") ? item.source_url : `https://${item.source_url}`).hostname : "") : "Quick Note";
+                const hostname = isUrl ? (item.source_url ? new URL(item.source_url.startsWith("http") ? item.source_url : `https://${item.source_url}`).hostname.replace(/^www\./, "") : "") : "Quick Note";
+                const faviconUrl = isUrl ? getFaviconUrl(item.source_url) : null;
+                const showFavicon = faviconUrl && !imgErrorMap[item.id];
+                const snippet = item.summary || (isUrl && item.original_content && item.original_content !== item.source_url ? item.original_content : null);
 
                 return (
                   <div 
                     key={item.id} 
-                    className="p-3 bg-white border border-neutral-200/70 hover:border-neutral-300 rounded-2xl shadow-xs transition-all space-y-2 group"
+                    className="p-3.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all space-y-2.5 group"
                   >
-                    {/* Header: Type icon + domain + date */}
+                    {/* Header: Real Favicon + Domain name + Category Pill + Relative Time */}
                     <div className="flex items-center justify-between text-[11px] text-neutral-400">
-                      <div className="flex items-center gap-1.5 truncate min-w-0">
-                        {isUrl ? (
+                      <div className="flex items-center gap-1.5 truncate min-w-0 pr-2">
+                        {showFavicon ? (
+                          <img 
+                            src={faviconUrl!} 
+                            className="w-3.5 h-3.5 rounded-xs shrink-0 object-contain" 
+                            onError={() => setImgErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                            alt=""
+                          />
+                        ) : isUrl ? (
                           <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                         ) : (
                           <FileText className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                         )}
-                        <span className="font-medium text-neutral-600 truncate">{hostname}</span>
+                        <span className="font-semibold text-neutral-700 truncate tracking-tight text-[11.5px]">{hostname}</span>
                       </div>
-                      <span className="shrink-0">{formatTimeAgo(item.created_at)}</span>
+                      
+                      <div className="flex items-center gap-1.5 shrink-0 text-[10.5px]">
+                        <span className="px-1.5 py-0.5 bg-neutral-100 rounded text-neutral-500 font-medium">
+                          {isUrl ? "Link" : "Note"}
+                        </span>
+                        <span>{formatTimeAgo(item.created_at)}</span>
+                      </div>
                     </div>
 
-                    {/* Title / Snippet */}
-                    <div className="text-[13px] font-semibold text-neutral-900 leading-snug line-clamp-2">
+                    {/* Title */}
+                    <div className="text-[13.5px] font-semibold text-neutral-900 group-hover:text-black leading-snug line-clamp-2">
                       {displayTitle}
                     </div>
 
-                    {/* User Note if present */}
+                    {/* Snippet preview if available */}
+                    {snippet && (
+                      <p className="text-[12px] text-neutral-500 line-clamp-2 leading-relaxed">
+                        {snippet}
+                      </p>
+                    )}
+
+                    {/* User Note highlighted pill */}
                     {item.user_note && (
-                      <div className="text-[12px] text-neutral-600 bg-neutral-50 border border-neutral-150 px-2.5 py-1.5 rounded-lg italic">
+                      <div className="text-[11.5px] text-amber-900 bg-amber-50/80 border-l-2 border-amber-400 pl-2.5 py-1 rounded-r-lg italic">
                         "{item.user_note}"
                       </div>
                     )}
 
-                    {/* Action Toolbar */}
-                    <div className="flex items-center justify-end gap-1 pt-1 border-t border-neutral-100">
-                      <button
-                        onClick={(e) => handleCopyItem(item, e)}
-                        className="px-2 py-1 text-[11.5px] font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-md transition-colors flex items-center gap-1"
-                        title="Copy content / URL"
-                      >
-                        {copiedItemId === item.id ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            <span className="text-emerald-600 font-semibold">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
+                    {/* Sleek Action Toolbar */}
+                    <div className="flex items-center justify-between pt-1 border-t border-neutral-100/80 text-neutral-500">
+                      <div className="text-[11px] text-neutral-400">
+                        {isUrl && item.source_url ? (
+                          <span className="truncate max-w-[180px] inline-block font-mono text-[10.5px]">
+                            {item.source_url.replace(/^https?:\/\//, "").slice(0, 28)}...
+                          </span>
+                        ) : null}
+                      </div>
 
-                      {isUrl && item.source_url && (
+                      <div className="flex items-center gap-1">
                         <button
-                          onClick={() => chrome.tabs.create({ url: item.source_url })}
-                          className="px-2 py-1 text-[11.5px] font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-md transition-colors flex items-center gap-1"
-                          title="Open URL in new tab"
+                          onClick={(e) => handleCopyItem(item, e)}
+                          className="px-2 py-1 text-[11px] font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors flex items-center gap-1"
+                          title="Copy Link / Content"
                         >
-                          <ExternalLink className="w-3 h-3" />
-                          <span>Open</span>
+                          {copiedItemId === item.id ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="text-emerald-600 font-semibold">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy</span>
+                            </>
+                          )}
                         </button>
-                      )}
 
-                      <button
-                        onClick={(e) => handleDeleteItem(item.id, e)}
-                        className="p-1 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors ml-1"
-                        title="Delete memory"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        {isUrl && item.source_url && (
+                          <button
+                            onClick={() => chrome.tabs.create({ url: item.source_url })}
+                            className="p-1.5 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+                            title="Open URL in new tab"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        <button
+                          onClick={(e) => handleDeleteItem(item.id, e)}
+                          className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete memory"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1270,7 +1351,79 @@ export default function PopupApp() {
         </div>
       )}
 
-      {/* VIEW 3: CHAT & QUICK SAVE (Main Default Screen) */}
+      {/* VIEW 3: IN-EXTENSION FEEDBACK (Exact Web App Replica) */}
+      {currentView === "feedback" && (
+        <div className="flex-1 overflow-y-auto p-4 bg-white flex flex-col justify-between">
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold text-[16px] text-neutral-900">Feedback & Support</h3>
+              <p className="text-[12.5px] text-neutral-500 mt-0.5">Help me improve Forgot AI</p>
+            </div>
+
+            {feedbackSent ? (
+              <div className="py-12 flex flex-col items-center text-center space-y-3 animate-in fade-in duration-300">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-1">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <h4 className="font-semibold text-neutral-900 text-[15px]">Message Received!</h4>
+                <p className="text-[12.5px] text-neutral-500 max-w-[220px]">Thanks for helping make Forgot AI better.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitFeedback} className="space-y-3">
+                <div>
+                  <label className="block text-[12.5px] font-medium text-neutral-700 mb-1.5">
+                    How can I help you?
+                  </label>
+                  <textarea
+                    value={feedbackMessage}
+                    onChange={(e) => setFeedbackMessage(e.target.value)}
+                    placeholder="Found a bug? Have a feature request? Just want to say hi?"
+                    className="w-full h-32 p-3 border border-neutral-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 transition-all text-[13.5px] placeholder:text-neutral-400"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={submittingFeedback || !feedbackMessage.trim()}
+                  className="w-full py-2.5 px-4 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl font-medium text-[13px] flex justify-center items-center gap-2 transition-colors disabled:opacity-50 shadow-xs"
+                >
+                  {submittingFeedback ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      <span>Send directly to founder</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+          </div>
+
+          {/* Social Links Footer */}
+          <div className="pt-4 border-t border-neutral-100 text-center">
+            <p className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider mb-2.5">
+              Or reach me directly
+            </p>
+            <div className="flex justify-center gap-2">
+              {socials.map((s, i) => (
+                <a
+                  key={i}
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`p-2.5 rounded-xl transition-all border border-transparent hover:border-neutral-200 ${s.color}`}
+                  title={s.name}
+                >
+                  <s.icon className="h-4 w-4" />
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 4: CHAT & QUICK SAVE (Main Default Screen) */}
       {currentView === "chat" && (
         <>
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-8 pb-32" ref={scrollRef}>

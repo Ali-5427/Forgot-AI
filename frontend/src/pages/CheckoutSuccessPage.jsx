@@ -31,6 +31,7 @@ export default function CheckoutSuccessPage() {
 
       try {
         localStorage.setItem("forgot_ai_optimistic_billing", JSON.stringify(optimisticPlan));
+        localStorage.setItem("forgot_ai_pro_pass", JSON.stringify(optimisticPlan));
       } catch {}
 
       // Broadcast to extension immediately so it unlocks on the spot

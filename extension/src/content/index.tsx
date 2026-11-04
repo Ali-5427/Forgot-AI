@@ -346,6 +346,10 @@ window.addEventListener("message", (event) => {
     try {
       chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" });
     } catch {}
+  } else if (event.data?.type === "FORGOT_AI_BILLING_SYNC" && event.data?.billing) {
+    try {
+      chrome.storage.local.set({ forgot_ai_pro_pass: event.data.billing });
+    } catch {}
   }
 });
 

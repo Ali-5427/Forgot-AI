@@ -316,31 +316,17 @@ export const api = {
     axios.get(`${API}/billing/status`)
       .then((r) => {
         const data = r.data;
-        if (data && (data.status === "trial" || data.status === "active_pro" || data.status === "lifetime")) {
-          try { localStorage.removeItem("forgot_ai_optimistic_billing"); } catch {}
+        if (data && (data.has_access || data.status === "trial" || data.status === "active_pro" || data.status === "lifetime")) {
+          setProPass(data);
           return data;
         }
-        try {
-          const raw = localStorage.getItem("forgot_ai_optimistic_billing");
-          if (raw) {
-            const opt = JSON.parse(raw);
-            if (opt && opt.status) {
-              return { ...data, ...opt, has_access: true };
-            }
-          }
-        } catch {}
+        const cached = getProPass();
+        if (cached) return { ...data, ...cached };
         return data;
       })
       .catch((err) => {
-        try {
-          const raw = localStorage.getItem("forgot_ai_optimistic_billing");
-          if (raw) {
-            const opt = JSON.parse(raw);
-            if (opt && opt.status) {
-              return { ...opt, has_access: true };
-            }
-          }
-        } catch {}
+        const cached = getProPass();
+        if (cached) return cached;
         throw err;
       }),
   cancelSubscription: () => axios.post(`${API}/billing/cancel`).then((r) => r.data),
@@ -389,3 +375,28 @@ export function formatApiErrorDetail(detail) {
 }
 
 
+
+export function getProPass() {
+  try {
+    const raw = localStorage.getItem("forgot_ai_pro_pass") || localStorage.getItem("forgot_ai_optimistic_billing");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && (parsed.has_access || parsed.status === "trial" || parsed.status === "active_pro" || parsed.status === "lifetime")) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+export function setProPass(pass) {
+  try {
+    if (pass) {
+      localStorage.setItem("forgot_ai_pro_pass", JSON.stringify({ ...pass, cached_at: Date.now() }));
+      // Notify extension if available
+      try {
+        window.postMessage({ type: "FORGOT_AI_BILLING_SYNC", billing: pass }, "*");
+      } catch {}
+    }
+  } catch {}
+}

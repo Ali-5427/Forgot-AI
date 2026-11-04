@@ -1,5 +1,5 @@
 import { CONFIG } from "./config";
-import { getSession, setSession, clearSession } from "./storage";
+import { getSession, setSession, clearSession, getProPass, setProPass } from "./storage";
 
 // Shape returned by POST /api/items/text on the live backend.
 // The real backend returns { id, title, status, ... } — we only need
@@ -232,7 +232,52 @@ export const api = {
 
 
   getGroups: () => request<any[]>("/api/groups", { auth: true }),
-  billingStatus: () => request<{ plan_type: string; status: string; has_access: boolean; current_period_end: string | null }>("/api/billing/status", { auth: true }),
+  billingStatus: async () => {
+    try {
+      const data = await request<{ plan_type: string; status: string; has_access: boolean; current_period_end: string | null }>("/api/billing/status", { auth: true });
+      if (data && data.has_access) {
+        await setProPass(data);
+      }
+      return data;
+    } catch (err) {
+      const cached = await getProPass();
+      if (cached && cached.has_access) {
+        return cached;
+      }
+      throw err;
+    }
+  },
+  submitFeedback: async (message: string) => {
+    let userEmail = "anonymous";
+    try {
+      const res = await request<any>("/api/feedback", {
+        method: "POST",
+        body: JSON.stringify({ message }),
+        auth: true,
+      });
+      userEmail = res?.user_email || "anonymous";
+    } catch {
+      const s = await getSession();
+      if (s?.user?.email) userEmail = s.user.email;
+    }
+
+    try {
+      await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          access_key: "b0e79844-0463-4f1c-bc0e-c6ed8705a776",
+          subject: `New Forgot AI Feedback from ${userEmail} (Extension)`,
+          name: userEmail === "anonymous" ? "Guest User" : "Forgot AI User",
+          email: userEmail === "anonymous" ? "guest@forgot-ai.com" : userEmail,
+          message: message,
+        }),
+      });
+    } catch (e) {
+      console.warn("Web3Forms submit warning:", e);
+    }
+    return { success: true };
+  },
   billingPortal: () => request<{ portal_url: string }>("/api/billing/portal", { method: "POST", auth: true }),
   listItems: (limit = 100) => request<SavedItem[]>(`/api/items?limit=${limit}`, { auth: true }),
   deleteItem: (id: string) => request<any>(`/api/items/${id}`, { method: "DELETE", auth: true }),
