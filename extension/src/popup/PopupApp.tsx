@@ -279,6 +279,7 @@ export default function PopupApp() {
   const [itemFilter, setItemFilter] = useState<"all" | "link" | "text">("all");
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
   const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
+  const [selectedItem, setSelectedItem] = useState<SavedItem | null>(null);
 
   // In-Extension Settings State
   const [dockEnabled, setDockEnabled] = useState(true);
@@ -865,7 +866,7 @@ export default function PopupApp() {
               {/* Navigation Items (Exact structure requested) */}
               <div className="p-3 space-y-1">
                 <button 
-                  onClick={() => { setCurrentView("saved"); setIsMenuOpen(false); }}
+                  onClick={() => { setCurrentView("saved"); setSelectedItem(null); setIsMenuOpen(false); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition-colors text-left"
                 >
                   <Folder className="w-4 h-4 text-neutral-500" />
@@ -1015,16 +1016,22 @@ export default function PopupApp() {
           ) : (
             <div className="flex items-center gap-2">
               <button 
-                onClick={() => setCurrentView("chat")} 
+                onClick={() => {
+                  if (currentView === "saved" && selectedItem) {
+                    setSelectedItem(null);
+                  } else {
+                    setCurrentView("chat");
+                  }
+                }} 
                 className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors flex items-center gap-1 text-[13px] font-medium"
-                title="Back to Chat"
+                title={currentView === "saved" && selectedItem ? "Back to saved list" : "Back to Chat"}
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back</span>
               </button>
               <div className="h-4 w-px bg-neutral-200 mx-1" />
-              <span className="font-bold text-[15px] tracking-tight text-neutral-900">
-                {currentView === "saved" ? "All Saved Notes" :
+              <span className="font-bold text-[15px] tracking-tight text-neutral-900 truncate max-w-[200px]">
+                {currentView === "saved" ? (selectedItem ? "Memory Details" : "All Saved Notes") :
                  currentView === "settings" ? "Settings" :
                  "Feedback & Support"}
               </span>
@@ -1041,19 +1048,173 @@ export default function PopupApp() {
             <SquarePen className="w-5 h-5" />
           </button>
         ) : currentView === "saved" ? (
-          <button 
-            onClick={loadSavedItems} 
-            disabled={loadingItems}
-            className="p-1.5 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors" 
-            title="Refresh saves"
-          >
-            <RefreshCw className={`w-4 h-4 ${loadingItems ? 'animate-spin text-neutral-900' : ''}`} />
-          </button>
+          selectedItem ? (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => handleCopyItem(selectedItem, e)}
+                className="p-1.5 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+                title="Copy link / text"
+              >
+                {copiedItemId === selectedItem.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+              </button>
+              {selectedItem.source_url && (
+                <button
+                  onClick={() => chrome.tabs.create({ url: selectedItem.source_url })}
+                  className="p-1.5 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+                  title="Open URL in new tab"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={async (e) => {
+                  await handleDeleteItem(selectedItem.id, e);
+                  setSelectedItem(null);
+                }}
+                className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Delete memory"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={loadSavedItems} 
+              disabled={loadingItems}
+              className="p-1.5 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors" 
+              title="Refresh saves"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingItems ? 'animate-spin text-neutral-900' : ''}`} />
+            </button>
+          )
         ) : null}
       </div>
 
-      {/* VIEW 1: IN-EXTENSION ALL SAVED NOTES (PREMIUM REDESIGNED CARDS) */}
+      {/* VIEW 1: IN-EXTENSION ALL SAVED NOTES & DETAIL VIEW */}
       {currentView === "saved" && (
+        selectedItem ? (
+          /* FULL DETAIL VIEW FOR SELECTED ITEM */
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+            {/* Metadata Bar */}
+            <div className="flex items-center justify-between text-[11.5px] text-neutral-500 pb-2 border-b border-neutral-100">
+              <div className="flex items-center gap-2 truncate">
+                {selectedItem.source_url ? (
+                  <>
+                    <Globe className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span className="font-semibold text-neutral-800 truncate">
+                      {new URL(selectedItem.source_url.startsWith("http") ? selectedItem.source_url : `https://${selectedItem.source_url}`).hostname.replace(/^www\./, "")}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="font-semibold text-neutral-800">Quick Note</span>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="px-2 py-0.5 bg-neutral-100 rounded-full font-medium text-[11px] uppercase tracking-wide">
+                  {selectedItem.content_type === "url" || selectedItem.source_url ? "Link" : "Note"}
+                </span>
+                <span>{formatTimeAgo(selectedItem.created_at)}</span>
+              </div>
+            </div>
+
+            {/* Full Title */}
+            <div>
+              <h2 className="text-[17px] font-bold text-neutral-900 leading-snug">
+                {selectedItem.title || selectedItem.source_title || (selectedItem.source_url ? selectedItem.source_url : selectedItem.original_content) || "Saved Memory"}
+              </h2>
+            </div>
+
+            {/* Source Link Pill (if URL) */}
+            {selectedItem.source_url && (
+              <div className="p-2.5 bg-neutral-50 border border-neutral-200/80 rounded-xl flex items-center justify-between gap-2">
+                <span className="text-[12px] font-mono text-neutral-600 truncate">
+                  {selectedItem.source_url}
+                </span>
+                <button
+                  onClick={() => chrome.tabs.create({ url: selectedItem.source_url })}
+                  className="px-2.5 py-1 bg-white hover:bg-neutral-100 text-neutral-800 rounded-lg text-[11.5px] font-medium border border-neutral-200/80 flex items-center gap-1 shrink-0 transition-colors shadow-2xs"
+                >
+                  <span>Open URL</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {/* User Note (if user added one) */}
+            {selectedItem.user_note && (
+              <div className="p-3.5 bg-amber-50/70 border-l-4 border-amber-400 rounded-r-2xl space-y-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-800">
+                  Your Note
+                </div>
+                <div className="text-[13px] text-amber-950 font-normal leading-relaxed whitespace-pre-wrap">
+                  {selectedItem.user_note}
+                </div>
+              </div>
+            )}
+
+            {/* AI Summary (if available) */}
+            {selectedItem.summary && (
+              <div className="p-3.5 bg-gradient-to-br from-indigo-50/60 to-purple-50/40 border border-indigo-100 rounded-2xl space-y-1.5 shadow-2xs">
+                <div className="flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-indigo-700">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  AI Summary & Insights
+                </div>
+                <div className="text-[13px] text-neutral-800 leading-relaxed whitespace-pre-wrap font-normal">
+                  {selectedItem.summary}
+                </div>
+              </div>
+            )}
+
+            {/* Full Captured Content / Note Body */}
+            {(selectedItem.original_content || selectedItem.text) && (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-semibold text-neutral-700">
+                    {selectedItem.content_type === "url" ? "Captured Text / Highlights" : "Note Content"}
+                  </span>
+                  <button
+                    onClick={(e) => handleCopyItem(selectedItem, e)}
+                    className="text-[11px] font-medium text-neutral-500 hover:text-neutral-800 flex items-center gap-1"
+                  >
+                    {copiedItemId === selectedItem.id ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-600" />
+                        <span className="text-emerald-600 font-semibold">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copy Content</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="p-3.5 bg-neutral-50 border border-neutral-200/80 rounded-2xl text-[13px] text-neutral-800 leading-relaxed whitespace-pre-wrap max-h-[220px] overflow-y-auto select-text font-normal">
+                  {selectedItem.original_content || selectedItem.text}
+                </div>
+              </div>
+            )}
+
+            {/* "Ask AI About This Memory" Button */}
+            <div className="pt-2">
+              <button
+                onClick={() => {
+                  const query = `What is this memory about? ${selectedItem.title || selectedItem.source_title || selectedItem.source_url || ""}`;
+                  setChatQuery(query);
+                  setCurrentView("chat");
+                  setSelectedItem(null);
+                }}
+                className="w-full py-3 px-4 bg-neutral-900 hover:bg-neutral-800 text-white rounded-2xl font-medium text-[13px] flex items-center justify-center gap-2 shadow-xs transition-colors"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Ask AI about this memory</span>
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="flex-1 flex flex-col overflow-hidden bg-neutral-50/50">
           {/* Search & Filter Header */}
           <div className="p-3 bg-white border-b border-neutral-200/80 space-y-2">
@@ -1126,7 +1287,8 @@ export default function PopupApp() {
                 return (
                   <div 
                     key={item.id} 
-                    className="p-3.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all space-y-2.5 group"
+                    onClick={() => setSelectedItem(item)}
+                    className="p-3.5 bg-white border border-neutral-200/90 hover:border-neutral-400 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all space-y-2.5 group cursor-pointer"
                   >
                     {/* Header: Real Favicon + Domain name + Category Pill + Relative Time */}
                     <div className="flex items-center justify-between text-[11px] text-neutral-400">
@@ -1227,6 +1389,7 @@ export default function PopupApp() {
             )}
           </div>
         </div>
+        )
       )}
 
       {/* VIEW 2: IN-EXTENSION SETTINGS */}
