@@ -27,6 +27,24 @@ def _apply_filter(query, key: str, value: Any):
             return query.in_(key, value["$in"])
         if "in" in value:
             return query.in_(key, value["in"])
+        
+        # Support comparison operators across the entire application
+        has_comparison = False
+        if "$gte" in value:
+            query = query.gte(key, value["$gte"])
+            has_comparison = True
+        if "$gt" in value:
+            query = query.gt(key, value["$gt"])
+            has_comparison = True
+        if "$lte" in value:
+            query = query.lte(key, value["$lte"])
+            has_comparison = True
+        if "$lt" in value:
+            query = query.lt(key, value["$lt"])
+            has_comparison = True
+        if has_comparison:
+            return query
+
     if value is None:
         return query.is_(key, "null")
     return query.eq(key, value)

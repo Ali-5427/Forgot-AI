@@ -14,6 +14,7 @@ from agent_tools import (
     tool_get_recent_memories,
     clean_item_for_agent
 )
+from agent_sanitizer import sanitize_agent_text, StreamSanitizer
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +23,16 @@ def build_agent_system_prompt(today: datetime, active_memories: Optional[List[di
     today_str = today.strftime("%Y-%m-%d (%A)")
     
     prompt = (
-        f"You are Forgot AI, an intelligent, personal memory assistant. Today's date is {today_str} (UTC).\n\n"
+        f"You are Forgot AI, a warm, intelligent personal memory assistant. Today's date is {today_str} (UTC).\n\n"
         "YOUR ROLE:\n"
         "You help users recall, search, summarize, and understand what they have saved across web pages, articles, screenshots, and text notes.\n\n"
-        "AVAILABLE TOOLS:\n"
-        "You have access to 4 deterministic tools:\n"
-        "1. `search_by_time_range(start_date, end_date)`: Use when the user asks about time (e.g. 'this week', 'today', 'yesterday', 'past 7 days', 'last month', 'September 2026'). ALWAYS compute accurate start and end ISO dates based on today's date ({today_str})!\n"
-        "2. `semantic_hybrid_search(query)`: Use when searching for topics, concepts, vague recollections ('a book like a vip or something'), meetings, people, or keywords.\n"
-        "3. `inspect_memory(item_id, url_or_title)`: Use when the user asks for deep details on an item ('explain the 2nd one', 'what date was it?'), or pastes a link/summary (e.g. 'ownerbook.com').\n"
-        "4. `get_recent_memories(limit)`: Use when user asks for recent saves, or as a helpful fallback.\n\n"
-        "CRITICAL RULES:\n"
-        "- CASUAL CONVERSATION: If the user says 'hi', 'how are you', 'thanks', etc., reply warmly, naturally, and concisely WITHOUT calling any tools.\n"
-        "- MULTI-TURN MEMORY: If the user refers to something previously discussed (e.g. 'that second one', 'tell me more about the VIP ticket'), inspect or reference that specific memory directly.\n"
-        "- CITATIONS & LINKS: When mentioning saved items with URLs, format them as clickable Markdown links: [Title](URL). If an item has NO URL (URL is null or note/image), format as bold text: **Title** (Note/Image).\n"
-        "- ANTI-GASLIGHTING: NEVER claim an item does not exist if it was cited earlier in conversation or returned by your tools. If a tool returns results, explain them accurately."
+        "CONVERSATIONAL STYLE & BEHAVIOR:\n"
+        "- Speak naturally, concisely, and warmly as a knowledgeable human companion.\n"
+        "- SILENT TOOLS: Your internal tools and database mechanics are strictly silent and invisible. Never mention tool names, function signatures (such as inspect_memory or search_by_time_range), or technical query operations in your responses. Talk like a human helper, not an API.\n"
+        "- CASUAL CONVERSATION: If the user says 'hi', 'how are you', 'thanks', etc., reply warmly and concisely without executing any tools.\n"
+        "- CITATIONS & LINKS: When mentioning saved items that have URLs, format them as clickable Markdown links: [Title](URL). If an item has NO URL (note or screenshot), format as bold text: **Title** (Note/Image).\n"
+        "- MULTI-TURN MEMORY: If the user refers to something previously discussed (e.g. 'that second one', 'tell me more about the VIP ticket'), reference or look into that specific item seamlessly.\n"
+        "- ANTI-GASLIGHTING: NEVER claim an item does not exist if it was cited earlier in conversation or returned by your tools. If tools return items, present them clearly and accurately."
     )
 
     if active_memories:
@@ -150,58 +147,75 @@ async def run_agent_stream(
             if it.get("id"):
                 cited_ids.add(str(it["id"]))
 
-    # Step 2: Execute tools if requested
-    if tool_calls:
-        # Append assistant tool call message
+    # Step 2A: If no tools were called, stream direct conversational answer immediately
+    if not tool_calls:
+        clean_direct = sanitize_agent_text(direct_content)
+        if clean_direct:
+            words = clean_direct.split(" ")
+            for i, word in enumerate(words):
+                chunk = word if i == len(words) - 1 else word + " "
+                yield {"type": "token", "text": chunk}
+                await asyncio.sleep(0.008)
+
+            yield {
+                "type": "final",
+                "answer": clean_direct,
+                "results": list(active_memory_docs or []),
+                "context_ids": list(cited_ids)
+            }
+            return
+
+    # Step 2B: Execute tools if requested
+    # Append assistant tool call message
+    messages.append({
+        "role": "assistant",
+        "content": direct_content or None,
+        "tool_calls": tool_calls
+    })
+
+    for tc in tool_calls:
+        fn_name = tc.get("function", {}).get("name", "")
+        raw_args = tc.get("function", {}).get("arguments", "{}")
+        try:
+            fn_args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+        except Exception:
+            fn_args = {}
+
+        yield {"type": "tool_start", "name": fn_name, "args": fn_args}
+
+        tool_result = await execute_agent_tool(fn_name, fn_args, db, lib, retrieve_func)
+
+        # Collect items from tool result
+        if isinstance(tool_result, dict):
+            items = tool_result.get("items") or []
+            single_item = tool_result.get("item")
+            if single_item:
+                items.append(single_item)
+            for itm in items:
+                if itm.get("id"):
+                    cited_ids.add(str(itm["id"]))
+                    cited_items.append(itm)
+
         messages.append({
-            "role": "assistant",
-            "content": direct_content or None,
-            "tool_calls": tool_calls
+            "role": "tool",
+            "tool_call_id": tc.get("id", ""),
+            "name": fn_name,
+            "content": json.dumps(tool_result)
         })
 
-        for tc in tool_calls:
-            fn_name = tc.get("function", {}).get("name", "")
-            raw_args = tc.get("function", {}).get("arguments", "{}")
-            try:
-                fn_args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-            except Exception:
-                fn_args = {}
-
-            yield {"type": "tool_start", "name": fn_name, "args": fn_args}
-
-            tool_result = await execute_agent_tool(fn_name, fn_args, db, lib, retrieve_func)
-
-            # Collect items from tool result
-            if isinstance(tool_result, dict):
-                items = tool_result.get("items") or []
-                single_item = tool_result.get("item")
-                if single_item:
-                    items.append(single_item)
-                for itm in items:
-                    if itm.get("id"):
-                        cited_ids.add(str(itm["id"]))
-                        cited_items.append(itm)
-
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.get("id", ""),
-                "name": fn_name,
-                "content": json.dumps(tool_result)
-            })
-
-    # Step 3: Stream the final answer (either direct or after tool execution)
+    # Step 3: Stream the final synthesized answer with the Zero-Leak Sanitizer
     step2_payload = {
         "model": model,
         "messages": messages,
         "stream": True
     }
 
+    sanitizer = StreamSanitizer()
     full_answer_chunks = []
     try:
         async with await get_httpx_client() as client:
             async with client.stream("POST", url, headers=headers, json=step2_payload) as resp:
                 resp.raise_for_status()
-                inside_think = False
                 async for line in resp.aiter_lines():
                     if not line or not line.startswith("data: "):
                         continue
@@ -213,30 +227,27 @@ async def run_agent_stream(
                         delta = chunk_json["choices"][0].get("delta", {})
                         text_delta = delta.get("content", "")
                         
-                        # Handle thinking tags if model outputs them
-                        if "<think>" in text_delta:
-                            inside_think = True
-                        if "</think>" in text_delta:
-                            inside_think = False
-                            continue
-                        if inside_think:
-                            continue
-
                         if text_delta:
-                            full_answer_chunks.append(text_delta)
-                            yield {"type": "token", "text": text_delta}
+                            clean_chunk = sanitizer.push(text_delta)
+                            if clean_chunk:
+                                full_answer_chunks.append(clean_chunk)
+                                yield {"type": "token", "text": clean_chunk}
                     except Exception:
                         continue
+                
+                # Flush any remaining buffer in sanitizer
+                flushed = sanitizer.flush()
+                if flushed:
+                    full_answer_chunks.append(flushed)
+                    yield {"type": "token", "text": flushed}
     except Exception as e:
         logger.error(f"Agent streaming synthesis failed: {e}")
         # Fallback to direct content if streaming choked
-        if direct_content and not full_answer_chunks:
-            full_answer_chunks.append(direct_content)
-            yield {"type": "token", "text": direct_content}
-        else:
-            yield {"type": "token", "text": " (An error occurred while streaming response.)"}
+        fallback_text = sanitize_agent_text(direct_content) if direct_content else "I encountered an issue processing that. Could you try asking again?"
+        full_answer_chunks.append(fallback_text)
+        yield {"type": "token", "text": fallback_text}
 
-    final_answer = "".join(full_answer_chunks)
+    final_answer = sanitize_agent_text("".join(full_answer_chunks))
 
     # Clean cited items (deduplicated)
     seen = set()

@@ -114,28 +114,19 @@ def clean_item_for_agent(doc: dict) -> dict:
 
 
 async def tool_search_by_time_range(db, lib: str, start_date: str, end_date: str, description_hint: str = "") -> dict:
-    """Deterministic timestamp filter against database created_at."""
+    """Deterministic timestamp filter against database created_at using clean PostgREST syntax."""
     try:
-        # Standardize dates
-        # Try Supabase RPC or direct table query first
-        res = db.supabase.table("items").select("*") \
+        query = db.supabase.table("items").select("*") \
             .eq("library_id", lib) \
-            .eq("status", "ready") \
-            .gte("created_at", start_date) \
-            .lte("created_at", end_date) \
-            .order("created_at", desc=True) \
-            .limit(20) \
-            .execute()
-        
+            .eq("status", "ready")
+
+        if start_date:
+            query = query.gte("created_at", start_date)
+        if end_date:
+            query = query.lte("created_at", end_date)
+
+        res = query.order("created_at", desc=True).limit(20).execute()
         items = res.data or []
-        if not items:
-            # Fallback to local mongo/supabase wrapper
-            cursor_items = await db.items.find({
-                "library_id": lib,
-                "status": "ready",
-                "created_at": {"$gte": start_date, "$lte": end_date}
-            }).sort("created_at", -1).to_list(20)
-            items = cursor_items or []
 
         cleaned = [clean_item_for_agent(i) for i in items]
         return {
