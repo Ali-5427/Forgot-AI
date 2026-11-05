@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
 from supabase_db import SupabaseDatabase, create_supabase_client
 from supabase import create_client as make_supabase_client
 from ai_provider import embed_texts, llm_chat, llm_chat_stream
+from agent_engine import run_agent_stream
 from billing import (
     CheckoutIn,
     SupabaseBillingStore,
@@ -1646,94 +1647,26 @@ async def chat(payload: ChatIn, lib: str = Depends(resolve_library)):
     q = payload.query.strip()
     if not q:
         return {"answer": "Ask me anything about what you've saved, or just say hi!", "results": []}
-    
-    # Rolling Context Merger
-    results = []
-    seen_ids = set()
-    
-    # 1. Fresh search
-    search_results, _ = await retrieve(q, lib, limit=8)
-    for r in search_results:
-        if r["id"] not in seen_ids:
-            results.append(r)
-            seen_ids.add(r["id"])
-            
-    # 2. Add past context if provided
+
+    active_docs = []
     if payload.context_item_ids:
-        past_docs = await db.items.find({"id": {"$in": payload.context_item_ids}, "library_id": lib, "status": "ready"}).to_list(None)
-        for d in past_docs:
-            if d["id"] not in seen_ids:
-                results.append(clean(d))
-                seen_ids.add(d["id"])
-                
-    # 3. Cap at 8 items max to prevent prompt bloat
-    results = results[:8]
-    
-    import json
-    ctx_parts = []
-    if results:
-        for r in results:
-            clean_doc = {
-                "item_type": r.get('content_type', 'unknown'),
-                "title": r.get('title'),
-                "category": r.get('category'),
-                "source_url": r.get('source_url'),
-                "keywords": r.get('keywords', []),
-                "ai_summary": r.get('summary'),
-                "user_original_note": r.get('user_note'),
-                "assistant_rephrased_reason": r.get('why_saved'),
-                "full_content_text": r.get('extracted_text') or r.get('original_text') or ''
-            }
-            ctx_parts.append(json.dumps(clean_doc, indent=2))
-        memory_context = "SAVED MEMORIES (JSON format):\n[\n" + ",\n".join(ctx_parts) + "\n]"
-    else:
-        memory_context = "SAVED MEMORIES:\n[] (Empty - no relevant memories found)"
-
-    system = (
-        "You are Forgot AI, a highly intelligent, friendly, and conversational personal assistant. "
-        "CRITICAL RULES:\n"
-        "1. The JSON block below is REFERENCE DATA only. Use it to answer the user's prompt.\n"
-        "2. CONVERSATIONAL FLOW: Do NOT restate 'You saved a note about X' or summarize the entire memory on every turn. If the user is asking a follow-up question, just answer their specific question directly and concisely. Talk like a human friend.\n"
-        "3. NEVER reply as JSON, schema field tables, or key-value dumps of the memory structure.\n"
-        "4. If the user is asking about THEIR saved items, use ONLY the SAVED MEMORIES below. If none match, say you couldn't find it.\n"
-        "5. If they're asking general questions or chitchat, answer normally without needing memories.\n\n"
-        + memory_context
-    )
-    
-    async def _safe_llm_stream():
         try:
-            async for chunk in llm_stream(system, q, history=payload.history):
-                yield chunk
-        except Exception as e:
-            logger.error(f"LLM stream failed: {e}")
-            yield b" (Sorry, I'm having trouble connecting to my brain right now, but here are your search results!)"
+            items_res = await db.items.find({"id": {"$in": payload.context_item_ids}, "library_id": lib, "status": "ready"}).to_list(10)
+            active_docs = items_res or []
+        except Exception:
+            active_docs = []
 
-    if payload.stream:
-        headers = {
-            "X-Accel-Buffering": "no",
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive"
-        }
-        if results:
-            headers["X-Context-Ids"] = ",".join(str(r["id"]) for r in results)
-            
-        return StreamingResponse(
-            _safe_llm_stream(),
-            media_type="application/octet-stream",
-            headers=headers
-        )
-        
-    # Non-streaming with retry
-    for attempt in range(2):
-        try:
-            answer = await llm_text(system, q, history=payload.history, json_format=False)
-            break
-        except Exception as e:
-            logger.error(f"LLM text failed (attempt {attempt+1}): {e}")
-            if attempt == 1:
-                answer = "Sorry, I couldn't process that right now, but I've attached your relevant search results below if any were found!"
-    
-    return {"answer": answer, "results": results, "query": q}
+    final_payload = {}
+    async for event in run_agent_stream(q, payload.history or [], db, lib, retrieve, active_docs):
+        if event.get("type") == "final":
+            final_payload = event
+
+    return {
+        "answer": final_payload.get("answer", ""),
+        "results": final_payload.get("results", []),
+        "context_ids": final_payload.get("context_ids", []),
+        "query": q
+    }
 
 
 @api_router.get("/files/{path:path}")
@@ -1784,6 +1717,7 @@ async def startup():
 # =====================================================================
 
 from ai_provider import embed_texts, llm_chat, llm_chat_stream
+from agent_engine import run_agent_stream
 
 class ConversationCreate(BaseModel):
     title: Optional[str] = None
@@ -2122,62 +2056,126 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
 
 @api_router.post("/chat/v2")
 async def chat_v2(payload: ChatV2In, lib: str = Depends(resolve_library)):
-    conv_id, system_prompt, llm_history, final_ids, context_items, is_new = await _process_chat_v2_internal(payload, lib)
-    
+    user_id = lib
+    conv_id = payload.conversation_id
+    if not conv_id:
+        c_res = db.supabase.table("conversations").insert({"user_id": user_id, "title": payload.query[:40]}).execute()
+        conv_id = c_res.data[0]["id"]
+        messages = []
+    else:
+        c_res = db.supabase.table("conversations").select("id").eq("id", conv_id).eq("user_id", user_id).execute()
+        if not c_res.data:
+            raise HTTPException(404, "Conversation not found")
+        m_res = db.supabase.table("messages").select("*").eq("conversation_id", conv_id).order("created_at", desc=True).limit(12).execute()
+        messages = list(reversed(m_res.data))
+
+    session_cited_ids = []
+    if payload.context_item_ids:
+        for cid in payload.context_item_ids:
+            if cid and cid not in session_cited_ids:
+                session_cited_ids.append(cid)
+
+    for m in messages:
+        if m.get("role") == "assistant" and m.get("cited_item_ids"):
+            for cid in m["cited_item_ids"]:
+                if cid and cid not in session_cited_ids:
+                    session_cited_ids.append(cid)
+
+    active_docs = []
+    if session_cited_ids:
+        try:
+            items_res = db.supabase.table("items").select("*").in_("id", session_cited_ids).eq("library_id", lib).execute()
+            active_docs = items_res.data or []
+        except Exception as e:
+            logger.error(f"Failed to fetch session items: {e}")
+
     db.supabase.table("messages").insert({"conversation_id": conv_id, "role": "user", "content": payload.query}).execute()
-    
-    answer = await llm_chat(system_prompt, llm_history)
-    
+    history = [{"role": m["role"], "content": m["content"]} for m in messages]
+
+    final_payload = {}
+    async for event in run_agent_stream(payload.query, history, db, lib, retrieve, active_docs):
+        if event.get("type") == "final":
+            final_payload = event
+
+    answer = final_payload.get("answer", "")
+    cited_ids = final_payload.get("context_ids", [])
+    cited_results = final_payload.get("results", [])
+
     db.supabase.table("messages").insert({
         "conversation_id": conv_id,
         "role": "assistant",
         "content": answer,
-        "cited_item_ids": final_ids
+        "cited_item_ids": cited_ids
     }).execute()
-    
     db.supabase.table("conversations").update({"updated_at": "now()"}).eq("id", conv_id).execute()
-    
+
     return {
         "conversation_id": conv_id,
         "answer": answer,
-        "results": [clean(i) for i in context_items],
-        "context_ids": final_ids
+        "results": cited_results,
+        "context_ids": cited_ids
     }
 
 @api_router.post("/chat/v2/stream")
 async def chat_v2_stream(payload: ChatV2In, lib: str = Depends(resolve_library)):
-    conv_id, system_prompt, llm_history, final_ids, context_items, is_new = await _process_chat_v2_internal(payload, lib)
-    
-    db.supabase.table("messages").insert({"conversation_id": conv_id, "role": "user", "content": payload.query}).execute()
-    
-    async def event_generator():
-        answer_chunks = []
+    user_id = lib
+    conv_id = payload.conversation_id
+    if not conv_id:
+        c_res = db.supabase.table("conversations").insert({"user_id": user_id, "title": payload.query[:40]}).execute()
+        conv_id = c_res.data[0]["id"]
+        messages = []
+    else:
+        c_res = db.supabase.table("conversations").select("id").eq("id", conv_id).eq("user_id", user_id).execute()
+        if not c_res.data:
+            raise HTTPException(404, "Conversation not found")
+        m_res = db.supabase.table("messages").select("*").eq("conversation_id", conv_id).order("created_at", desc=True).limit(12).execute()
+        messages = list(reversed(m_res.data))
+
+    session_cited_ids = []
+    if payload.context_item_ids:
+        for cid in payload.context_item_ids:
+            if cid and cid not in session_cited_ids:
+                session_cited_ids.append(cid)
+
+    for m in messages:
+        if m.get("role") == "assistant" and m.get("cited_item_ids"):
+            for cid in m["cited_item_ids"]:
+                if cid and cid not in session_cited_ids:
+                    session_cited_ids.append(cid)
+
+    active_docs = []
+    if session_cited_ids:
         try:
-            async for chunk in llm_chat_stream(system_prompt, llm_history):
-                answer_chunks.append(chunk)
-                yield f"data: {json.dumps({'type': 'token', 'text': chunk})}\n\n"
+            items_res = db.supabase.table("items").select("*").in_("id", session_cited_ids).eq("library_id", lib).execute()
+            active_docs = items_res.data or []
         except Exception as e:
-            logger.error(f"Stream error: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'text': 'Stream interrupted.'})}\n\n"
-            
-        final_answer = "".join(answer_chunks)
-        
-        db.supabase.table("messages").insert({
-            "conversation_id": conv_id,
-            "role": "assistant",
-            "content": final_answer,
-            "cited_item_ids": final_ids
-        }).execute()
-        
-        db.supabase.table("conversations").update({"updated_at": "now()"}).eq("id", conv_id).execute()
-        
-        final_payload = {
-            "type": "final",
-            "conversation_id": conv_id,
-            "results": [clean(i) for i in context_items],
-            "context_ids": final_ids
-        }
-        yield f"data: {json.dumps(final_payload)}\n\n"
+            logger.error(f"Failed to fetch session items: {e}")
+
+    db.supabase.table("messages").insert({"conversation_id": conv_id, "role": "user", "content": payload.query}).execute()
+    history = [{"role": m["role"], "content": m["content"]} for m in messages]
+
+    async def event_generator():
+        final_payload = {}
+        try:
+            async for event in run_agent_stream(payload.query, history, db, lib, retrieve, active_docs):
+                if event.get("type") == "token":
+                    yield f"data: {json.dumps({'type': 'token', 'text': event['text']})}\n\n"
+                elif event.get("type") == "final":
+                    final_payload = event
+                    db.supabase.table("messages").insert({
+                        "conversation_id": conv_id,
+                        "role": "assistant",
+                        "content": final_payload.get("answer", ""),
+                        "cited_item_ids": final_payload.get("context_ids", [])
+                    }).execute()
+                    db.supabase.table("conversations").update({"updated_at": "now()"}).eq("id", conv_id).execute()
+
+                    yield f"data: {json.dumps({'type': 'final', 'conversation_id': conv_id, 'results': final_payload.get('results', []), 'context_ids': final_payload.get('context_ids', [])})}\n\n"
+        except Exception as e:
+            logger.error(f"Agent event stream error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'text': 'Agent stream interrupted.'})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
         
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

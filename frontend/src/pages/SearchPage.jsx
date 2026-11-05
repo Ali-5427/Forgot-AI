@@ -23,6 +23,7 @@ export default function SearchPage() {
   const [q, setQ] = useState(() => params.get("q") || "");
   const [answer, setAnswer] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiResults, setAiResults] = useState(null);
   const [submittedQuery, setSubmittedQuery] = useState(() => params.get("q") || "");
 
   // 0ms In-Memory Instant Keystroke Filter
@@ -30,6 +31,15 @@ export default function SearchPage() {
     if (!q.trim()) return [];
     return filterAndRankItems(items, q);
   }, [items, q]);
+
+  // Combined Results: Show Agent's retrieved tools results when available, else 0ms instant keystroke results
+  const displayedResults = useMemo(() => {
+    if (!q.trim()) return [];
+    if (aiResults !== null && submittedQuery === q.trim()) {
+      return aiResults;
+    }
+    return instantResults;
+  }, [q, aiResults, submittedQuery, instantResults]);
 
   // Execute AI explanation for questions / full sentences on Enter
   const runAiQuery = useCallback(async (query) => {
@@ -44,6 +54,9 @@ export default function SearchPage() {
       const topContextIds = filterAndRankItems(items, trimmed).slice(0, 8).map((i) => i.id);
       const res = await api.chat(trimmed, [], topContextIds);
       setAnswer(res.answer || "");
+      if (Array.isArray(res.results) && res.results.length > 0) {
+        setAiResults(res.results);
+      }
     } catch (err) {
       console.error("AI answer error:", err);
     } finally {
@@ -65,11 +78,13 @@ export default function SearchPage() {
   const handleQueryChange = (val) => {
     setQ(val);
     if (answer) setAnswer("");
+    if (aiResults) setAiResults(null);
   };
 
   const handleClear = () => {
     setQ("");
     setAnswer("");
+    setAiResults(null);
     setSubmittedQuery("");
     setParams({});
   };
@@ -189,14 +204,14 @@ export default function SearchPage() {
         )}
 
         {/* Section Header for Cards when AI answer is present */}
-        {answer && instantResults.length > 0 && (
+        {answer && displayedResults.length > 0 && (
           <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3 pl-1">
-            Related Memories ({instantResults.length})
+            Related Memories ({displayedResults.length})
           </p>
         )}
 
         {/* Empty State */}
-        {hasQuery && instantResults.length === 0 && !aiLoading && (
+        {hasQuery && displayedResults.length === 0 && !aiLoading && (
           <div className="text-center py-16 bg-neutral-50/50 rounded-2xl border border-dashed border-neutral-200">
             <SearchIcon className="h-10 w-10 mx-auto text-neutral-300 mb-3" />
             <p className="text-[15px] font-semibold text-neutral-700" data-testid="search-empty">
@@ -208,10 +223,10 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Instant Memory Cards (0ms Keystroke) */}
-        {instantResults.length > 0 && (
+        {/* Instant Memory Cards (0ms Keystroke or Agent Tools) */}
+        {displayedResults.length > 0 && (
           <div className="space-y-4" data-testid="search-results">
-            {instantResults.map((item) => (
+            {displayedResults.map((item) => (
               <div key={item.id} className="animate-in fade-in duration-200">
                 <ItemCard item={item} onClick={openItem} onPin={togglePin} />
               </div>
