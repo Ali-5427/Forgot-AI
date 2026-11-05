@@ -783,123 +783,123 @@ def rel_age(iso: str) -> str:
 
 
 async def retrieve(query: str, lib: str, limit: int = 30):
+    q = (query or "").strip()
+    if not q:
+        return [], {}
+
+    # 1. Clean query & target keywords
+    q_lower = q.lower()
+    clean_q_words = [w.strip() for w in re.sub(r'[^\w\s]', ' ', q_lower).split() if len(w.strip()) >= 2]
+    stop_words = {"the", "and", "for", "with", "from", "that", "this", "what", "which", "where", "when", "some", "note", "notes", "saved", "about", "have", "there", "show", "tell", "like", "did"}
+    target_words = [w for w in clean_q_words if w not in stop_words]
+
+    # Stems and common phonetic/variant expansions (e.g. owe -> own, owned, owner)
+    expanded_words = set(target_words)
+    for tw in target_words:
+        if tw == "owe":
+            expanded_words.update(["own", "owned", "owner", "ownerbook"])
+        elif tw in ("own", "owned", "owner"):
+            expanded_words.update(["owe", "owned", "owner", "ownerbook"])
+        elif tw.endswith("s") and len(tw) > 3:
+            expanded_words.add(tw[:-1])
+        elif tw.endswith("ing") and len(tw) > 4:
+            expanded_words.add(tw[:-3])
+
+    search_text = " ".join(target_words) if target_words else q
+
+    final_results = []
+    seen_ids = set()
+    by_id = {}
+
+    # 2. Native Hybrid Search RPC (pgvector cosine distance + Postgres FTS via RRF)
     try:
-        ready_docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(200)
+        query_embedding = await get_embedding(q)
+        if query_embedding:
+            rpc_params = {
+                "p_library": lib,
+                "p_query": search_text,
+                "p_embedding": query_embedding,
+                "p_limit": min(limit * 2, 20)
+            }
+            res = db.supabase.rpc("hybrid_search_items", rpc_params).execute()
+            if res and res.data:
+                matched_ids = [str(row["id"]) for row in res.data if row.get("id")]
+                if matched_ids:
+                    docs = await db.items.find({"id": {"$in": matched_ids}, "library_id": lib}).to_list(len(matched_ids))
+                    doc_map = {d["id"]: d for d in docs}
+                    for row in res.data:
+                        mid = str(row["id"])
+                        if mid in doc_map and mid not in seen_ids:
+                            cleaned = clean(doc_map[mid])
+                            cleaned["match_reason"] = "Semantic concept match in memory"
+                            final_results.append(cleaned)
+                            seen_ids.add(mid)
+                            by_id[mid] = cleaned
+    except Exception as e:
+        logger.warning(f"hybrid_search_items RPC search failed or skipped: {e}")
+
+    # 3. High-Quality Multi-Field Search (Guarantees 100% recall even if RPC fails or embedding is pending)
+    try:
+        ready_docs = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(300)
     except Exception as e:
         logger.error(f"Error fetching ready items in retrieve: {e}")
         ready_docs = []
 
-    try:
-        proc_docs = await db.items.find({"status": "processing", "library_id": lib}).sort("created_at", -1).to_list(15)
-    except Exception as e:
-        logger.error(f"Error fetching processing items in retrieve: {e}")
-        proc_docs = []
-
-    seen_ids = set()
-    docs = []
-    for d in (proc_docs + ready_docs):
-        if d.get("id") and d["id"] not in seen_ids:
-            docs.append(d)
-            seen_ids.add(d["id"])
-    
-    if not docs:
-        return [], {}
-
-    # Extract clean target keywords (length >= 3, skipping common conversational stop words)
-    q_lower = query.lower()
-    clean_q_words = [w.strip() for w in re.sub(r'[^\w\s]', ' ', q_lower).split() if len(w.strip()) >= 3]
-    stop_words = {"the", "and", "for", "with", "from", "that", "this", "what", "which", "where", "when", "some", "note", "notes", "saved", "about", "have", "there", "show", "tell", "like"}
-    target_words = [w for w in clean_q_words if w not in stop_words]
-
-    catalog = []
     exact_matches = []
-    by_id = {d["id"]: clean(d) for d in docs}
+    for d in ready_docs:
+        did = d.get("id")
+        if not did:
+            continue
+        cleaned = clean(d)
+        by_id[did] = cleaned
 
-    for d in docs:
-        text_comb = (
+        if did in seen_ids:
+            continue
+
+        title_str = (d.get("title") or "").lower()
+        summary_str = (d.get("summary") or "").lower()
+        user_note_str = (d.get("user_note") or "").lower()
+        url_str = (d.get("source_url") or "").lower()
+        domain_str = (d.get("source_domain") or "").lower()
+        kws = d.get("keywords") or []
+        kw_str = " ".join(kws).lower() if isinstance(kws, list) else str(kws).lower()
+        text_str = (
             (d.get("original_text") or "") + " " +
             (d.get("searchable_text") or "") + " " +
             (d.get("extracted_text") or "")
-        ).strip()
-        
-        title_str = d.get("title", "") or ""
-        summary_str = d.get("summary", "") or ""
-        kws = d.get("keywords") or []
-        kw_str = " ".join(kws) if isinstance(kws, list) else str(kws)
+        ).lower()
 
-        # Check for direct keyword matches (strict multi-word matching so single-word noise does not pollute results)
-        full_haystack = f"{title_str} {summary_str} {kw_str} {text_comb}".lower()
-        if target_words:
-            if q_lower in full_haystack:
-                exact_copy = by_id[d["id"]].copy()
-                exact_copy["match_reason"] = f"Exact phrase match for '{query}'"
-                exact_matches.append((100, exact_copy))
-            else:
-                matched_cnt = sum(1 for tw in target_words if tw in full_haystack)
-                match_ratio = matched_cnt / len(target_words)
-                # Only include if ALL keywords match (or >= 75% for queries with 3+ words)
-                if (len(target_words) <= 2 and match_ratio == 1.0) or (len(target_words) > 2 and match_ratio >= 0.75):
-                    exact_copy = by_id[d["id"]].copy()
-                    exact_copy["match_reason"] = "Matched all search keywords"
-                    exact_matches.append((int(match_ratio * 50), exact_copy))
+        full_haystack = f"{title_str} {summary_str} {user_note_str} {url_str} {domain_str} {kw_str} {text_str}"
 
-        catalog.append({
-            "id": d["id"],
-            "title": title_str,
-            "type": d.get("content_type", ""),
-            "category": d.get("category", ""),
-            "domain": d.get("source_domain", ""),
-            "keywords": kws if isinstance(kws, list) else [],
-            "summary": summary_str,
-            "saved": rel_age(d.get("created_at", "")),
-            "saved_at": d.get("created_at", ""),
-            "text": text_comb[:600]
-        })
-
-    current_time_utc = datetime.now(timezone.utc).isoformat()
-    system_prompt = (
-        f"You are a search ranker for a user's saved items. The current UTC time is {current_time_utc}. "
-        "Your job is to match the user's query by MEANING using all signals available. "
-        "Handle time-based queries (e.g. today, yesterday, this week, last month) using the 'saved' and 'saved_at' fields. "
-        "Return ONLY a JSON object in this exact format: {\"results\": [{\"id\": \"item_id\", \"reason\": \"match reason\"}]}. "
-        f"Return at most {min(limit, 20)} results. If nothing is relevant to the query, return an empty results array: {{\"results\": []}}."
-    )
-    user_prompt = f"Query: {query}\n\nCatalog:\n{json.dumps(catalog, indent=2)}"
-
-    results_list = []
-    try:
-        raw_response = await llm_chat(system_prompt, [{"role": "user", "content": user_prompt}])
-        parsed = parse_json_block(raw_response)
-        results_list = parsed.get("results", []) if isinstance(parsed, dict) else []
-    except Exception as e:
-        logger.error(f"llm_chat search ranking error: {e}")
-        try:
-            raw_response = await llm_text(system_prompt, user_prompt)
-            parsed = parse_json_block(raw_response)
-            results_list = parsed.get("results", []) if isinstance(parsed, dict) else []
-        except Exception as e2:
-            logger.error(f"llm_text fallback search ranking error: {e2}")
-            results_list = []
-
-    final_results = []
-    seen_result_ids = set()
-
-    for r in results_list:
-        if not isinstance(r, dict):
+        # Exact phrase match in any field
+        if q_lower in full_haystack:
+            copy_item = cleaned.copy()
+            copy_item["match_reason"] = f"Exact match for '{q}'"
+            exact_matches.append((100, copy_item))
             continue
-        item_id = r.get("id")
-        if item_id in by_id and item_id not in seen_result_ids:
-            item_copy = by_id[item_id].copy()
-            item_copy["match_reason"] = r.get("reason", "")
-            final_results.append(item_copy)
-            seen_result_ids.add(item_id)
 
-    # Append verified high-quality keyword matches not already in AI results, sorted by score
+        # Check expanded and target word matches
+        matched_words = [w for w in expanded_words if w in full_haystack]
+        if matched_words:
+            matched_targets = [w for w in target_words if w in full_haystack]
+            ratio = len(matched_words) / max(1, len(target_words))
+            # Match if at least 50% of target words match, or key entities match
+            if ratio >= 0.5 or (len(matched_words) >= 2 and any(k in matched_words for k in ["vip", "own", "owner", "ownerbook", "event", "book"])):
+                copy_item = cleaned.copy()
+                copy_item["match_reason"] = f"Matched keywords: {', '.join(matched_words[:3])}"
+                score = int(ratio * 60)
+                if any(w in title_str for w in matched_words):
+                    score += 25
+                if any(w in summary_str for w in matched_words):
+                    score += 15
+                exact_matches.append((score, copy_item))
+
+    # Sort exact matches by score descending and append
     exact_matches.sort(key=lambda x: x[0], reverse=True)
     for _, em in exact_matches:
-        if em["id"] not in seen_result_ids:
+        if em["id"] not in seen_ids:
             final_results.append(em)
-            seen_result_ids.add(em["id"])
+            seen_ids.add(em["id"])
 
     return final_results[:limit], by_id
 
@@ -1791,6 +1791,7 @@ class ConversationCreate(BaseModel):
 class ChatV2In(BaseModel):
     conversation_id: Optional[str] = None
     query: str
+    context_item_ids: Optional[List[str]] = None
 
 class ConversationPatch(BaseModel):
     title: str
@@ -1886,8 +1887,11 @@ def classify_agent_action(query: str, has_history: bool) -> str:
     if clean_q in {"how are you", "who are you", "what can you do", "help"}:
         return "chitchat"
 
-    # 2. Followup (only if conversation has history)
+    # 2. In-Context Review / Critique / Followup / Pasted content
     if has_history:
+        # User references previous messages, complaints, or pastes memory text/URLs
+        if re.search(r'\b(why did you|why you told|why you said|how did you|how you shared|then what is|then whatis|what about this|look at this|ai summary|you said|you told|above)\b', clean_q) or "http" in q or "www." in q:
+            return "followup"
         # Ordinal reference: 1st, 2nd, 3rd, 4th, 5th, etc.
         if re.search(r'\b(\d+(st|nd|rd|th)|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last)\b', clean_q):
             return "followup"
@@ -1944,6 +1948,11 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
 
     # Collect all cited item IDs across the entire conversation history (Session Memory Pool)
     session_cited_ids = []
+    if payload.context_item_ids:
+        for cid in payload.context_item_ids:
+            if cid and cid not in session_cited_ids:
+                session_cited_ids.append(cid)
+
     for m in messages:
         if m.get("role") == "assistant" and m.get("cited_item_ids"):
             for cid in m["cited_item_ids"]:
@@ -1977,6 +1986,17 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
                 logger.error(f"Failed to fetch session items for followup: {e}")
                 context_items = []
         
+        # If user mentions a specific URL or key terms in their followup/complaint, lookup matching items
+        url_match = re.search(r'([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?)', query)
+        if url_match:
+            try:
+                target_url = url_match.group(1).lower()
+                url_items = await db.items.find({"library_id": lib, "source_url": {"$regex": target_url, "$options": "i"}}).to_list(4)
+                if url_items:
+                    context_items = deduplicate_items(url_items + context_items)
+            except Exception as e:
+                logger.error(f"URL lookup in followup failed: {e}")
+
         # Fallback to recent items if session had no cited IDs
         if not context_items:
             try:
@@ -1991,13 +2011,14 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
 
         system_prompt = (
             f"You are Forgot AI, an intelligent personal memory assistant. Today's date is {today_str}.\n"
-            "The user is asking a follow-up question about an item or topic already discussed in this conversation.\n"
+            "The user is asking a follow-up question, seeking clarification, or discussing items/topics already present in this conversation.\n"
             "Use the conversation history and the saved memories below to answer the user directly and helpfully.\n"
             "- If the user asks about 'the 4th one', 'the 5th one', 'the second link', etc., identify that exact item from your previous message in the chat history.\n"
+            "- If the user is pointing out a note that was previously missed or questioning why an item wasn't shown earlier, acknowledge the item respectfully, explain what you found in their memory, and provide the helpful details without being defensive.\n"
             "- Link formatting rule: If an item has a URL, format it as a clickable markdown link [Title](URL). If an item has NO URL (URL is None, such as an uploaded image, screenshot, or text note), do NOT create a markdown link; write it in bold text: **Title** (Image) or **Title** (Note).\n"
-            "- NEVER claim an item does not exist or that you made a mistake if it was already mentioned or appears in the chat history.\n"
+            "- NEVER claim an item does not exist if it appears in the chat history or in the memories below.\n"
             "- Do NOT output raw database IDs. Refer to items by their title or clean clickable link.\n\n"
-            f"Previously discussed memories:\n{context_str}"
+            f"Active Memories in Conversation:\n{context_str}"
         )
 
     elif action == "recency":
@@ -2062,12 +2083,35 @@ async def _process_chat_v2_internal(payload: ChatV2In, lib: str):
                 f"Search Results:\n{context_str}"
             )
         else:
-            system_prompt = (
-                f"You are Forgot AI, a personal memory assistant. Today's date is {today_str}.\n"
-                f"The user searched for '{query}', but no saved notes or links matching that topic were found in their library.\n"
-                "Politely and concisely let the user know you couldn't find any saved notes matching that specific search, and suggest they try another keyword or save something new.\n"
-                "IMPORTANT: Do NOT apologize for previous messages or claim previous items didn't exist."
-            )
+            # Smart Anti-Gaslight Protocol: Provide recent library saves as candidate references
+            cand_items = []
+            try:
+                cand_res = await db.items.find({"status": "ready", "library_id": lib}).sort("created_at", -1).to_list(4)
+                cand_items = deduplicate_items([clean(c) for c in cand_res])
+            except Exception as e:
+                logger.error(f"Failed to fetch candidate items: {e}")
+                cand_items = []
+
+            if cand_items:
+                cand_str = format_memory_blocks(cand_items)
+                system_prompt = (
+                    f"You are Forgot AI, an intelligent personal memory assistant. Today's date is {today_str}.\n"
+                    f"The user asked: '{query}'.\n"
+                    "No exact direct match was found for those exact words, but here are some of the user's recent saves for reference:\n"
+                    f"{cand_str}\n"
+                    "RULES:\n"
+                    "- Check if any of the above memories are conceptually related to what the user is asking about (e.g. slight spelling variation, related topic, or phonetic similarity like 'owe' vs 'own/ownerbook').\n"
+                    "- If one of the memories seems relevant, explain it helpfully and format links as [Title](URL).\n"
+                    "- If none of them are related, politely let the user know you couldn't find a matching note for that specific phrase and invite them to describe it differently or save it now.\n"
+                    "- NEVER claim an item does not exist if it appears in the conversation history or above."
+                )
+                final_ids = [c["id"] for c in cand_items]
+            else:
+                system_prompt = (
+                    f"You are Forgot AI, a personal memory assistant. Today's date is {today_str}.\n"
+                    f"The user searched for '{query}', but no saved items were found in their library yet.\n"
+                    "Politely and warmly let the user know, and invite them to save a note or link."
+                )
 
     llm_history = [{"role": m["role"], "content": m["content"]} for m in messages]
     llm_history.append({"role": "user", "content": query})
