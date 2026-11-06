@@ -19,7 +19,7 @@ from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, B
 from fastapi.responses import Response, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
+from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr, model_validator
 from supabase_db import SupabaseDatabase, create_supabase_client
 from supabase import create_client as make_supabase_client
 from ai_provider import embed_texts, llm_chat, llm_chat_stream
@@ -241,21 +241,39 @@ class SavedItem(BaseModel):
 
 
 class TextSaveIn(BaseModel):
-    text: str
+    text: Optional[str] = None
+    original_content: Optional[str] = None
     source_url: Optional[str] = None
     source_title: Optional[str] = None
     user_note: Optional[str] = None
     group_id: Optional[str] = None
     new_group_name: Optional[str] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_text_field(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("text") and data.get("original_content"):
+                data["text"] = data["original_content"]
+        return data
+
 
 class UrlSaveIn(BaseModel):
-    url: str
+    url: Optional[str] = None
+    source_url: Optional[str] = None
     context_text: Optional[str] = None
     source_title: Optional[str] = None
     user_note: Optional[str] = None
     group_id: Optional[str] = None
     new_group_name: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_url_field(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("url") and data.get("source_url"):
+                data["url"] = data["source_url"]
+        return data
 
 
 class BulkBookmarkItem(BaseModel):
@@ -1320,15 +1338,16 @@ async def check_duplicate(payload: CheckIn, lib: str = Depends(resolve_library))
 @api_router.post("/items/text", response_model=SavedItem)
 async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str = Depends(require_active_subscription)):
     limiter.check(lib, 60, 60)
-    if not payload.text.strip():
+    raw_text = (payload.text or payload.original_content or "").strip()
+    if not raw_text:
         raise HTTPException(400, "Text is empty")
     group_id, group_name, group_color = await _handle_new_group(payload, lib, lib)
-    item = SavedItem(library_id=lib, content_type="text", original_text=payload.text,
+    item = SavedItem(library_id=lib, content_type="text", original_text=raw_text,
                      source_url=payload.source_url, source_title=payload.source_title,
                      source_domain=domain_of(payload.source_url) if payload.source_url else None,
                      user_note=payload.user_note,
                      group_id=group_id, group_name=group_name, group_color=group_color,
-                     dedup_key=text_hash(payload.text), title=payload.text.strip()[:60])
+                     dedup_key=text_hash(raw_text), title=raw_text[:60])
     values = item.model_dump()
     values["owner_user_id"] = lib
     await db.items.insert_one(values)
@@ -1340,9 +1359,10 @@ async def save_text(payload: TextSaveIn, background: BackgroundTasks, lib: str =
 @api_router.post("/items/url", response_model=SavedItem)
 async def save_url(payload: UrlSaveIn, background: BackgroundTasks, lib: str = Depends(require_active_subscription)):
     limiter.check(lib, 60, 60)
-    url = payload.url.strip()
-    if not url:
+    raw_url = (payload.url or payload.source_url or "").strip()
+    if not raw_url:
         raise HTTPException(400, "URL is empty")
+    url = raw_url
     if not url.startswith("http"):
         url = "https://" + url
     group_id, group_name, group_color = await _handle_new_group(payload, lib, lib)

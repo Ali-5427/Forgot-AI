@@ -557,12 +557,14 @@ export default function PopupApp() {
         if (isUrl) {
           const urlObj = new URL(text.startsWith("http") ? text : `https://${text}`);
           await api.saveUrl({
+            url: urlObj.href,
             source_url: urlObj.href,
             source_title: urlObj.hostname,
             user_note: userNote.trim() || undefined
           });
         } else {
           await api.saveText({
+            text: text,
             original_content: text,
             user_note: userNote.trim() || undefined
           });
