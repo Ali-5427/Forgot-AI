@@ -33,7 +33,7 @@ def build_agent_system_prompt(today: datetime, active_memories: Optional[List[di
         "- CITATIONS & LINKS: When mentioning saved items that have URLs, format them as clickable Markdown links: [Title](URL). If an item has NO URL (note or screenshot), format as bold text: **Title** (Note/Image).\n"
         "- MULTI-TURN MEMORY: If the user refers to something previously discussed (e.g. 'that second one', 'tell me more about the VIP ticket'), reference or look into that specific item seamlessly.\n"
         "- ANTI-GASLIGHTING: NEVER claim an item does not exist if it was cited earlier in conversation or returned by your tools. If tools return items, present them clearly and accurately.\n"
-        "- GROUNDED REASONS ON 'WHY DID I SAVE THIS?': When the user asks 'Why did I save this?', 'Why do I have this?', or asks for their intent behind saving: 1. Look strictly at 'User Note/Reason' for that item. 2. If the user provided a note or reason when saving, report it accurately: 'When you saved this, you noted: [note]'. 3. If NO user note or reason was provided (says None or None provided), YOU MUST EXPLICITLY STATE: 'You didn't add a note or reason when you saved this.' You may summarize what the page content itself is about, but NEVER fabricate, guess, or invent the user's personal motives, past thoughts, or intentions (NEVER say 'You were thinking about...' or 'You noted that you like this...' unless it literally exists in the user's note).\n"
+        "- GROUNDED REASONS ON 'WHY DID I SAVE THIS?': When the user asks 'Why did I save this?', 'Why do I have this?', or asks for their intent behind saving: 1. Look strictly at 'User Note/Reason' for that item. 2. If the user provided a note or reason when saving, refer to it and explain why they saved it. 3. If NO user note or reason was provided (says None or None provided), YOU MUST EXPLICITLY STATE: 'You didn't add a note or reason when you saved this.' You may summarize what the page content itself is about, but NEVER fabricate, guess, or invent the user's personal motives, past thoughts, or intentions (NEVER say 'You were thinking about...' or 'You noted that you like this...' unless it literally exists in the user's note).\n"
         "- CLEAN MARKDOWN FORMATTING: Always use clean, standard Markdown. Ensure Markdown headers have a space after hashes (e.g. '### Header', never '###Header'). When outputting tables, ensure every row is on its own separate line with proper '|' borders so it renders cleanly as a table."
     )
 
@@ -41,7 +41,7 @@ def build_agent_system_prompt(today: datetime, active_memories: Optional[List[di
         prompt += "\n\nACTIVE MEMORIES CURRENTLY IN CONVERSATION CONTEXT:\n"
         for idx, m in enumerate(active_memories, 1):
             url_part = f"URL: {m.get('source_url') or m.get('url') or 'None'}"
-            user_intent = m.get('user_note') or m.get('why_saved')
+            user_intent = m.get('why_saved') or m.get('user_note')
             intent_str = f"User Note/Reason: {user_intent}" if user_intent else "User Note/Reason: None provided when saved"
             prompt += f"[{idx}] Title: {m.get('title')} | {url_part}\n  {intent_str}\n  Summary: {m.get('summary', '')[:250]}\n"
 
