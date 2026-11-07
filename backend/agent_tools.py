@@ -99,6 +99,8 @@ def clean_item_for_agent(doc: dict) -> dict:
     if not doc:
         return {}
     raw_url = (doc.get("source_url") or doc.get("url") or "").strip()
+    user_note_val = (doc.get("user_note") or "").strip()
+    why_saved_val = (doc.get("why_saved") or "").strip()
     return {
         "id": str(doc.get("id")),
         "title": doc.get("title") or doc.get("source_title") or "Untitled",
@@ -106,7 +108,8 @@ def clean_item_for_agent(doc: dict) -> dict:
         "content_type": doc.get("content_type", "text"),
         "category": doc.get("category", "General"),
         "summary": doc.get("summary", ""),
-        "user_note": doc.get("user_note", ""),
+        "user_note": user_note_val if user_note_val else None,
+        "why_saved": why_saved_val if why_saved_val else None,
         "saved_at": doc.get("created_at", ""),
         "keywords": doc.get("keywords") or [],
         "text_preview": (doc.get("extracted_text") or doc.get("original_text") or doc.get("searchable_text") or "")[:500]

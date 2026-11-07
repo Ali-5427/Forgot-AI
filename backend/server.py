@@ -730,10 +730,16 @@ async def enrich_item(item_id: str, user_note: Optional[str] = None):
         if isinstance(kws, str):
             kws = [k.strip() for k in kws.split(",") if k.strip()]
         
+        why_saved_raw = meta.get("why_saved")
+        if not user_note or not user_note.strip() or not why_saved_raw or str(why_saved_raw).strip().lower() in ("null", "none", "", "n/a"):
+            why_saved_val = None
+        else:
+            why_saved_val = str(why_saved_raw).strip()
+
         update = {
             "title": str(meta.get("title", "Untitled"))[:200],
             "summary": str(meta.get("summary", "")),
-            "why_saved": str(meta.get("why_saved", "")),
+            "why_saved": why_saved_val,
             "keywords": [str(k) for k in kws][:12],
             "category": str(meta.get("category", "Uncategorized"))[:40],
             "extracted_text": str(meta.get("extracted_text", "")),
@@ -741,7 +747,6 @@ async def enrich_item(item_id: str, user_note: Optional[str] = None):
             "status": "ready",
         }
         
-        # Don't overwrite why_saved if it's empty but previously existed (though it should be a new insert usually)
         if not update["why_saved"]:
             del update["why_saved"]
             

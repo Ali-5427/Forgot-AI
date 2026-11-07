@@ -24,7 +24,7 @@ SENSITIVE_PREFIXES = (
 )
 
 
-def sanitize_agent_text(text: str) -> str:
+def sanitize_agent_text(text: str, strip_whitespace: bool = True) -> str:
     """
     Sanitize full completed text from the agent:
     1. Strips any internal reasoning <think>...</think> tags.
@@ -47,7 +47,7 @@ def sanitize_agent_text(text: str) -> str:
     # Clean up double spaces or awkward parentheses left behind
     cleaned = re.sub(r'\(\s*\)', '', cleaned)
     cleaned = re.sub(r'[ \t]{2,}', ' ', cleaned)
-    return cleaned.strip()
+    return cleaned.strip() if strip_whitespace else cleaned
 
 
 class StreamSanitizer:
@@ -102,7 +102,7 @@ class StreamSanitizer:
         if last_space > 20:
             to_emit = self.buffer[:last_space + 1]
             self.buffer = self.buffer[last_space + 1:]
-            return self._flush_clean(to_emit)
+            return self._flush_clean(to_emit, strip_whitespace=False)
 
         return ""
 
@@ -115,5 +115,5 @@ class StreamSanitizer:
         self.buffer = ""
         return self._flush_clean(remaining)
 
-    def _flush_clean(self, text: str) -> str:
-        return sanitize_agent_text(text)
+    def _flush_clean(self, text: str, strip_whitespace: bool = False) -> str:
+        return sanitize_agent_text(text, strip_whitespace=strip_whitespace)
