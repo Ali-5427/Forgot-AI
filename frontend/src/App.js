@@ -12,6 +12,7 @@ import { Layout } from "@/components/Layout";
 import { SaveDialog } from "@/components/SaveDialog";
 import { BookmarkImporterModal } from "@/components/BookmarkImporterModal";
 import { PaywallModal } from "@/components/PaywallModal";
+import { InstallVerifier } from "@/components/InstallVerifier";
 import { LandingPage } from "@/components/landing-page/landing-page";
 import { PublicLayout } from "@/components/PublicLayout";
 import AuthGate from "@/pages/AuthGate";
@@ -61,6 +62,7 @@ function GlobalDialogs() {
       <SaveDialog open={saveOpen} onOpenChange={setSaveOpen} onSaved={() => reloadItems()} onOpenExisting={(id) => openItem(id)} />
       <BookmarkImporterModal open={importerOpen} onOpenChange={setImporterOpen} />
       <PaywallModal open={paywallOpen} onOpenChange={setPaywallOpen} reason={paywallReason} />
+      <InstallVerifier />
     </>
   );
 }
