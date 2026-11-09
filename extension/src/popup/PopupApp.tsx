@@ -16,6 +16,7 @@ import ExtensionTour, { resetExtensionTour } from "./ExtensionTour";
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  items?: SavedItem[];
 }
 
 const SocialIcons = {
@@ -303,6 +304,13 @@ export default function PopupApp() {
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
   const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
   const [selectedItem, setSelectedItem] = useState<SavedItem | null>(null);
+  const [itemSourceView, setItemSourceView] = useState<"chat" | "saved">("saved");
+
+  const handleOpenItemFromChat = (item: SavedItem) => {
+    setSelectedItem(item);
+    setItemSourceView("chat");
+    setCurrentView("saved");
+  };
 
   // In-Extension Settings State
   const [dockEnabled, setDockEnabled] = useState(true);
@@ -703,17 +711,28 @@ export default function PopupApp() {
       const decoder = new TextDecoder("utf-8");
       
       let answerText = "";
+      let finalResults: SavedItem[] | null = null;
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
       
       let animationFrameId: number | null = null;
-      const flushUpdate = () => {
+      const flushUpdate = (resultsToAttach?: SavedItem[] | null) => {
         setMessages((prev) => {
           if (!prev.length) return prev;
           const updated = [...prev];
           const lastIdx = updated.length - 1;
-          if (updated[lastIdx].role === "assistant" && updated[lastIdx].content !== answerText) {
-            updated[lastIdx] = { ...updated[lastIdx], content: answerText };
-            return updated;
+          if (updated[lastIdx].role === "assistant") {
+            const currentObj = updated[lastIdx];
+            const toAttach = resultsToAttach !== undefined ? resultsToAttach : finalResults;
+            const needsContentUpdate = currentObj.content !== answerText;
+            const needsItemsUpdate = toAttach && toAttach.length > 0 && !currentObj.items;
+            if (needsContentUpdate || needsItemsUpdate) {
+              updated[lastIdx] = {
+                ...currentObj,
+                content: answerText,
+                items: toAttach && toAttach.length > 0 ? toAttach : currentObj.items,
+              };
+              return updated;
+            }
           }
           return prev;
         });
@@ -722,7 +741,7 @@ export default function PopupApp() {
 
       const scheduleFlush = () => {
         if (animationFrameId === null) {
-          animationFrameId = requestAnimationFrame(flushUpdate);
+          animationFrameId = requestAnimationFrame(() => flushUpdate());
         }
       };
 
@@ -747,6 +766,14 @@ export default function PopupApp() {
                   setConvId(data.conversation_id);
                   chrome.storage.local.set({ extension_conv_id: data.conversation_id });
                 }
+                if (data.results && Array.isArray(data.results) && data.results.length > 0) {
+                  finalResults = data.results;
+                  setSavedItems((prev) => {
+                    const existingIds = new Set(prev.map((i) => i.id));
+                    const toAdd = data.results.filter((i: any) => i && i.id && !existingIds.has(i.id));
+                    return toAdd.length > 0 ? [...toAdd, ...prev] : prev;
+                  });
+                }
               } else if (data.type === "error") {
                 answerText += "\n\n*(Error: " + (data.text || "Stream error") + ")*";
                 scheduleFlush();
@@ -762,7 +789,7 @@ export default function PopupApp() {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
       }
-      flushUpdate();
+      flushUpdate(finalResults);
     } catch (e: any) {
       if (e.name === 'AbortError') return;
       let errorMessage = "Sorry, I couldn't process that right now.";
@@ -928,7 +955,7 @@ export default function PopupApp() {
               {/* Navigation Items (Exact structure requested) */}
               <div className="p-3 space-y-1">
                 <button 
-                  onClick={() => { setCurrentView("saved"); setSelectedItem(null); setIsMenuOpen(false); }}
+                  onClick={() => { setCurrentView("saved"); setSelectedItem(null); setItemSourceView("saved"); setIsMenuOpen(false); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl transition-colors text-left"
                 >
                   <Folder className="w-4 h-4 text-neutral-500" />
@@ -1081,12 +1108,15 @@ export default function PopupApp() {
                 onClick={() => {
                   if (currentView === "saved" && selectedItem) {
                     setSelectedItem(null);
+                    if (itemSourceView === "chat") {
+                      setCurrentView("chat");
+                    }
                   } else {
                     setCurrentView("chat");
                   }
                 }} 
                 className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors flex items-center gap-1 text-[13px] font-medium"
-                title={currentView === "saved" && selectedItem ? "Back to saved list" : "Back to Chat"}
+                title={currentView === "saved" && selectedItem ? (itemSourceView === "chat" ? "Back to Chat" : "Back to saved list") : "Back to Chat"}
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back</span>
@@ -1760,15 +1790,94 @@ export default function PopupApp() {
                           msg.role === 'user' ? 'max-w-[85%] bg-neutral-900 text-white rounded-3xl rounded-br-md px-4 py-3 shadow-sm whitespace-pre-wrap' : 'max-w-[90%] text-neutral-800'
                         }`}>
                           {msg.role === 'assistant' ? (
-                            <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold break-words min-w-0">
-                              <ReactMarkdown 
-                                remarkPlugins={[remarkGfm]}
-                                components={{
-                                  a: ({node, ...props}) => <ChatLink isUser={false} {...props} />
-                                }}
-                              >
-                                {msg.content}
-                              </ReactMarkdown>
+                            <div className="w-full min-w-0">
+                              <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-neutral-50 prose-pre:text-neutral-800 prose-headings:font-semibold break-words min-w-0">
+                                <ReactMarkdown 
+                                  remarkPlugins={[remarkGfm]}
+                                  components={{
+                                    a: ({node, ...props}) => <ChatLink isUser={false} {...props} />
+                                  }}
+                                >
+                                  {msg.content}
+                                </ReactMarkdown>
+                              </div>
+
+                              {/* Interactive Memory / Note Cards attached to this response */}
+                              {msg.items && msg.items.length > 0 && (
+                                <div className="mt-3.5 space-y-2 w-full not-prose">
+                                  <div className="text-[10.5px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5 px-0.5">
+                                    <Sparkles className="w-3 h-3 text-amber-500" />
+                                    <span>Referenced Memory</span>
+                                  </div>
+                                  {msg.items.map((item, itemIdx) => {
+                                    const isUrl = Boolean(item.source_url && (item.source_url.startsWith("http://") || item.source_url.startsWith("https://")));
+                                    let hostname = "Saved Note";
+                                    if (isUrl && item.source_url) {
+                                      try {
+                                        hostname = new URL(item.source_url).hostname.replace(/^www\./, "");
+                                      } catch {
+                                        hostname = "Web Link";
+                                      }
+                                    }
+                                    const faviconUrl = isUrl ? getFaviconUrl(item.source_url) : null;
+                                    const displayTitle = item.title || item.source_title || (isUrl ? hostname : "Quick Note");
+                                    const snippet = item.summary || item.original_content || "";
+
+                                    return (
+                                      <div
+                                        key={item.id || itemIdx}
+                                        onClick={() => handleOpenItemFromChat(item)}
+                                        className="p-3 bg-neutral-50/90 hover:bg-white border border-neutral-200/90 hover:border-neutral-400 rounded-2xl shadow-xs hover:shadow-md transition-all space-y-1.5 group cursor-pointer text-left"
+                                      >
+                                        <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                                          <div className="flex items-center gap-1.5 truncate min-w-0 pr-2">
+                                            {faviconUrl && !imgErrorMap[item.id] ? (
+                                              <img
+                                                src={faviconUrl}
+                                                className="w-3.5 h-3.5 rounded-xs shrink-0 object-contain"
+                                                onError={() => setImgErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                                                alt=""
+                                              />
+                                            ) : isUrl ? (
+                                              <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                            ) : (
+                                              <FileText className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                            )}
+                                            <span className="font-semibold text-neutral-700 truncate tracking-tight text-[11px]">{hostname}</span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5 shrink-0 text-[10px]">
+                                            <span className="px-1.5 py-0.5 bg-neutral-200/60 rounded text-neutral-600 font-medium">
+                                              {isUrl ? "Link" : "Note"}
+                                            </span>
+                                            {item.created_at && <span>{formatTimeAgo(item.created_at)}</span>}
+                                          </div>
+                                        </div>
+
+                                        <div className="text-[13px] font-semibold text-neutral-900 group-hover:text-black leading-snug line-clamp-1">
+                                          {displayTitle}
+                                        </div>
+
+                                        {snippet && (
+                                          <p className="text-[11.5px] text-neutral-500 line-clamp-2 leading-relaxed">
+                                            {snippet}
+                                          </p>
+                                        )}
+
+                                        {item.user_note && (
+                                          <div className="text-[11px] text-amber-900 bg-amber-50/90 border-l-2 border-amber-400 pl-2 py-0.5 rounded-r-md italic line-clamp-1">
+                                            "{item.user_note}"
+                                          </div>
+                                        )}
+
+                                        <div className="flex items-center justify-between pt-1 border-t border-neutral-200/50 text-[11px] text-neutral-400 group-hover:text-neutral-700 font-medium transition-colors">
+                                          <span>Click to view full note</span>
+                                          <span className="group-hover:translate-x-0.5 transition-transform text-neutral-600">➔</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           ) : (
                             renderMessageWithLinks(msg.content, true)
