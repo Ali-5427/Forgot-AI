@@ -682,25 +682,11 @@ export default function PopupApp() {
     abortControllerRef.current = controller;
 
     try {
-      // Extract top client-cached candidate IDs to ensure backend LLM is never blind to local memories
-      const candidateIds: string[] = [];
-      const qLower = q.toLowerCase();
-      const qTokens = qLower.split(/\s+/).filter((t) => t.length >= 3);
-      for (const itm of savedItems) {
-        if (!itm.id) continue;
-        const haystack = `${itm.title || ''} ${itm.source_title || ''} ${itm.source_url || ''} ${itm.user_note || ''} ${itm.original_content || ''} ${itm.summary || ''}`.toLowerCase();
-        if (qTokens.length > 0 && qTokens.some((tok) => haystack.includes(tok))) {
-          candidateIds.push(itm.id);
-          if (candidateIds.length >= 6) break;
-        }
-      }
-
       const res = await fetchStream("/api/chat/v2/stream", {
         method: "POST",
         body: JSON.stringify({
           query: q,
           conversation_id: convId || undefined,
-          context_item_ids: candidateIds.length > 0 ? candidateIds : undefined,
         }),
         signal: controller.signal,
       });

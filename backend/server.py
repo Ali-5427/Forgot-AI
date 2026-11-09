@@ -2094,25 +2094,13 @@ async def chat_v2(payload: ChatV2In, lib: str = Depends(resolve_library)):
         m_res = db.supabase.table("messages").select("*").eq("conversation_id", conv_id).order("created_at", desc=True).limit(12).execute()
         messages = list(reversed(m_res.data))
 
-    session_cited_ids = []
-    if payload.context_item_ids:
-        for cid in payload.context_item_ids:
-            if cid and cid not in session_cited_ids:
-                session_cited_ids.append(cid)
-
-    for m in messages:
-        if m.get("role") == "assistant" and m.get("cited_item_ids"):
-            for cid in m["cited_item_ids"]:
-                if cid and cid not in session_cited_ids:
-                    session_cited_ids.append(cid)
-
     active_docs = []
-    if session_cited_ids:
+    if payload.context_item_ids:
         try:
-            items_res = db.supabase.table("items").select("*").in_("id", session_cited_ids).eq("library_id", lib).execute()
+            items_res = db.supabase.table("items").select("*").in_("id", payload.context_item_ids).eq("library_id", lib).execute()
             active_docs = items_res.data or []
         except Exception as e:
-            logger.error(f"Failed to fetch session items: {e}")
+            logger.error(f"Failed to fetch context items: {e}")
 
     db.supabase.table("messages").insert({"conversation_id": conv_id, "role": "user", "content": payload.query}).execute()
     history = [{"role": m["role"], "content": m["content"]} for m in messages]
@@ -2156,25 +2144,13 @@ async def chat_v2_stream(payload: ChatV2In, lib: str = Depends(resolve_library))
         m_res = db.supabase.table("messages").select("*").eq("conversation_id", conv_id).order("created_at", desc=True).limit(12).execute()
         messages = list(reversed(m_res.data))
 
-    session_cited_ids = []
-    if payload.context_item_ids:
-        for cid in payload.context_item_ids:
-            if cid and cid not in session_cited_ids:
-                session_cited_ids.append(cid)
-
-    for m in messages:
-        if m.get("role") == "assistant" and m.get("cited_item_ids"):
-            for cid in m["cited_item_ids"]:
-                if cid and cid not in session_cited_ids:
-                    session_cited_ids.append(cid)
-
     active_docs = []
-    if session_cited_ids:
+    if payload.context_item_ids:
         try:
-            items_res = db.supabase.table("items").select("*").in_("id", session_cited_ids).eq("library_id", lib).execute()
+            items_res = db.supabase.table("items").select("*").in_("id", payload.context_item_ids).eq("library_id", lib).execute()
             active_docs = items_res.data or []
         except Exception as e:
-            logger.error(f"Failed to fetch session items: {e}")
+            logger.error(f"Failed to fetch context items: {e}")
 
     db.supabase.table("messages").insert({"conversation_id": conv_id, "role": "user", "content": payload.query}).execute()
     history = [{"role": m["role"], "content": m["content"]} for m in messages]

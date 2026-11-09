@@ -12,6 +12,7 @@ from agent_tools import (
     tool_semantic_hybrid_search,
     tool_inspect_memory,
     tool_get_recent_memories,
+    tool_show_memory_card,
     clean_item_for_agent
 )
 from agent_sanitizer import sanitize_agent_text, StreamSanitizer
@@ -34,16 +35,18 @@ def build_agent_system_prompt(today: datetime, active_memories: Optional[List[di
         "- MULTI-TURN MEMORY: If the user refers to something previously discussed (e.g. 'that second one', 'tell me more about the VIP ticket'), reference or look into that specific item seamlessly.\n"
         "- ANTI-GASLIGHTING: NEVER claim an item does not exist if it was cited earlier in conversation or returned by your tools. If tools return items, present them clearly and accurately.\n"
         "- GROUNDED REASONS ON 'WHY DID I SAVE THIS?': When the user asks 'Why did I save this?', 'Why do I have this?', or asks for their intent behind saving: 1. Look strictly at 'User Note/Reason' for that item. 2. If the user provided a note or reason when saving, use it and explain why they saved it. 3. If NO user note or reason was provided (says None or None provided), YOU MUST EXPLICITLY STATE: 'You didn't add a note or reason when you saved this.' You may summarize what the page content itself is about, but NEVER fabricate, guess, or invent the user's personal motives, past thoughts, or intentions (NEVER say 'You were thinking about...' or 'You noted that you like this...' unless it literally exists in the user's note).\n"
-        "- CLEAN MARKDOWN FORMATTING: Always use clean, standard Markdown. Ensure Markdown headers have a space after hashes (e.g. '### Header', never '###Header'). When outputting tables, ensure every row is on its own separate line with proper '|' borders so it renders cleanly as a table."
+        "- CLEAN MARKDOWN FORMATTING: Always use clean, standard Markdown. Ensure Markdown headers have a space after hashes (e.g. '### Header', never '###Header'). When outputting tables, ensure every row is on its own separate line with proper '|' borders so it renders cleanly as a table.\n"
+        "- UI MEMORY CARDS: Do NOT show memory cards during general conversation, questions, answers, or summaries. Answer normally with clear text. ONLY when the user explicitly requests to show, view, see, display, or open a specific saved note (e.g. 'show me that note', 'display the note from Mehul', 'let me see the note for X', 'open that card'), call the `show_memory_card` tool with the item ID.\n"
+        "- NO CITATION BRACKETS OR SLOT NUMBERS: Never use citation markers like [1], [2], or internal slot numbers (such as '# 6') in your responses. Refer to items naturally by their title or content."
     )
 
     if active_memories:
         prompt += "\n\nACTIVE MEMORIES CURRENTLY IN CONVERSATION CONTEXT:\n"
-        for idx, m in enumerate(active_memories, 1):
+        for m in active_memories:
             url_part = f"URL: {m.get('source_url') or m.get('url') or 'None'}"
             user_intent = m.get('why_saved') or m.get('user_note')
             intent_str = f"User Note/Reason: {user_intent}" if user_intent else "User Note/Reason: None provided when saved"
-            prompt += f"[{idx}] Title: {m.get('title')} | {url_part}\n  {intent_str}\n  Summary: {m.get('summary', '')[:250]}\n"
+            prompt += f"- ID: {m.get('id')} | Title: {m.get('title')} | {url_part}\n  {intent_str}\n  Summary: {m.get('summary', '')[:250]}\n"
 
     return prompt
 
@@ -79,6 +82,12 @@ async def execute_agent_tool(tool_name: str, tool_args: dict, db, lib: str, retr
                 db=db,
                 lib=lib,
                 limit=tool_args.get("limit", 8)
+            )
+        elif tool_name == "show_memory_card":
+            return await tool_show_memory_card(
+                db=db,
+                lib=lib,
+                item_id=tool_args.get("item_id", "")
             )
         else:
             return {"status": "error", "message": f"Unknown tool: {tool_name}"}
@@ -144,14 +153,9 @@ async def run_agent_stream(
 
     cited_items = []
     cited_ids = set()
+    presented_items = []
 
-    # If active memories exist in context, keep their IDs available
-    if active_memory_docs:
-        for it in active_memory_docs:
-            if it.get("id"):
-                cited_ids.add(str(it["id"]))
-
-    # Step 2A: If no tools were called, stream direct conversational answer immediately
+    # Step 2A: If no tools were called, stream direct conversational answer immediately (zero cards)
     if not tool_calls:
         clean_direct = sanitize_agent_text(direct_content)
         if clean_direct:
@@ -164,8 +168,8 @@ async def run_agent_stream(
             yield {
                 "type": "final",
                 "answer": clean_direct,
-                "results": list(active_memory_docs or []),
-                "context_ids": list(cited_ids)
+                "results": [],
+                "context_ids": []
             }
             return
 
@@ -191,6 +195,12 @@ async def run_agent_stream(
 
         # Collect items from tool result
         if isinstance(tool_result, dict):
+            presented_item = tool_result.get("presented_item")
+            if presented_item:
+                presented_items.append(presented_item)
+                if presented_item.get("id"):
+                    cited_ids.add(str(presented_item["id"]))
+
             items = tool_result.get("items") or []
             single_item = tool_result.get("item")
             if single_item:
@@ -253,17 +263,17 @@ async def run_agent_stream(
 
     final_answer = sanitize_agent_text("".join(full_answer_chunks))
 
-    # Clean cited items (deduplicated)
+    # Clean presented items (strictly only items explicitly requested via show_memory_card)
     seen = set()
-    unique_cited_items = []
-    for it in cited_items:
+    unique_presented_items = []
+    for it in presented_items:
         if it.get("id") and it["id"] not in seen:
             seen.add(it["id"])
-            unique_cited_items.append(it)
+            unique_presented_items.append(it)
 
     yield {
         "type": "final",
         "answer": final_answer,
-        "results": unique_cited_items,
-        "context_ids": list(cited_ids)
+        "results": unique_presented_items,
+        "context_ids": list(seen)
     }

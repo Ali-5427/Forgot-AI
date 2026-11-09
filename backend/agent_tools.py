@@ -90,6 +90,23 @@ AGENT_TOOLS_SCHEMA = [
                 }
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "show_memory_card",
+            "description": "Display an interactive memory card in the user's interface. Call this tool ONLY when the user explicitly requests to show, view, see, display, or open a specific note or item (e.g. 'show me that note', 'display the note from Mehul', 'can you show me the saved note', 'let me see the card'). NEVER call this tool during casual chat, general questions, or summaries.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "item_id": {
+                        "type": "string",
+                        "description": "The exact ID of the memory item to display."
+                    }
+                },
+                "required": ["item_id"]
+            }
+        }
     }
 ]
 
@@ -218,3 +235,19 @@ async def tool_get_recent_memories(db, lib: str, limit: int = 8) -> dict:
     except Exception as e:
         logger.error(f"tool_get_recent_memories error: {e}")
         return {"status": "error", "message": str(e), "items": []}
+
+
+async def tool_show_memory_card(db, lib: str, item_id: str) -> dict:
+    """Fetch and prepare a single memory card to be presented in the user UI."""
+    try:
+        res = db.supabase.table("items").select("*").eq("id", item_id).eq("library_id", lib).execute()
+        item = res.data[0] if res.data else None
+        if not item and hasattr(db, "items"):
+            item = await db.items.find_one({"id": item_id, "library_id": lib})
+        
+        if item:
+            return {"status": "success", "presented_item": item}
+        return {"status": "error", "message": f"Item {item_id} not found."}
+    except Exception as e:
+        logger.error(f"tool_show_memory_card error: {e}")
+        return {"status": "error", "message": str(e)}
