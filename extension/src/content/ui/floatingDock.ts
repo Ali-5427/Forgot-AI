@@ -45,23 +45,15 @@ const ICONS = {
     <path d="M6 10h10"/>
     <path d="M6 14h6"/>
   </svg>`,
-  chevronRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="m9 18 6-6-6-6"/>
+  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 6 6 18"/>
+    <path d="m6 6 12 12"/>
   </svg>`,
   chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="m15 18-6-6 6-6"/>
   </svg>`,
-  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 6 6 18"/>
-    <path d="m6 6 12 12"/>
-  </svg>`,
-  check: `<svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M20 6 9 17l-5-5"/>
-  </svg>`,
-  alert: `<svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <line x1="12" y1="8" x2="12" y2="12"/>
-    <line x1="12" y1="16" x2="12.01" y2="16"/>
   </svg>`,
 };
 
@@ -87,60 +79,29 @@ const DOCK_CSS = `
   pointer-events: none;
 }
 
-/* Sider-Style Vertical Action Dock */
+/* Vertical Action Dock */
 .tool-dock {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   background: #FFFFFF;
-  padding: 8px 6px;
+  padding: 10px 6px;
   border-radius: 9999px;
-  box-shadow: 0 10px 32px -4px rgba(0, 0, 0, 0.16), 0 3px 10px -2px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.09);
-  margin-right: 10px;
-  pointer-events: auto;
-  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.15), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  margin-right: 12px;
+  margin-bottom: 10px;
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.dock-root.collapsed .tool-dock {
-  display: none;
-}
-
-/* Top Header & Logo (Drag Handle) */
-.dock-header {
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  cursor: grab;
-  transition: background-color 150ms ease, transform 150ms ease;
-  position: relative;
-}
-
-.dock-header:hover {
-  background: #F4F4F5;
-}
-
-.dock-header:active {
-  cursor: grabbing;
-}
-
-.dock-header svg {
-  width: 26px;
-  height: 26px;
-  pointer-events: none;
-}
-
-/* Tool Buttons */
 .tool-item {
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: none;
   background: transparent;
@@ -155,9 +116,9 @@ const DOCK_CSS = `
 }
 
 .tool-item svg {
-  width: 19px;
-  height: 19px;
-  stroke-width: 1.9;
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.8;
   transition: transform 120ms ease;
 }
 
@@ -168,20 +129,7 @@ const DOCK_CSS = `
 }
 
 .tool-item:active {
-  transform: scale(0.94);
-}
-
-.tool-item.saved {
-  background: #ECFDF5;
-  color: #059669;
-}
-
-/* Divider inside tool dock */
-.tool-divider {
-  width: 22px;
-  height: 1px;
-  background: #E5E7EB;
-  margin: 3px 0;
+  transform: scale(0.95);
 }
 
 /* Tooltip labels sliding out to the left */
@@ -193,116 +141,155 @@ const DOCK_CSS = `
   background: #111827;
   color: #FFFFFF;
   font-size: 11.5px;
-  font-weight: 500;
+  font-weight: 600;
   padding: 5px 9px;
-  border-radius: 7px;
+  border-radius: 8px;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   transition: opacity 120ms ease, transform 120ms ease;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  z-index: 100;
 }
 
-.tool-label kbd {
-  background: #374151;
-  color: #E5E7EB;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-family: inherit;
-}
-
-.tool-item:hover .tool-label,
-.dock-header:hover .tool-label,
-.collapse-btn:hover .tool-label {
+.tool-item:hover .tool-label {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
 }
 
-/* Collapse Arrow Button */
-.collapse-btn {
-  position: relative;
+/* Divider inside tool dock */
+.tool-divider {
+  width: 20px;
+  height: 1px;
+  background: #E5E7EB;
+  margin: 2px 0;
+}
+
+/* Trigger Button Container */
+.trigger-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.trigger-bar:active {
+  cursor: grabbing;
+}
+
+/* Brain Trigger Pill */
+.trigger-pill {
+  height: 44px;
+  padding: 0 12px 0 10px;
+  background: #FFFFFF;
+  border-radius: 9999px 0 0 9999px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-right: none;
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.16), 0 2px 8px -2px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease, background 160ms ease;
+}
+
+.trigger-pill:hover {
+  transform: translateX(-4px);
+  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.22);
+}
+
+.trigger-icon {
   width: 28px;
   height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trigger-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* Minimize Toggle Button */
+.collapse-btn {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
+  background: #18181B;
+  color: #A1A1AA;
   border: none;
-  background: transparent;
-  color: #9CA3AF;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease, transform 140ms ease;
-  outline: none;
+  margin-right: -4px;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
   padding: 0;
-  margin-top: 2px;
 }
 
 .collapse-btn svg {
-  width: 15px;
-  height: 15px;
+  width: 12px;
+  height: 12px;
 }
 
 .collapse-btn:hover {
-  background: #F3F4F6;
-  color: #111827;
+  background: #27272A;
+  color: #FFFFFF;
   transform: scale(1.1);
 }
 
-/* Collapsed Mini Edge Nub */
+/* Collapsed Mini Nub - Curved white tab with brain icon */
 .collapsed-nub {
   display: none;
-  pointer-events: auto;
-  position: fixed;
-  right: 0;
-  width: 32px;
+  width: 44px;
   height: 44px;
   background: #FFFFFF;
   border-radius: 22px 0 0 22px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-right: none;
-  box-shadow: -2px 6px 20px -2px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 6px 24px -2px rgba(0, 0, 0, 0.22);
   cursor: pointer;
+  pointer-events: auto !important;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding-left: 3px;
+  padding-left: 4px;
   transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease;
 }
 
 .collapsed-nub:hover {
   transform: translateX(-4px);
-  box-shadow: -4px 8px 24px -2px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 8px 30px -2px rgba(0, 0, 0, 0.3);
 }
 
 .collapsed-nub .nub-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .collapsed-nub .nub-icon svg {
-  width: 19px;
-  height: 19px;
+  width: 22px;
+  height: 22px;
 }
 
 .collapsed-nub .nub-arrow {
-  color: #6B7280;
-  width: 10px;
-  height: 10px;
+  color: #4B5563;
+  width: 12px;
+  height: 12px;
   display: flex;
   align-items: center;
 }
-
 .collapsed-nub .nub-arrow svg {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
+}
+
+.dock-root.collapsed .trigger-bar,
+.dock-root.collapsed .tool-dock {
+  display: none;
 }
 
 .dock-root.collapsed .collapsed-nub {
@@ -312,21 +299,19 @@ const DOCK_CSS = `
 /* Quick Note Popover Card */
 .quick-note-card {
   position: absolute;
-  right: 58px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 290px;
+  right: 56px;
+  bottom: 0;
+  width: 280px;
   background: #FFFFFF;
   border-radius: 18px;
   padding: 14px;
-  box-shadow: 0 16px 40px -6px rgba(0, 0, 0, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.09);
+  box-shadow: 0 16px 40px -6px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.08);
   display: none;
   flex-direction: column;
   gap: 10px;
   pointer-events: auto;
-  z-index: 200;
-  animation: faPopIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: faPopIn 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .quick-note-card.visible {
@@ -334,14 +319,8 @@ const DOCK_CSS = `
 }
 
 @keyframes faPopIn {
-  from {
-    opacity: 0;
-    transform: translateY(-50%) translateX(10px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0) scale(1);
-  }
+  from { opacity: 0; transform: scale(0.92) translateX(10px); }
+  to { opacity: 1; transform: scale(1) translateX(0); }
 }
 
 .quick-note-header {
@@ -353,74 +332,53 @@ const DOCK_CSS = `
   color: #111827;
 }
 
-.quick-note-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.quick-note-title svg {
-  width: 15px;
-  height: 15px;
-  stroke: #6366F1;
-}
-
 .quick-note-close {
-  background: transparent;
+  background: none;
   border: none;
   color: #9CA3AF;
   cursor: pointer;
-  padding: 3px;
-  border-radius: 50%;
+  padding: 2px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: all 120ms ease;
 }
 
 .quick-note-close:hover {
-  background: #F3F4F6;
   color: #111827;
-}
-
-.quick-note-close svg {
-  width: 14px;
-  height: 14px;
 }
 
 .quick-note-textarea {
   width: 100%;
   box-sizing: border-box;
-  min-height: 85px;
-  max-height: 200px;
-  border-radius: 10px;
+  height: 72px;
   border: 1px solid #E5E7EB;
-  padding: 9px 11px;
+  border-radius: 10px;
+  padding: 8px 10px;
   font-size: 12.5px;
   font-family: inherit;
-  color: #1F2937;
-  resize: vertical;
+  color: #111827;
+  resize: none;
   outline: none;
-  line-height: 1.45;
-  transition: border-color 150ms ease;
+  background: #F9FAFB;
+  transition: border-color 150ms ease, background 150ms ease;
 }
 
 .quick-note-textarea:focus {
-  border-color: #6366F1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  border-color: #111827;
+  background: #FFFFFF;
 }
 
 .quick-note-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .quick-note-btn {
-  font-size: 12px;
-  font-weight: 600;
   padding: 6px 12px;
   border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   border: none;
   transition: all 120ms ease;
@@ -430,61 +388,52 @@ const DOCK_CSS = `
   background: #F3F4F6;
   color: #4B5563;
 }
-
 .quick-note-btn.cancel:hover {
   background: #E5E7EB;
-  color: #111827;
 }
 
 .quick-note-btn.save {
   background: #111827;
   color: #FFFFFF;
 }
-
 .quick-note-btn.save:hover {
   background: #000000;
 }
 
-/* Action Toast Notification */
+/* Success Toast Ripple */
 .action-toast {
   position: absolute;
-  right: 58px;
+  right: 56px;
   bottom: 6px;
   background: #111827;
   color: #FFFFFF;
-  padding: 8px 13px;
-  border-radius: 10px;
+  padding: 8px 14px;
+  border-radius: 12px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
-  opacity: 0;
-  transform: translateY(8px);
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
   pointer-events: none;
-  transition: opacity 180ms ease, transform 180ms ease;
-  white-space: nowrap;
-  z-index: 300;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 150ms ease, transform 150ms ease;
 }
 
 .action-toast.show {
   opacity: 1;
   transform: translateY(0);
-  pointer-events: auto;
 }
 
 .action-toast svg {
+  color: #10B981;
   width: 16px;
   height: 16px;
-  flex-shrink: 0;
 }
 `;
 
-// -----------------------------------------------------------------------------
-// Content Extraction Helper
-// -----------------------------------------------------------------------------
-function extractPageMetadata() {
+function extractCleanPageData() {
   const selection = window.getSelection()?.toString().trim();
   if (selection && selection.length > 3) {
     return {
@@ -526,9 +475,6 @@ function extractPageMetadata() {
   };
 }
 
-// -----------------------------------------------------------------------------
-// Main Initialization
-// -----------------------------------------------------------------------------
 export function initFloatingDock() {
   if (document.querySelector("[data-forgot-ai='floating-dock']")) return;
 
@@ -541,7 +487,6 @@ export function initFloatingDock() {
   host.style.zIndex = "2147483647";
   host.style.pointerEvents = "none";
 
-  // Check if disabled by user settings
   if (typeof chrome !== "undefined" && chrome.storage?.local) {
     chrome.storage.local.get(["forgot_ai_dock_disabled"], (res) => {
       if (res?.forgot_ai_dock_disabled) {
@@ -563,14 +508,14 @@ export function initFloatingDock() {
   const root = document.createElement("div");
   root.className = "dock-root";
 
-  // Calculate Initial Vertical Position (localStorage fallback)
+  // Initial vertical position
   const savedTop = localStorage.getItem(DOCK_STORAGE_KEY_TOP);
   const vh = window.innerHeight || 800;
-  const defaultTop = Math.max(100, Math.round(vh / 2 - 130));
+  const defaultTop = Math.max(120, vh - 260);
   let initialTop = defaultTop;
   if (savedTop) {
     const parsed = parseInt(savedTop, 10);
-    if (!isNaN(parsed) && parsed > 40 && parsed < (vh - 100)) {
+    if (!isNaN(parsed) && parsed > 50 && parsed < (vh - 80)) {
       initialTop = parsed;
     }
   }
@@ -582,27 +527,18 @@ export function initFloatingDock() {
   }
 
   root.innerHTML = `
-    <!-- Sider-Style Vertical Tool Dock -->
+    <!-- Vertical Tool Dock -->
     <div class="tool-dock">
-      <!-- Drag Handle & Logo -->
-      <div class="dock-header" title="Forgot AI (Drag to move)">
-        <div class="dock-logo">${ICONS.brain}</div>
-        <span class="tool-label">Forgot AI</span>
-      </div>
-
-      <!-- Action 1: Save Page -->
-      <button class="tool-item" data-action="save" title="Save Page (Alt+S)">
+      <button class="tool-item" data-action="save" title="Save Page">
         ${ICONS.save}
-        <span class="tool-label">Save Page <kbd>Alt+S</kbd></span>
+        <span class="tool-label">Save Page (Alt+S)</span>
       </button>
 
-      <!-- Action 2: Ask AI / Chat -->
-      <button class="tool-item" data-action="chat" title="Ask AI / Chat (Alt+P)">
+      <button class="tool-item" data-action="chat" title="Chat with AI">
         ${ICONS.chat}
-        <span class="tool-label">Ask AI <kbd>Alt+P</kbd></span>
+        <span class="tool-label">Ask / Chat (Alt+P)</span>
       </button>
 
-      <!-- Action 3: Quick Note -->
       <button class="tool-item" data-action="note" title="Quick Note">
         ${ICONS.note}
         <span class="tool-label">Quick Note</span>
@@ -610,43 +546,38 @@ export function initFloatingDock() {
 
       <div class="tool-divider"></div>
 
-      <!-- Action 4: Summarize Page -->
       <button class="tool-item" data-action="summarize" title="Summarize Page">
         ${ICONS.summarize}
         <span class="tool-label">Summarize</span>
       </button>
 
-      <!-- Action 5: Search Memory -->
       <button class="tool-item" data-action="search" title="Search Memory">
         ${ICONS.search}
-        <span class="tool-label">Search</span>
-      </button>
-
-      <div class="tool-divider"></div>
-
-      <!-- Action 6: Collapse Dock -->
-      <button class="collapse-btn" title="Collapse Dock">
-        ${ICONS.chevronRight}
-        <span class="tool-label">Collapse Dock</span>
+        <span class="tool-label">Search Memory</span>
       </button>
     </div>
 
-    <!-- Collapsed Slim Edge Nub -->
+    <!-- Trigger Bar (Draggable) -->
+    <div class="trigger-bar">
+      <div class="trigger-pill" title="Forgot AI (Drag to move)">
+        <div class="trigger-icon">${ICONS.brain}</div>
+        <button class="collapse-btn" title="Collapse">${ICONS.close}</button>
+      </div>
+    </div>
+
+    <!-- Collapsed Edge Nub -->
     <div class="collapsed-nub" title="Forgot AI (Click to expand)">
       <div class="nub-icon">${ICONS.brain}</div>
       <div class="nub-arrow">${ICONS.chevronLeft}</div>
     </div>
 
-    <!-- Quick Note Popover Card -->
+    <!-- Quick Note Inline Popover -->
     <div class="quick-note-card">
       <div class="quick-note-header">
-        <div class="quick-note-title">
-          ${ICONS.note}
-          <span>Quick Note</span>
-        </div>
-        <button class="quick-note-close" title="Close">${ICONS.close}</button>
+        <span>Quick Note</span>
+        <button class="quick-note-close">${ICONS.close}</button>
       </div>
-      <textarea class="quick-note-textarea" placeholder="Add a thought or note to remember with this page..."></textarea>
+      <textarea class="quick-note-textarea" placeholder="Type a thought or note to remember..."></textarea>
       <div class="quick-note-actions">
         <button class="quick-note-btn cancel">Cancel</button>
         <button class="quick-note-btn save">Save Note</button>
@@ -655,8 +586,8 @@ export function initFloatingDock() {
 
     <!-- Action Toast Notification -->
     <div class="action-toast">
-      <span class="toast-icon">${ICONS.check}</span>
-      <span class="toast-text">Saved to Forgot AI!</span>
+      ${ICONS.check}
+      <span class="toast-text">Saved to Memory!</span>
     </div>
   `;
 
@@ -666,13 +597,17 @@ export function initFloatingDock() {
   // ---------------------------------------------------------------------------
   // Dragging Logic along Y-Axis
   // ---------------------------------------------------------------------------
-  const dockHeader = root.querySelector(".dock-header") as HTMLElement;
+  const triggerBar = root.querySelector(".trigger-bar") as HTMLElement;
   let isDragging = false;
   let startY = 0;
   let startTop = 0;
+  let hasMoved = false;
 
-  dockHeader.addEventListener("mousedown", (e) => {
+  triggerBar.addEventListener("mousedown", (e) => {
+    if ((e.target as HTMLElement).closest(".collapse-btn")) return;
+    
     isDragging = true;
+    hasMoved = false;
     startY = e.clientY;
     startTop = root.getBoundingClientRect().top;
     document.addEventListener("mousemove", onMouseMove);
@@ -683,9 +618,11 @@ export function initFloatingDock() {
   function onMouseMove(e: MouseEvent) {
     if (!isDragging) return;
     const dy = e.clientY - startY;
+    if (Math.abs(dy) > 3) hasMoved = true;
+    
     let newTop = startTop + dy;
     const currentVh = window.innerHeight || 800;
-    newTop = Math.max(50, Math.min(currentVh - 140, newTop));
+    newTop = Math.max(60, Math.min(currentVh - 120, newTop));
     root.style.top = `${newTop}px`;
   }
 
@@ -695,7 +632,7 @@ export function initFloatingDock() {
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("mouseup", onMouseUp);
     const finalTop = Math.round(root.getBoundingClientRect().top);
-    if (finalTop > 30) {
+    if (finalTop > 50) {
       localStorage.setItem(DOCK_STORAGE_KEY_TOP, String(finalTop));
       if (typeof chrome !== "undefined" && chrome.storage?.local) {
         chrome.storage.local.set({ [DOCK_STORAGE_KEY_TOP]: finalTop }).catch(() => {});
@@ -707,33 +644,25 @@ export function initFloatingDock() {
   // Toast Helper
   // ---------------------------------------------------------------------------
   const toast = root.querySelector(".action-toast") as HTMLElement;
-  const toastIcon = root.querySelector(".toast-icon") as HTMLElement;
   const toastText = root.querySelector(".toast-text") as HTMLElement;
   let toastTimer: any = null;
 
-  function showToast(msg: string, type: "success" | "warn" | "error" = "success") {
+  function showToast(msg: string) {
     clearTimeout(toastTimer);
     toastText.textContent = msg;
-    if (type === "success") {
-      toastIcon.innerHTML = ICONS.check;
-    } else if (type === "warn") {
-      toastIcon.innerHTML = ICONS.alert;
-    } else {
-      toastIcon.innerHTML = ICONS.alert;
-    }
     toast.classList.add("show");
-    toastTimer = setTimeout(() => toast.classList.remove("show"), 2500);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
   }
 
   // ---------------------------------------------------------------------------
-  // Elements & Event Handlers
+  // Action Handlers
   // ---------------------------------------------------------------------------
   const toolDock = root.querySelector(".tool-dock") as HTMLElement;
+  const triggerPill = root.querySelector(".trigger-pill") as HTMLElement;
   const collapseBtn = root.querySelector(".collapse-btn") as HTMLElement;
   const collapsedNub = root.querySelector(".collapsed-nub") as HTMLElement;
   const noteCard = root.querySelector(".quick-note-card") as HTMLElement;
   const noteTextarea = root.querySelector(".quick-note-textarea") as HTMLTextAreaElement;
-  const saveBtn = root.querySelector('[data-action="save"]') as HTMLElement;
 
   // Toggle Collapse
   collapseBtn.addEventListener("click", (e) => {
@@ -754,9 +683,9 @@ export function initFloatingDock() {
   });
 
   // Save Page Action
-  async function handleSavePage() {
-    showToast("Saving page...", "warn");
-    const payload = extractPageMetadata();
+  function handleSavePage() {
+    showToast("Saving page...");
+    const payload = extractCleanPageData();
 
     chrome.runtime.sendMessage(
       {
@@ -764,21 +693,12 @@ export function initFloatingDock() {
         payload,
       },
       (resp: any) => {
-        if (chrome.runtime.lastError) {
-          showToast(chrome.runtime.lastError.message || "Save error", "error");
-          return;
-        }
         if (resp?.ok) {
-          showToast(resp.deduped ? "Already in your memory!" : "Saved to Forgot AI!", "success");
-          if (saveBtn) {
-            saveBtn.classList.add("saved");
-            setTimeout(() => saveBtn.classList.remove("saved"), 1800);
-          }
+          showToast(resp.deduped ? "Already saved!" : "Saved to Forgot AI!");
         } else if (resp?.unauthenticated) {
-          showToast("Not signed in — click to log in", "warn");
-          toast.onclick = () => chrome.runtime.sendMessage({ type: "OPEN_AUTH_TAB" });
+          showToast("Please sign in to Forgot AI");
         } else {
-          showToast(resp?.error || "Save failed. Try again.", "error");
+          showToast(resp?.error || "Save failed");
         }
       }
     );
@@ -797,10 +717,10 @@ export function initFloatingDock() {
     } else if (action === "note") {
       noteCard.classList.add("visible");
       setTimeout(() => noteTextarea.focus(), 60);
-    } else if (action === "summarize") {
-      showToast("Opening side panel...", "success");
-      chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
     } else if (action === "search") {
+      chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
+    } else if (action === "summarize") {
+      showToast("Opening side panel...");
       chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
     }
   });
@@ -816,7 +736,7 @@ export function initFloatingDock() {
     const text = noteTextarea.value.trim();
     if (!text) return;
 
-    showToast("Saving note...", "warn");
+    showToast("Saving note...");
     chrome.runtime.sendMessage(
       {
         type: "SAVE_MEMORY",
@@ -831,13 +751,13 @@ export function initFloatingDock() {
       },
       (resp: any) => {
         if (resp?.ok) {
-          showToast("Note saved to Forgot AI!", "success");
+          showToast("Note saved!");
           noteTextarea.value = "";
           noteCard.classList.remove("visible");
         } else if (resp?.unauthenticated) {
-          showToast("Not signed in — please log in", "warn");
+          showToast("Please sign in first");
         } else {
-          showToast(resp?.error || "Failed to save note", "error");
+          showToast(resp?.error || "Failed to save note");
         }
       }
     );
