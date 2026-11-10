@@ -1,4 +1,4 @@
-// Service worker: routes SAVE_MEMORY messages, opens auth tab.
+// Service worker: routes SAVE_MEMORY messages, opens auth tab, handles shortcuts & side panel.
 import { api } from "../lib/api";
 import { CONFIG } from "../lib/config";
 import type {
@@ -22,6 +22,50 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch(console.error);
 
+// -----------------------------------------------------------------------------
+// Chrome Keyboard Shortcuts (Alt+S, Alt+P)
+// -----------------------------------------------------------------------------
+chrome.commands?.onCommand?.addListener(async (command) => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    if (command === "open-panel") {
+      try {
+        await (chrome as any).sidePanel?.open?.({ tabId: tab.id });
+      } catch {
+        if (tab.windowId) {
+          await (chrome as any).sidePanel?.open?.({ windowId: tab.windowId });
+        }
+      }
+    } else if (command === "save-page") {
+      // Ask content script to trigger dock save animation & toast
+      chrome.tabs.sendMessage(tab.id, { type: "TRIGGER_DOCK_SAVE" }).catch(async () => {
+        // Fallback save in background if content script is not running on this tab
+        const session = await getSession();
+        if (session && tab.url) {
+          try {
+            await api.createMemory({
+              capture_type: "content",
+              original_content: tab.title || tab.url,
+              source_url: tab.url,
+              source_title: tab.title || "",
+              source_domain: new URL(tab.url).hostname,
+            });
+          } catch (e) {
+            console.error("Background fallback save failed:", e);
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.error("Error handling shortcut command:", err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Message Router
+// -----------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) => {
   (async () => {
     try {
@@ -36,17 +80,21 @@ chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) =>
           sendResponse(resp);
           return;
         }
-        // 1. INSTANTLY tell the Content Script it was successful!
-        sendResponse({
-          ok: true,
-          memory: { id: "optimistic" } as any,
-          deduped: false,
-        });
 
-        // 2. Do the slow API call in the background without awaiting it.
-        api.createMemory(msg.payload).catch((e: any) => {
-          console.error("Background save failed:", e);
-        });
+        try {
+          const memory = await api.createMemory(msg.payload);
+          sendResponse({
+            ok: true,
+            memory,
+            deduped: Boolean((memory as any)?.deduped),
+          });
+        } catch (err: any) {
+          console.error("Background save failed:", err);
+          sendResponse({
+            ok: false,
+            error: err?.message || "Failed to save memory to server.",
+          });
+        }
         return;
       }
       if (msg.type === "OPEN_AUTH_TAB") {
@@ -55,8 +103,21 @@ chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) =>
         return;
       }
       if (msg.type === "OPEN_SIDE_PANEL") {
-        if (_sender.tab?.id) {
-          (chrome as any).sidePanel?.open?.({ tabId: _sender.tab.id })?.catch?.(console.error);
+        let tabId = _sender.tab?.id;
+        if (!tabId) {
+          const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          tabId = activeTab?.id;
+        }
+        if (tabId) {
+          try {
+            await (chrome as any).sidePanel?.open?.({ tabId });
+          } catch (err) {
+            console.warn("sidePanel.open by tabId failed, falling back to windowId:", err);
+            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (activeTab?.windowId) {
+              await (chrome as any).sidePanel?.open?.({ windowId: activeTab.windowId });
+            }
+          }
         }
         sendResponse({ ok: true });
         return;
@@ -110,4 +171,3 @@ chrome.runtime.onMessage.addListener((msg: ExtMessage, _sender, sendResponse) =>
   })();
   return true; // keep channel open for async response
 });
-

@@ -396,8 +396,26 @@ if (isForgotAiHost) {
   } catch {}
 }
 
+// Do NOT mount floating dock on Forgot AI webapp / PWA / auth pages to avoid double chrome
+const isOwnApp = (() => {
+  try {
+    const host = window.location.hostname.toLowerCase();
+    const path = window.location.pathname.toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.includes("forgot-ai.vercel.app") ||
+      host.includes("forgot-ai") ||
+      path.startsWith("/login") ||
+      path.startsWith("/auth")
+    );
+  } catch {
+    return false;
+  }
+})();
+
 // Initialize Draggable Quick-Access Floating Dock
-if (window.top === window) {
+if (window.top === window && !isOwnApp) {
   const mountDock = () => {
     try {
       initFloatingDock();

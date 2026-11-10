@@ -45,15 +45,23 @@ const ICONS = {
     <path d="M6 10h10"/>
     <path d="M6 14h6"/>
   </svg>`,
-  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 6 6 18"/>
-    <path d="m6 6 12 12"/>
+  chevronRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m9 18 6-6-6-6"/>
   </svg>`,
   chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="m15 18-6-6 6-6"/>
   </svg>`,
-  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 6 6 18"/>
+    <path d="m6 6 12 12"/>
+  </svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M20 6 9 17l-5-5"/>
+  </svg>`,
+  alert: `<svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
   </svg>`,
 };
 
@@ -79,36 +87,60 @@ const DOCK_CSS = `
   pointer-events: none;
 }
 
-/* Vertical Action Dock */
+/* Sider-Style Vertical Action Dock */
 .tool-dock {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   background: #FFFFFF;
-  padding: 10px 6px;
+  padding: 8px 6px;
   border-radius: 9999px;
-  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.15), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  margin-right: 12px;
-  margin-bottom: 10px;
-  opacity: 0;
-  transform: translateY(8px) scale(0.95);
-  pointer-events: none;
-  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.dock-root.expanded .tool-dock,
-.dock-root:hover .tool-dock {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+  box-shadow: 0 10px 32px -4px rgba(0, 0, 0, 0.16), 0 3px 10px -2px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  margin-right: 10px;
   pointer-events: auto;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+  opacity: 1;
+  transform: translateX(0);
 }
 
-.tool-item {
-  position: relative;
+.dock-root.collapsed .tool-dock {
+  display: none;
+}
+
+/* Top Header & Logo (Drag Handle) */
+.dock-header {
   width: 38px;
   height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: grab;
+  transition: background-color 150ms ease, transform 150ms ease;
+  position: relative;
+}
+
+.dock-header:hover {
+  background: #F4F4F5;
+}
+
+.dock-header:active {
+  cursor: grabbing;
+}
+
+.dock-header svg {
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
+}
+
+/* Tool Buttons */
+.tool-item {
+  position: relative;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: none;
   background: transparent;
@@ -123,9 +155,9 @@ const DOCK_CSS = `
 }
 
 .tool-item svg {
-  width: 20px;
-  height: 20px;
-  stroke-width: 1.8;
+  width: 19px;
+  height: 19px;
+  stroke-width: 1.9;
   transition: transform 120ms ease;
 }
 
@@ -136,7 +168,20 @@ const DOCK_CSS = `
 }
 
 .tool-item:active {
-  transform: scale(0.95);
+  transform: scale(0.94);
+}
+
+.tool-item.saved {
+  background: #ECFDF5;
+  color: #059669;
+}
+
+/* Divider inside tool dock */
+.tool-divider {
+  width: 22px;
+  height: 1px;
+  background: #E5E7EB;
+  margin: 3px 0;
 }
 
 /* Tooltip labels sliding out to the left */
@@ -148,156 +193,116 @@ const DOCK_CSS = `
   background: #111827;
   color: #FFFFFF;
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 5px 9px;
-  border-radius: 8px;
+  border-radius: 7px;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
   transition: opacity 120ms ease, transform 120ms ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 100;
 }
 
-.tool-item:hover .tool-label {
+.tool-label kbd {
+  background: #374151;
+  color: #E5E7EB;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: inherit;
+}
+
+.tool-item:hover .tool-label,
+.dock-header:hover .tool-label,
+.collapse-btn:hover .tool-label {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
 }
 
-/* Divider inside tool dock */
-.tool-divider {
-  width: 20px;
-  height: 1px;
-  background: #E5E7EB;
-  margin: 2px 0;
-}
-
-/* Trigger Button Container */
-.trigger-bar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  pointer-events: auto;
-  cursor: grab;
-}
-
-.trigger-bar:active {
-  cursor: grabbing;
-}
-
-/* Brain Trigger Pill */
-.trigger-pill {
-  height: 44px;
-  padding: 0 12px 0 10px;
-  background: #FFFFFF;
-  border-radius: 9999px 0 0 9999px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-right: none;
-  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.16), 0 2px 8px -2px rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease, background 160ms ease;
-}
-
-.trigger-pill:hover {
-  transform: translateX(-4px);
-  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.22);
-}
-
-.trigger-icon {
+/* Collapse Arrow Button */
+.collapse-btn {
+  position: relative;
   width: 28px;
   height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.trigger-icon svg {
-  width: 26px;
-  height: 26px;
-}
-
-/* Minimize Toggle Button */
-.collapse-btn {
-  width: 24px;
-  height: 24px;
   border-radius: 50%;
-  background: #18181B;
-  color: #A1A1AA;
   border: none;
+  background: transparent;
+  color: #9CA3AF;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  margin-right: -4px;
-  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+  transition: background-color 150ms ease, color 150ms ease, transform 140ms ease;
+  outline: none;
   padding: 0;
+  margin-top: 2px;
 }
 
 .collapse-btn svg {
-  width: 12px;
-  height: 12px;
+  width: 15px;
+  height: 15px;
 }
 
 .collapse-btn:hover {
-  background: #27272A;
-  color: #FFFFFF;
+  background: #F3F4F6;
+  color: #111827;
   transform: scale(1.1);
 }
 
-/* Collapsed Mini Nub */
-/* Collapsed Mini Nub - Highly visible curved white tab with brain icon */
+/* Collapsed Mini Edge Nub */
 .collapsed-nub {
   display: none;
-  width: 44px;
+  pointer-events: auto;
+  position: fixed;
+  right: 0;
+  width: 32px;
   height: 44px;
   background: #FFFFFF;
   border-radius: 22px 0 0 22px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-right: none;
-  box-shadow: 0 6px 24px -2px rgba(0, 0, 0, 0.22);
+  box-shadow: -2px 6px 20px -2px rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  pointer-events: auto !important;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding-left: 4px;
+  padding-left: 3px;
   transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease;
 }
 
 .collapsed-nub:hover {
   transform: translateX(-4px);
-  box-shadow: 0 8px 30px -2px rgba(0, 0, 0, 0.3);
+  box-shadow: -4px 8px 24px -2px rgba(0, 0, 0, 0.24);
 }
 
 .collapsed-nub .nub-icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .collapsed-nub .nub-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 19px;
+  height: 19px;
 }
 
 .collapsed-nub .nub-arrow {
-  color: #4B5563;
-  width: 12px;
-  height: 12px;
+  color: #6B7280;
+  width: 10px;
+  height: 10px;
   display: flex;
   align-items: center;
 }
-.collapsed-nub .nub-arrow svg {
-  width: 12px;
-  height: 12px;
-}
 
-.dock-root.collapsed .trigger-bar,
-.dock-root.collapsed .tool-dock {
-  display: none;
+.collapsed-nub .nub-arrow svg {
+  width: 10px;
+  height: 10px;
 }
 
 .dock-root.collapsed .collapsed-nub {
@@ -307,19 +312,21 @@ const DOCK_CSS = `
 /* Quick Note Popover Card */
 .quick-note-card {
   position: absolute;
-  right: 56px;
-  bottom: 0;
-  width: 280px;
+  right: 58px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 290px;
   background: #FFFFFF;
   border-radius: 18px;
   padding: 14px;
-  box-shadow: 0 16px 40px -6px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.08);
-  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 16px 40px -6px rgba(0, 0, 0, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.09);
   display: none;
   flex-direction: column;
   gap: 10px;
   pointer-events: auto;
-  animation: faPopIn 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 200;
+  animation: faPopIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .quick-note-card.visible {
@@ -327,8 +334,14 @@ const DOCK_CSS = `
 }
 
 @keyframes faPopIn {
-  from { opacity: 0; transform: scale(0.92) translateX(10px); }
-  to { opacity: 1; transform: scale(1) translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
 }
 
 .quick-note-header {
@@ -340,53 +353,74 @@ const DOCK_CSS = `
   color: #111827;
 }
 
+.quick-note-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-note-title svg {
+  width: 15px;
+  height: 15px;
+  stroke: #6366F1;
+}
+
 .quick-note-close {
-  background: none;
+  background: transparent;
   border: none;
   color: #9CA3AF;
   cursor: pointer;
-  padding: 2px;
-  border-radius: 4px;
+  padding: 3px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
+  justify-content: center;
+  transition: all 120ms ease;
 }
 
 .quick-note-close:hover {
+  background: #F3F4F6;
   color: #111827;
+}
+
+.quick-note-close svg {
+  width: 14px;
+  height: 14px;
 }
 
 .quick-note-textarea {
   width: 100%;
   box-sizing: border-box;
-  height: 72px;
-  border: 1px solid #E5E7EB;
+  min-height: 85px;
+  max-height: 200px;
   border-radius: 10px;
-  padding: 8px 10px;
+  border: 1px solid #E5E7EB;
+  padding: 9px 11px;
   font-size: 12.5px;
   font-family: inherit;
-  color: #111827;
-  resize: none;
+  color: #1F2937;
+  resize: vertical;
   outline: none;
-  background: #F9FAFB;
-  transition: border-color 150ms ease, background 150ms ease;
+  line-height: 1.45;
+  transition: border-color 150ms ease;
 }
 
 .quick-note-textarea:focus {
-  border-color: #111827;
-  background: #FFFFFF;
+  border-color: #6366F1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
 }
 
 .quick-note-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
 }
 
 .quick-note-btn {
-  padding: 6px 12px;
-  border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
   cursor: pointer;
   border: none;
   transition: all 120ms ease;
@@ -396,51 +430,105 @@ const DOCK_CSS = `
   background: #F3F4F6;
   color: #4B5563;
 }
+
 .quick-note-btn.cancel:hover {
   background: #E5E7EB;
+  color: #111827;
 }
 
 .quick-note-btn.save {
   background: #111827;
   color: #FFFFFF;
 }
+
 .quick-note-btn.save:hover {
   background: #000000;
 }
 
-/* Success Toast Ripple */
+/* Action Toast Notification */
 .action-toast {
   position: absolute;
-  right: 56px;
+  right: 58px;
   bottom: 6px;
   background: #111827;
   color: #FFFFFF;
-  padding: 8px 14px;
-  border-radius: 12px;
+  padding: 8px 13px;
+  border-radius: 10px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 6px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-  pointer-events: none;
+  gap: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
   opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 150ms ease, transform 150ms ease;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+  white-space: nowrap;
+  z-index: 300;
 }
 
 .action-toast.show {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
 }
 
 .action-toast svg {
-  color: #10B981;
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
 }
 `;
 
+// -----------------------------------------------------------------------------
+// Content Extraction Helper
+// -----------------------------------------------------------------------------
+function extractPageMetadata() {
+  const selection = window.getSelection()?.toString().trim();
+  if (selection && selection.length > 3) {
+    return {
+      capture_type: "highlight" as const,
+      original_content: selection.slice(0, 5000),
+      source_url: location.href,
+      source_title: document.title || location.hostname,
+      source_domain: location.hostname,
+    };
+  }
+
+  const metaDesc =
+    document.querySelector('meta[name="description"]')?.getAttribute("content") ||
+    document.querySelector('meta[property="og:description"]')?.getAttribute("content") ||
+    document.querySelector('meta[name="twitter:description"]')?.getAttribute("content") ||
+    "";
+
+  const mainEl =
+    document.querySelector("article") ||
+    document.querySelector("main") ||
+    document.querySelector('[role="main"]') ||
+    document.body;
+
+  const rawText = (mainEl?.innerText || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 3000);
+
+  const content = metaDesc
+    ? `${metaDesc}\n\n${rawText.slice(0, 2200)}`
+    : rawText || document.title;
+
+  return {
+    capture_type: "content" as const,
+    original_content: content.slice(0, 3000),
+    source_url: location.href,
+    source_title: document.title || location.hostname,
+    source_domain: location.hostname,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Main Initialization
+// -----------------------------------------------------------------------------
 export function initFloatingDock() {
   if (document.querySelector("[data-forgot-ai='floating-dock']")) return;
 
@@ -453,6 +541,7 @@ export function initFloatingDock() {
   host.style.zIndex = "2147483647";
   host.style.pointerEvents = "none";
 
+  // Check if disabled by user settings
   if (typeof chrome !== "undefined" && chrome.storage?.local) {
     chrome.storage.local.get(["forgot_ai_dock_disabled"], (res) => {
       if (res?.forgot_ai_dock_disabled) {
@@ -474,14 +563,14 @@ export function initFloatingDock() {
   const root = document.createElement("div");
   root.className = "dock-root";
 
-  // Initial vertical position
+  // Calculate Initial Vertical Position (localStorage fallback)
   const savedTop = localStorage.getItem(DOCK_STORAGE_KEY_TOP);
   const vh = window.innerHeight || 800;
-  const defaultTop = Math.max(120, vh - 220);
+  const defaultTop = Math.max(100, Math.round(vh / 2 - 130));
   let initialTop = defaultTop;
   if (savedTop) {
     const parsed = parseInt(savedTop, 10);
-    if (!isNaN(parsed) && parsed > 50 && parsed < (vh - 80)) {
+    if (!isNaN(parsed) && parsed > 40 && parsed < (vh - 100)) {
       initialTop = parsed;
     }
   }
@@ -493,18 +582,27 @@ export function initFloatingDock() {
   }
 
   root.innerHTML = `
-    <!-- Vertical Tool Dock -->
+    <!-- Sider-Style Vertical Tool Dock -->
     <div class="tool-dock">
-      <button class="tool-item" data-action="save" title="Save Page">
+      <!-- Drag Handle & Logo -->
+      <div class="dock-header" title="Forgot AI (Drag to move)">
+        <div class="dock-logo">${ICONS.brain}</div>
+        <span class="tool-label">Forgot AI</span>
+      </div>
+
+      <!-- Action 1: Save Page -->
+      <button class="tool-item" data-action="save" title="Save Page (Alt+S)">
         ${ICONS.save}
-        <span class="tool-label">Save Page</span>
+        <span class="tool-label">Save Page <kbd>Alt+S</kbd></span>
       </button>
 
-      <button class="tool-item" data-action="chat" title="Chat with AI">
+      <!-- Action 2: Ask AI / Chat -->
+      <button class="tool-item" data-action="chat" title="Ask AI / Chat (Alt+P)">
         ${ICONS.chat}
-        <span class="tool-label">Ask / Chat</span>
+        <span class="tool-label">Ask AI <kbd>Alt+P</kbd></span>
       </button>
 
+      <!-- Action 3: Quick Note -->
       <button class="tool-item" data-action="note" title="Quick Note">
         ${ICONS.note}
         <span class="tool-label">Quick Note</span>
@@ -512,38 +610,43 @@ export function initFloatingDock() {
 
       <div class="tool-divider"></div>
 
+      <!-- Action 4: Summarize Page -->
       <button class="tool-item" data-action="summarize" title="Summarize Page">
         ${ICONS.summarize}
         <span class="tool-label">Summarize</span>
       </button>
 
+      <!-- Action 5: Search Memory -->
       <button class="tool-item" data-action="search" title="Search Memory">
         ${ICONS.search}
-        <span class="tool-label">Search Memory</span>
+        <span class="tool-label">Search</span>
+      </button>
+
+      <div class="tool-divider"></div>
+
+      <!-- Action 6: Collapse Dock -->
+      <button class="collapse-btn" title="Collapse Dock">
+        ${ICONS.chevronRight}
+        <span class="tool-label">Collapse Dock</span>
       </button>
     </div>
 
-    <!-- Trigger Bar (Draggable) -->
-    <div class="trigger-bar">
-      <div class="trigger-pill" title="Forgot AI (Drag to move)">
-        <div class="trigger-icon">${ICONS.brain}</div>
-        <button class="collapse-btn" title="Collapse">${ICONS.close}</button>
-      </div>
-    </div>
-
-    <!-- Collapsed Edge Nub -->
+    <!-- Collapsed Slim Edge Nub -->
     <div class="collapsed-nub" title="Forgot AI (Click to expand)">
       <div class="nub-icon">${ICONS.brain}</div>
       <div class="nub-arrow">${ICONS.chevronLeft}</div>
     </div>
 
-    <!-- Quick Note Inline Popover -->
+    <!-- Quick Note Popover Card -->
     <div class="quick-note-card">
       <div class="quick-note-header">
-        <span>Quick Note</span>
-        <button class="quick-note-close">${ICONS.close}</button>
+        <div class="quick-note-title">
+          ${ICONS.note}
+          <span>Quick Note</span>
+        </div>
+        <button class="quick-note-close" title="Close">${ICONS.close}</button>
       </div>
-      <textarea class="quick-note-textarea" placeholder="Type a thought or note to remember..."></textarea>
+      <textarea class="quick-note-textarea" placeholder="Add a thought or note to remember with this page..."></textarea>
       <div class="quick-note-actions">
         <button class="quick-note-btn cancel">Cancel</button>
         <button class="quick-note-btn save">Save Note</button>
@@ -552,8 +655,8 @@ export function initFloatingDock() {
 
     <!-- Action Toast Notification -->
     <div class="action-toast">
-      ${ICONS.check}
-      <span class="toast-text">Saved to Memory!</span>
+      <span class="toast-icon">${ICONS.check}</span>
+      <span class="toast-text">Saved to Forgot AI!</span>
     </div>
   `;
 
@@ -563,18 +666,13 @@ export function initFloatingDock() {
   // ---------------------------------------------------------------------------
   // Dragging Logic along Y-Axis
   // ---------------------------------------------------------------------------
-  const triggerBar = root.querySelector(".trigger-bar") as HTMLElement;
+  const dockHeader = root.querySelector(".dock-header") as HTMLElement;
   let isDragging = false;
   let startY = 0;
   let startTop = 0;
-  let hasMoved = false;
 
-  triggerBar.addEventListener("mousedown", (e) => {
-    // If clicking close button, don't drag
-    if ((e.target as HTMLElement).closest(".collapse-btn")) return;
-    
+  dockHeader.addEventListener("mousedown", (e) => {
     isDragging = true;
-    hasMoved = false;
     startY = e.clientY;
     startTop = root.getBoundingClientRect().top;
     document.addEventListener("mousemove", onMouseMove);
@@ -585,11 +683,9 @@ export function initFloatingDock() {
   function onMouseMove(e: MouseEvent) {
     if (!isDragging) return;
     const dy = e.clientY - startY;
-    if (Math.abs(dy) > 3) hasMoved = true;
-    
     let newTop = startTop + dy;
-    const vh = window.innerHeight || 800;
-    newTop = Math.max(60, Math.min(vh - 120, newTop));
+    const currentVh = window.innerHeight || 800;
+    newTop = Math.max(50, Math.min(currentVh - 140, newTop));
     root.style.top = `${newTop}px`;
   }
 
@@ -599,8 +695,11 @@ export function initFloatingDock() {
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("mouseup", onMouseUp);
     const finalTop = Math.round(root.getBoundingClientRect().top);
-    if (finalTop > 50) {
+    if (finalTop > 30) {
       localStorage.setItem(DOCK_STORAGE_KEY_TOP, String(finalTop));
+      if (typeof chrome !== "undefined" && chrome.storage?.local) {
+        chrome.storage.local.set({ [DOCK_STORAGE_KEY_TOP]: finalTop }).catch(() => {});
+      }
     }
   }
 
@@ -608,44 +707,82 @@ export function initFloatingDock() {
   // Toast Helper
   // ---------------------------------------------------------------------------
   const toast = root.querySelector(".action-toast") as HTMLElement;
+  const toastIcon = root.querySelector(".toast-icon") as HTMLElement;
   const toastText = root.querySelector(".toast-text") as HTMLElement;
   let toastTimer: any = null;
 
-  function showToast(msg: string) {
+  function showToast(msg: string, type: "success" | "warn" | "error" = "success") {
     clearTimeout(toastTimer);
     toastText.textContent = msg;
+    if (type === "success") {
+      toastIcon.innerHTML = ICONS.check;
+    } else if (type === "warn") {
+      toastIcon.innerHTML = ICONS.alert;
+    } else {
+      toastIcon.innerHTML = ICONS.alert;
+    }
     toast.classList.add("show");
-    toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 2500);
   }
 
   // ---------------------------------------------------------------------------
-  // Action Handlers
+  // Elements & Event Handlers
   // ---------------------------------------------------------------------------
   const toolDock = root.querySelector(".tool-dock") as HTMLElement;
-  const triggerPill = root.querySelector(".trigger-pill") as HTMLElement;
   const collapseBtn = root.querySelector(".collapse-btn") as HTMLElement;
   const collapsedNub = root.querySelector(".collapsed-nub") as HTMLElement;
   const noteCard = root.querySelector(".quick-note-card") as HTMLElement;
   const noteTextarea = root.querySelector(".quick-note-textarea") as HTMLTextAreaElement;
+  const saveBtn = root.querySelector('[data-action="save"]') as HTMLElement;
 
   // Toggle Collapse
   collapseBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     root.classList.add("collapsed");
     localStorage.setItem(DOCK_STORAGE_KEY_COLLAPSED, "true");
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      chrome.storage.local.set({ [DOCK_STORAGE_KEY_COLLAPSED]: "true" }).catch(() => {});
+    }
   });
 
   collapsedNub.addEventListener("click", () => {
     root.classList.remove("collapsed");
     localStorage.setItem(DOCK_STORAGE_KEY_COLLAPSED, "false");
-  });
-
-  // Toggle expand on trigger pill click (if not dragged)
-  triggerPill.addEventListener("click", () => {
-    if (!hasMoved) {
-      root.classList.toggle("expanded");
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      chrome.storage.local.set({ [DOCK_STORAGE_KEY_COLLAPSED]: "false" }).catch(() => {});
     }
   });
+
+  // Save Page Action
+  async function handleSavePage() {
+    showToast("Saving page...", "warn");
+    const payload = extractPageMetadata();
+
+    chrome.runtime.sendMessage(
+      {
+        type: "SAVE_MEMORY",
+        payload,
+      },
+      (resp: any) => {
+        if (chrome.runtime.lastError) {
+          showToast(chrome.runtime.lastError.message || "Save error", "error");
+          return;
+        }
+        if (resp?.ok) {
+          showToast(resp.deduped ? "Already in your memory!" : "Saved to Forgot AI!", "success");
+          if (saveBtn) {
+            saveBtn.classList.add("saved");
+            setTimeout(() => saveBtn.classList.remove("saved"), 1800);
+          }
+        } else if (resp?.unauthenticated) {
+          showToast("Not signed in — click to log in", "warn");
+          toast.onclick = () => chrome.runtime.sendMessage({ type: "OPEN_AUTH_TAB" });
+        } else {
+          showToast(resp?.error || "Save failed. Try again.", "error");
+        }
+      }
+    );
+  }
 
   // Tool Click Events
   toolDock.addEventListener("click", async (e) => {
@@ -654,34 +791,16 @@ export function initFloatingDock() {
     const action = btn.dataset.action;
 
     if (action === "save") {
-      showToast("Saving page...");
-      chrome.runtime.sendMessage(
-        {
-          type: "SAVE_MEMORY",
-          payload: {
-            capture_type: "content",
-            original_content: document.body.innerText.slice(0, 3000),
-            source_url: location.href,
-            source_title: document.title,
-            source_domain: location.hostname,
-          },
-        },
-        (resp: any) => {
-          if (resp?.ok) {
-            showToast("Saved to Forgot AI!");
-          } else {
-            showToast(resp?.error || "Save failed");
-          }
-        }
-      );
+      handleSavePage();
     } else if (action === "chat") {
       chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
     } else if (action === "note") {
       noteCard.classList.add("visible");
       setTimeout(() => noteTextarea.focus(), 60);
-    } else if (action === "search") {
-      chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
     } else if (action === "summarize") {
+      showToast("Opening side panel...", "success");
+      chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
+    } else if (action === "search") {
       chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
     }
   });
@@ -697,7 +816,7 @@ export function initFloatingDock() {
     const text = noteTextarea.value.trim();
     if (!text) return;
 
-    showToast("Saving note...");
+    showToast("Saving note...", "warn");
     chrome.runtime.sendMessage(
       {
         type: "SAVE_MEMORY",
@@ -712,13 +831,24 @@ export function initFloatingDock() {
       },
       (resp: any) => {
         if (resp?.ok) {
-          showToast("Note saved!");
+          showToast("Note saved to Forgot AI!", "success");
           noteTextarea.value = "";
           noteCard.classList.remove("visible");
+        } else if (resp?.unauthenticated) {
+          showToast("Not signed in — please log in", "warn");
         } else {
-          showToast(resp?.error || "Failed to save note");
+          showToast(resp?.error || "Failed to save note", "error");
         }
       }
     );
   });
+
+  // Global Shortcut Command Listener (e.g. Alt+S pressed)
+  if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg?.type === "TRIGGER_DOCK_SAVE") {
+        handleSavePage();
+      }
+    });
+  }
 }

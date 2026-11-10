@@ -25,6 +25,22 @@ export default defineManifest({
     service_worker: "src/background/service-worker.ts",
     type: "module",
   },
+  commands: {
+    "save-page": {
+      suggested_key: {
+        default: "Alt+S",
+        mac: "MacCtrl+S",
+      },
+      description: "Quick-save current webpage to Forgot AI",
+    },
+    "open-panel": {
+      suggested_key: {
+        default: "Alt+P",
+        mac: "MacCtrl+P",
+      },
+      description: "Open Forgot AI Side Panel",
+    },
+  },
   content_scripts: [
     {
       matches: ["<all_urls>"],
@@ -42,4 +58,3 @@ export default defineManifest({
   permissions: ["storage", "sidePanel", "tabs", "activeTab"],
   host_permissions: ["<all_urls>"],
 });
-
