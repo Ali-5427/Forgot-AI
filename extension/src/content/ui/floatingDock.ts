@@ -92,10 +92,16 @@ const DOCK_CSS = `
   border: 1px solid rgba(0, 0, 0, 0.08);
   margin-right: 12px;
   margin-bottom: 10px;
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+  pointer-events: none;
+  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dock-root.open .tool-dock {
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
-  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tool-item {
@@ -213,19 +219,23 @@ const DOCK_CSS = `
 
 /* Minimize Toggle Button */
 .collapse-btn {
+  display: none;
   width: 24px;
   height: 24px;
   border-radius: 50%;
   background: #18181B;
   color: #A1A1AA;
   border: none;
-  display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   margin-right: -4px;
   transition: background 150ms ease, color 150ms ease, transform 150ms ease;
   padding: 0;
+}
+
+.dock-root.open .collapse-btn {
+  display: flex;
 }
 
 .collapse-btn svg {
@@ -521,10 +531,8 @@ export function initFloatingDock() {
   }
   root.style.top = `${initialTop}px`;
 
-  // Initial collapsed state
-  if (localStorage.getItem(DOCK_STORAGE_KEY_COLLAPSED) === "true") {
-    root.classList.add("collapsed");
-  }
+  // Initial state: closed by default (only edge brain icon is shown)
+  root.classList.remove("open");
 
   root.innerHTML = `
     <!-- Vertical Tool Dock -->
@@ -664,22 +672,32 @@ export function initFloatingDock() {
   const noteCard = root.querySelector(".quick-note-card") as HTMLElement;
   const noteTextarea = root.querySelector(".quick-note-textarea") as HTMLTextAreaElement;
 
-  // Toggle Collapse
+  // Toggle Open/Close on Trigger Pill click (if not dragged)
+  triggerPill.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest(".collapse-btn")) return;
+    if (hasMoved) return;
+
+    root.classList.toggle("open");
+  });
+
+  // Cross Icon (✕) closes the open tool pill
   collapseBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    root.classList.add("collapsed");
-    localStorage.setItem(DOCK_STORAGE_KEY_COLLAPSED, "true");
-    if (typeof chrome !== "undefined" && chrome.storage?.local) {
-      chrome.storage.local.set({ [DOCK_STORAGE_KEY_COLLAPSED]: "true" }).catch(() => {});
+    root.classList.remove("open");
+  });
+
+  // Clicking outside closes the open pill
+  document.addEventListener("click", (e) => {
+    if (!root.classList.contains("open")) return;
+    const path = e.composedPath ? e.composedPath() : [];
+    if (!path.includes(host)) {
+      root.classList.remove("open");
     }
   });
 
   collapsedNub.addEventListener("click", () => {
     root.classList.remove("collapsed");
-    localStorage.setItem(DOCK_STORAGE_KEY_COLLAPSED, "false");
-    if (typeof chrome !== "undefined" && chrome.storage?.local) {
-      chrome.storage.local.set({ [DOCK_STORAGE_KEY_COLLAPSED]: "false" }).catch(() => {});
-    }
+    root.classList.add("open");
   });
 
   // Save Page Action
