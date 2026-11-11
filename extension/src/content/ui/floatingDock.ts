@@ -5,21 +5,15 @@ const DOCK_STORAGE_KEY_TOP = "forgot_ai_dock_top";
 const DOCK_STORAGE_KEY_COLLAPSED = "forgot_ai_dock_collapsed_v2";
 
 const ICONS = {
-  brain: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="faBrainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#EC4899" />
-        <stop offset="35%" stop-color="#8B5CF6" />
-        <stop offset="70%" stop-color="#3B82F6" />
-        <stop offset="100%" stop-color="#06B6D4" />
-      </linearGradient>
-    </defs>
-    <path d="M16 6a5.5 5.5 0 0 0-5.3 4.1 4.5 4.5 0 0 0-3.2 4.3 4.5 4.5 0 0 0 .5 2 5.5 5.5 0 0 0 2.5 9.6h1.5M16 6a5.5 5.5 0 0 1 5.3 4.1 4.5 4.5 0 0 1 3.2 4.3 4.5 4.5 0 0 1-.5 2 5.5 5.5 0 0 1-2.5 9.6H20" stroke="url(#faBrainGrad)" stroke-width="2.2" stroke-linecap="round"/>
-    <path d="M12 12a3 3 0 0 1 3 3v8M20 12a3 3 0 0 0-3 3v8" stroke="url(#faBrainGrad)" stroke-width="2" stroke-linecap="round"/>
-    <circle cx="16" cy="15" r="1.5" fill="url(#faBrainGrad)"/>
-    <circle cx="12" cy="18" r="1.2" fill="url(#faBrainGrad)"/>
-    <circle cx="20" cy="18" r="1.2" fill="url(#faBrainGrad)"/>
-  </svg>`,
+  brain: `<div class="fa-brain-badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+      <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+      <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/>
+      <path d="M12 18v4"/>
+      <path d="M8 22h8"/>
+    </svg>
+  </div>`,
   save: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
     <line x1="12" x2="12" y1="7" y2="13"/>
@@ -205,16 +199,31 @@ const DOCK_CSS = `
 }
 
 .trigger-icon {
-  width: 28px;
-  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.trigger-icon svg {
-  width: 26px;
-  height: 26px;
+/* Bulletproof Self-Contained Brain Badge */
+.fa-brain-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #EC4899 0%, #8B5CF6 50%, #3B82F6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
+  flex-shrink: 0;
+}
+
+.fa-brain-badge svg {
+  width: 17px;
+  height: 17px;
+  stroke: #FFFFFF !important;
+  stroke-width: 2.2 !important;
+  fill: none !important;
+  display: block;
 }
 
 /* Minimize Toggle Button */
