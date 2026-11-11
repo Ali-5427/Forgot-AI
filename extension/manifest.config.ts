@@ -51,7 +51,7 @@ export default defineManifest({
   ],
   web_accessible_resources: [
     {
-      resources: ["src/auth/index.html", "public/icons/*"],
+      resources: ["assets/*", "src/auth/index.html", "public/icons/*"],
       matches: ["<all_urls>"],
     },
   ],
