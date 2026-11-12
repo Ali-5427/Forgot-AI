@@ -4,7 +4,7 @@
 
 import { createPill, positionNearSelectionRect, positionAnchored } from "./ui/pill";
 import type { PillHandle } from "./ui/pill";
-import { initFloatingDock } from "./ui/floatingDock";
+import { initFloatingDock, isExtensionValid } from "./ui/floatingDock";
 import { pickAdapter, genericArticleAdapter } from "./adapters";
 import type { Adapter } from "./adapters/types";
 import type { SaveResponse } from "../lib/messages";
@@ -61,32 +61,40 @@ async function saveMemory(payload: {
   source_title: string;
   user_note?: string;
 }): Promise<SaveResponse> {
+  if (!isExtensionValid()) {
+    return { ok: false, error: "Extension was reloaded. Please refresh the page." };
+  }
   return new Promise((resolve) => {
     const timeoutId = setTimeout(() => {
       resolve({ ok: false, error: "Request timed out. Please try again." });
     }, 12000);
 
-    chrome.runtime.sendMessage(
-      {
-        type: "SAVE_MEMORY",
-        payload: {
-          capture_type: payload.capture_type,
-          original_content: payload.original_content,
-          source_url: url(),
-          source_title: payload.source_title || document.title || "",
-          source_domain: location.hostname,
-          user_note: payload.user_note,
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "SAVE_MEMORY",
+          payload: {
+            capture_type: payload.capture_type,
+            original_content: payload.original_content,
+            source_url: url(),
+            source_title: payload.source_title || document.title || "",
+            source_domain: location.hostname,
+            user_note: payload.user_note,
+          },
         },
-      },
-      (resp: SaveResponse) => {
-        clearTimeout(timeoutId);
-        if (chrome.runtime.lastError) {
-          resolve({ ok: false, error: chrome.runtime.lastError.message || "runtime error" });
-        } else {
-          resolve(resp);
+        (resp: SaveResponse) => {
+          clearTimeout(timeoutId);
+          if (!isExtensionValid() || chrome.runtime?.lastError) {
+            resolve({ ok: false, error: chrome.runtime?.lastError?.message || "runtime error" });
+          } else {
+            resolve(resp);
+          }
         }
-      }
-    );
+      );
+    } catch (e: any) {
+      clearTimeout(timeoutId);
+      resolve({ ok: false, error: e?.message || "Extension context invalidated. Refresh page." });
+    }
   });
 }
 
@@ -286,7 +294,7 @@ const isForgotAiHost =
   location.hostname === "127.0.0.1";
 
 function syncAuthFromDom(): boolean {
-  if (!isForgotAiHost) return false;
+  if (!isForgotAiHost || !isExtensionValid()) return false;
   try {
     const raw = document.documentElement?.getAttribute("data-forgot-ai-session");
     if (raw) {
@@ -305,10 +313,12 @@ function syncAuthFromDom(): boolean {
         setSession(sessionPayload).catch(console.error);
 
         // 2. Also notify background service worker
-        chrome.runtime.sendMessage({
-          type: "SYNC_AUTH_FROM_WEB",
-          payload: sessionPayload,
-        }).catch(() => {});
+        try {
+          chrome.runtime.sendMessage({
+            type: "SYNC_AUTH_FROM_WEB",
+            payload: sessionPayload,
+          }).catch(() => {});
+        } catch {}
         return true;
       }
     }
@@ -316,84 +326,6 @@ function syncAuthFromDom(): boolean {
     console.warn("Failed to sync auth from DOM:", e);
   }
   return false;
-}
-
-// Handle SPA navigations & ensure floating dock remains mounted
-let lastHref = location.href;
-setInterval(() => {
-  if (location.href !== lastHref) {
-    lastHref = location.href;
-  }
-  if (window.top === window) {
-    try {
-      initFloatingDock();
-    } catch {}
-  }
-}, 1500);
-
-// Listen to webpage messages (Web -> Extension one-way sync)
-window.addEventListener("message", (event) => {
-  if (event.source !== window) return;
-  if (event.data?.type === "FORGOT_AI_AUTH_SYNC" && event.data?.session?.token) {
-    const session = event.data.session;
-    try {
-      chrome.runtime.sendMessage({
-        type: "SYNC_AUTH_FROM_WEB",
-        payload: session,
-      });
-    } catch {}
-  } else if (event.data?.type === "FORGOT_AI_AUTH_LOGOUT") {
-    try {
-      chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" });
-    } catch {}
-  } else if (event.data?.type === "FORGOT_AI_BILLING_SYNC" && event.data?.billing) {
-    try {
-      chrome.storage.local.set({ forgot_ai_pro_pass: event.data.billing });
-    } catch {}
-  }
-});
-
-// Listen to extension runtime messages (e.g., popup requesting session sync from page)
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === "REQUEST_AUTH_FROM_PAGE") {
-    const synced = syncAuthFromDom();
-    if (!synced) {
-      window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
-    }
-    sendResponse({ ok: true, synced });
-  }
-});
-
-// Setup DOM observer & proactive sync on Forgot AI website
-if (isForgotAiHost) {
-  // Sync immediately on initial load
-  syncAuthFromDom();
-
-  // Observe attribute changes on <html>
-  try {
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.type === "attributes" && m.attributeName === "data-forgot-ai-session") {
-          if (document.documentElement.hasAttribute("data-forgot-ai-session")) {
-            syncAuthFromDom();
-          } else {
-            chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }).catch(() => {});
-          }
-        }
-      }
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-forgot-ai-session"],
-    });
-  } catch (e) {
-    console.warn("Forgot AI auth MutationObserver error:", e);
-  }
-
-  // Request current session from web page if not already in DOM
-  try {
-    window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
-  } catch {}
 }
 
 // Do NOT mount floating dock on Forgot AI webapp / PWA / auth pages to avoid double chrome
@@ -414,8 +346,102 @@ const isOwnApp = (() => {
   }
 })();
 
+// Handle SPA navigations & ensure floating dock remains mounted
+let lastHref = location.href;
+const spaTimer = setInterval(() => {
+  if (!isExtensionValid()) {
+    clearInterval(spaTimer);
+    return;
+  }
+  if (location.href !== lastHref) {
+    lastHref = location.href;
+  }
+  if (window.top === window && !isOwnApp) {
+    try {
+      initFloatingDock();
+    } catch {}
+  }
+}, 1500);
+
+// Listen to webpage messages (Web -> Extension one-way sync)
+window.addEventListener("message", (event) => {
+  if (event.source !== window) return;
+  if (!isExtensionValid()) return;
+  if (event.data?.type === "FORGOT_AI_AUTH_SYNC" && event.data?.session?.token) {
+    const session = event.data.session;
+    try {
+      chrome.runtime.sendMessage({
+        type: "SYNC_AUTH_FROM_WEB",
+        payload: session,
+      });
+    } catch {}
+  } else if (event.data?.type === "FORGOT_AI_AUTH_LOGOUT") {
+    try {
+      chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" });
+    } catch {}
+  } else if (event.data?.type === "FORGOT_AI_BILLING_SYNC" && event.data?.billing) {
+    try {
+      chrome.storage.local.set({ forgot_ai_pro_pass: event.data.billing });
+    } catch {}
+  }
+});
+
+// Listen to extension runtime messages (e.g., popup requesting session sync from page)
+if (isExtensionValid() && chrome.runtime?.onMessage) {
+  try {
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (!isExtensionValid()) return;
+      if (msg?.type === "REQUEST_AUTH_FROM_PAGE") {
+        const synced = syncAuthFromDom();
+        if (!synced) {
+          window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
+        }
+        sendResponse({ ok: true, synced });
+      }
+    });
+  } catch {}
+}
+
+// Setup DOM observer & proactive sync on Forgot AI website
+if (isForgotAiHost && isExtensionValid()) {
+  // Sync immediately on initial load
+  syncAuthFromDom();
+
+  // Observe attribute changes on <html>
+  try {
+    const observer = new MutationObserver((mutations) => {
+      if (!isExtensionValid()) {
+        observer.disconnect();
+        return;
+      }
+      for (const m of mutations) {
+        if (m.type === "attributes" && m.attributeName === "data-forgot-ai-session") {
+          if (document.documentElement.hasAttribute("data-forgot-ai-session")) {
+            syncAuthFromDom();
+          } else {
+            try {
+              chrome.runtime.sendMessage({ type: "CLEAR_AUTH_FROM_WEB" }).catch(() => {});
+            } catch {}
+          }
+        }
+      }
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-forgot-ai-session"],
+    });
+  } catch (e) {
+    console.warn("Forgot AI auth MutationObserver error:", e);
+  }
+
+  // Request current session from web page if not already in DOM
+  try {
+    window.postMessage({ type: "FORGOT_AI_REQUEST_SESSION" }, "*");
+  } catch {}
+}
+
 // Initialize Draggable Quick-Access Floating Dock
-if (window.top === window && !isOwnApp) {
+if (window.top === window && !isOwnApp && isExtensionValid()) {
   const mountDock = () => {
     try {
       initFloatingDock();

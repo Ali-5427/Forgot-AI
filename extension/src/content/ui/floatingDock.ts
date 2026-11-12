@@ -494,7 +494,17 @@ function extractCleanPageData() {
   };
 }
 
+// Helper to safely check if extension context is valid
+export function isExtensionValid(): boolean {
+  try {
+    return typeof chrome !== "undefined" && Boolean(chrome.runtime?.id);
+  } catch {
+    return false;
+  }
+}
+
 export function initFloatingDock() {
+  if (!isExtensionValid()) return;
   if (document.querySelector("[data-forgot-ai='floating-dock']")) return;
 
   const host = document.createElement("div");
@@ -506,17 +516,19 @@ export function initFloatingDock() {
   host.style.zIndex = "2147483647";
   host.style.pointerEvents = "none";
 
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    chrome.storage.local.get(["forgot_ai_dock_disabled"], (res) => {
-      if (res?.forgot_ai_dock_disabled) {
-        host.style.display = "none";
-      }
-    });
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === "local" && "forgot_ai_dock_disabled" in changes) {
-        host.style.display = changes.forgot_ai_dock_disabled.newValue ? "none" : "";
-      }
-    });
+  if (isExtensionValid() && chrome.storage?.local) {
+    try {
+      chrome.storage.local.get(["forgot_ai_dock_disabled"], (res) => {
+        if (res?.forgot_ai_dock_disabled) {
+          host.style.display = "none";
+        }
+      });
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && "forgot_ai_dock_disabled" in changes) {
+          host.style.display = changes.forgot_ai_dock_disabled.newValue ? "none" : "";
+        }
+      });
+    } catch {}
   }
 
   const shadow = host.attachShadow({ mode: "open" });
@@ -651,8 +663,10 @@ export function initFloatingDock() {
     const finalTop = Math.round(root.getBoundingClientRect().top);
     if (finalTop > 50) {
       localStorage.setItem(DOCK_STORAGE_KEY_TOP, String(finalTop));
-      if (typeof chrome !== "undefined" && chrome.storage?.local) {
-        chrome.storage.local.set({ [DOCK_STORAGE_KEY_TOP]: finalTop }).catch(() => {});
+      if (isExtensionValid() && chrome.storage?.local) {
+        try {
+          chrome.storage.local.set({ [DOCK_STORAGE_KEY_TOP]: finalTop }).catch(() => {});
+        } catch {}
       }
     }
   }
@@ -711,24 +725,32 @@ export function initFloatingDock() {
 
   // Save Page Action
   function handleSavePage() {
+    if (!isExtensionValid()) {
+      showToast("Extension reloaded — please refresh page");
+      return;
+    }
     showToast("Saving page...");
     const payload = extractCleanPageData();
 
-    chrome.runtime.sendMessage(
-      {
-        type: "SAVE_MEMORY",
-        payload,
-      },
-      (resp: any) => {
-        if (resp?.ok) {
-          showToast(resp.deduped ? "Already saved!" : "Saved to Forgot AI!");
-        } else if (resp?.unauthenticated) {
-          showToast("Please sign in to Forgot AI");
-        } else {
-          showToast(resp?.error || "Save failed");
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "SAVE_MEMORY",
+          payload,
+        },
+        (resp: any) => {
+          if (resp?.ok) {
+            showToast(resp.deduped ? "Already saved!" : "Saved to Forgot AI!");
+          } else if (resp?.unauthenticated) {
+            showToast("Please sign in to Forgot AI");
+          } else {
+            showToast(resp?.error || "Save failed");
+          }
         }
-      }
-    );
+      );
+    } catch {
+      showToast("Extension reloaded — please refresh page");
+    }
   }
 
   // Tool Click Events
@@ -737,18 +759,27 @@ export function initFloatingDock() {
     if (!btn) return;
     const action = btn.dataset.action;
 
-    if (action === "save") {
-      handleSavePage();
-    } else if (action === "chat") {
-      chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
-    } else if (action === "note") {
-      noteCard.classList.add("visible");
-      setTimeout(() => noteTextarea.focus(), 60);
-    } else if (action === "search") {
-      chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
-    } else if (action === "summarize") {
-      showToast("Opening side panel...");
-      chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
+    if (!isExtensionValid()) {
+      showToast("Extension reloaded — please refresh page");
+      return;
+    }
+
+    try {
+      if (action === "save") {
+        handleSavePage();
+      } else if (action === "chat") {
+        chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
+      } else if (action === "note") {
+        noteCard.classList.add("visible");
+        setTimeout(() => noteTextarea.focus(), 60);
+      } else if (action === "search") {
+        chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
+      } else if (action === "summarize") {
+        showToast("Opening side panel...");
+        chrome.runtime.sendMessage({ type: "OPEN_SIDE_PANEL" });
+      }
+    } catch {
+      showToast("Extension reloaded — please refresh page");
     }
   });
 
@@ -763,31 +794,40 @@ export function initFloatingDock() {
     const text = noteTextarea.value.trim();
     if (!text) return;
 
+    if (!isExtensionValid()) {
+      showToast("Extension reloaded — please refresh page");
+      return;
+    }
+
     showToast("Saving note...");
-    chrome.runtime.sendMessage(
-      {
-        type: "SAVE_MEMORY",
-        payload: {
-          capture_type: "content",
-          original_content: text,
-          source_url: location.href,
-          source_title: `Note from ${document.title}`,
-          source_domain: location.hostname,
-          user_note: text,
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "SAVE_MEMORY",
+          payload: {
+            capture_type: "content",
+            original_content: text,
+            source_url: location.href,
+            source_title: `Note from ${document.title}`,
+            source_domain: location.hostname,
+            user_note: text,
+          },
         },
-      },
-      (resp: any) => {
-        if (resp?.ok) {
-          showToast("Note saved!");
-          noteTextarea.value = "";
-          noteCard.classList.remove("visible");
-        } else if (resp?.unauthenticated) {
-          showToast("Please sign in first");
-        } else {
-          showToast(resp?.error || "Failed to save note");
+        (resp: any) => {
+          if (resp?.ok) {
+            showToast("Note saved!");
+            noteTextarea.value = "";
+            noteCard.classList.remove("visible");
+          } else if (resp?.unauthenticated) {
+            showToast("Please sign in first");
+          } else {
+            showToast(resp?.error || "Failed to save note");
+          }
         }
-      }
-    );
+      );
+    } catch {
+      showToast("Extension reloaded — please refresh page");
+    }
   });
 
   // Global Shortcut Command Listener (e.g. Alt+S pressed)
